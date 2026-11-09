@@ -55,7 +55,8 @@ type palette struct {
 	info    ui.Color
 
 	identity [8]ui.Color
-	tabKeyBg ui.Color // --tab-key-selected-bg // --identity-1…8, the avatar tones
+	tabKeyBg ui.Color            // --tab-key-selected-bg
+	board    map[string]ui.Color // --board-color-<token>-<part> // --identity-1…8, the avatar tones
 
 	popBg   ui.Color // the palette's panel
 	popHead ui.Color

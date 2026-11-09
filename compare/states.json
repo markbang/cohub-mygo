@@ -449,5 +449,14 @@
     "wait": 3000
    }
   ]
+ },
+ {
+  "name": "board",
+  "path": "/spaces/{BOARD_SPACE}?window=file%3Aapp_context_router.board",
+  "actions": [
+   {
+    "wait": 6000
+   }
+  ]
  }
 ]

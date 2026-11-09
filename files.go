@@ -99,6 +99,10 @@ func (a *app) fileView(c *ui.Context, spaceID, file string) {
 		a.loadingBlock(c, err, 200)
 		return
 	}
+	if strings.HasSuffix(strings.ToLower(f.Name), ".board") {
+		a.boardWindow(c, spaceID, f)
+		return
+	}
 	editable := f.Kind == "text" && a.can(spaceID, "file.edit")
 	var ed *fileEdit
 	if f.Kind == "text" {
@@ -454,7 +458,7 @@ func (a *app) fileWindowActions(c *ui.Context, spaceID, file string) {
 		return
 	}
 	var ed *fileEdit
-	if f.Kind == "text" {
+	if f.Kind == "text" && !strings.HasSuffix(strings.ToLower(f.Name), ".board") {
 		ed = a.editorFor(spaceID, f)
 	}
 	if ed != nil && strings.HasSuffix(strings.ToLower(f.Name), ".md") {

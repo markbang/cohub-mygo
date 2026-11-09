@@ -97,13 +97,14 @@ type app struct {
 	channelNew                   channelForm
 	walletForms                  map[string]*walletForm
 	confirmBox                   *confirmBox
-	windowWide                   bool                // the window takes the main column's room
-	viewportOff                  map[string]bool     // windows the user took out of the prompt's context
-	looseSessions                map[string]*Session // chats opened that no list holds
-	notices                      []*turnNotice       // finished turns the user did not see
-	rowRenaming                  string              // the chat row whose title is being edited
-	inHeader                     bool                // building a header: compact icon buttons grow to 40px
-	width                        float32             // the window's width, as media queries see it
+	windowWide                   bool                  // the window takes the main column's room
+	viewportOff                  map[string]bool       // windows the user took out of the prompt's context
+	looseSessions                map[string]*Session   // chats opened that no list holds
+	notices                      []*turnNotice         // finished turns the user did not see
+	rowRenaming                  string                // the chat row whose title is being edited
+	boardViews                   map[string]*boardView // each board's pan and zoom
+	inHeader                     bool                  // building a header: compact icon buttons grow to 40px
+	width                        float32               // the window's width, as media queries see it
 	purchase                     purchaseState
 	redeem                       redeemState
 	subsPage                     int
@@ -158,6 +159,7 @@ func newApp() *app {
 		viewportOff:   map[string]bool{},
 		looseSessions: map[string]*Session{},
 		cpTab:         map[string]int{},
+		boardViews:    map[string]*boardView{},
 		spaceEdits:    map[string]*spaceEdit{},
 		walletForms:   map[string]*walletForm{},
 		panelOpen:     true,

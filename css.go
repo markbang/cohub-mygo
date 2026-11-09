@@ -386,6 +386,14 @@ func buildPalette(name, custom string) *palette {
 			}
 		}
 	}
+	p.board = map[string]ui.Color{}
+	for _, tok := range []string{"brand", "neutral", "black", "white", "blue", "green", "amber", "violet", "rose"} {
+		for _, part := range []string{"stroke", "fill", "label"} {
+			if c, ok := parseColor("var(--board-color-"+tok+"-"+part+")", vars); ok {
+				p.board[tok+"-"+part] = c.color()
+			}
+		}
+	}
 	for i := range p.identity {
 		if c, ok := parseColor(fmt.Sprintf("var(--identity-%d)", i+1), vars); ok {
 			p.identity[i] = c.color()
