@@ -9,6 +9,7 @@ import (
 	"unicode"
 	"unicode/utf16"
 
+	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 )
 
@@ -387,4 +388,11 @@ func (a *app) adaptivePopover(c *ui.Context, anchor ui.Element, open *bool, widt
 			Shadow(0, 10, 24, 0, ui.RGBA(0, 0, 0, 0.12)).Margin(6, 0, 6, 0)
 		ui.Scroll(c.Key("pop-scroll")).MaxHeight(420).Padding(4).Children(build)
 	})
+}
+
+// openURL opens a link in the browser from outside a build.
+func (a *app) openURL(u string) {
+	if a.win != nil {
+		go mygo.Shell.OpenExternal(u)
+	}
 }
