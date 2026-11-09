@@ -176,6 +176,8 @@ func (rt *realtime) handle(env wsEnvelope) {
 		switch env.Type {
 		case "space.list.changed", "space.updated":
 			rt.dueLists()
+		case "space.ports.changed":
+			rt.a.update(func() { rt.a.portsChanged(env.SpaceID, env.Payload) })
 		case "space.presence.updated":
 			rt.presenceUpdated(env.Payload)
 		case "space.session.approvals.changed":

@@ -439,6 +439,8 @@ func (a *app) windowPane(c *ui.Context) {
 	switch {
 	case r.file() != "":
 		title = path.Base(r.file())
+	case r.port() != "":
+		title, iconName = ":"+r.port(), "globe"
 	case r.kind == routeSpaceCheckpoint:
 		title, iconName = m("sidebar_new_save"), "save"
 		if r.sub != "new" {
@@ -480,6 +482,8 @@ func (a *app) windowPane(c *ui.Context) {
 			ui.Spacer(c)
 			if f := r.file(); f != "" {
 				a.fileWindowActions(c, r.space, f)
+			} else if r.port() != "" {
+				a.portActions(c, r.space, r.port())
 			} else {
 				a.iconButton(c.Key("reload"), "refresh-cw", m("rules_refresh"), false)
 			}
@@ -495,6 +499,8 @@ func (a *app) windowPane(c *ui.Context) {
 			switch {
 			case r.file() != "":
 				a.fileView(c, r.space, r.file())
+			case r.port() != "":
+				a.portView(c, r.space, r.port())
 			case r.kind == routeSpaceCheckpoint:
 				a.checkpointView(c, r.space, r.sub)
 			case r.kind == routeSpaceTask:

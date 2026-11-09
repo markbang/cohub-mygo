@@ -48,6 +48,8 @@ func (a *app) view(c *ui.Context) {
 		// A public page, full window as the web's.
 		ui.Column(c).Fill().Background(a.pal.bgPrimary).Children(func() { a.invitePage(c) })
 		a.toastView(c)
+		a.portToastView(c)
+		a.publishDialog(c)
 		return
 	}
 	if a.compact {
@@ -55,6 +57,8 @@ func (a *app) view(c *ui.Context) {
 		a.paletteView(c)
 		a.confirmView(c)
 		a.toastView(c)
+		a.portToastView(c)
+		a.publishDialog(c)
 		return
 	}
 	p := a.pal
@@ -91,6 +95,8 @@ func (a *app) view(c *ui.Context) {
 	a.feedbackView(c)
 	a.confirmView(c)
 	a.toastView(c)
+	a.portToastView(c)
+	a.publishDialog(c)
 }
 
 // toastView is .toast-surface: what went wrong, for five seconds.

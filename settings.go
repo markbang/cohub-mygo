@@ -33,7 +33,7 @@ func (a *app) settingsPage(c *ui.Context) {
 func (a *app) settingsHeaderless(c *ui.Context) {
 	if a.compact {
 		a.header(c, func() {
-			if a.iconButton(c.Key("back"), "arrow-left", m("common_back"), false).Clicked() {
+			if a.iconButton(c.Key("back"), "arrow-left", m("nav_back"), false).Clicked() {
 				a.goBackFromSettings()
 			}
 			ui.Spacer(c)

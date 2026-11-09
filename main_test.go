@@ -601,3 +601,23 @@ func TestDanmaku(t *testing.T) {
 		t.Fatal("own message floated")
 	}
 }
+
+// TestMessageKeys checks every m("key") the code asks for is a message.
+func TestMessageKeys(t *testing.T) {
+	files, _ := filepath.Glob("*.go")
+	re := regexp.MustCompile(`\bm\("([a-z0-9_]+)"`)
+	for _, f := range files {
+		b, _ := os.ReadFile(f)
+		for _, mm := range re.FindAllStringSubmatch(string(b), -1) {
+			k := mm[1]
+			if strings.HasSuffix(k, "_") || k == "key" {
+				continue // a prefix the code completes
+			}
+			if _, ok := messages["en"][k]; !ok {
+				if _, ok := messages["zh-CN"][k]; !ok {
+					t.Errorf("%s: no message %q", f, k)
+				}
+			}
+		}
+	}
+}

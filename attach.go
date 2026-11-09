@@ -384,33 +384,63 @@ func promptContent(text string, ats []*attachment, urls map[string]string, sandb
 
 // viewport is the window the prompt carries as context, as the web's
 // viewport block: the open file, unless the user took it out.
+// viewportCtx is what the window shows, for the next message: a file, a
+// board or a port, as the protocol's ViewportContext.
+func (a *app) viewportCtx() (id, label, line string, meta map[string]any, ok bool) {
+	if !a.hasWindow() {
+		return
+	}
+	clean := strings.NewReplacer("\r", "_", "\n", "_", "`", "_").Replace
+	if f := a.route.file(); f != "" {
+		kind := "file"
+		if strings.HasSuffix(strings.ToLower(f), ".board") {
+			kind = "board"
+		}
+		id, label = kind+":"+f, filepath.Base(f)
+		line = "- " + kind + ": `" + clean(f) + "`"
+		meta = map[string]any{"kind": kind, "path": f}
+		return id, label, line, meta, !a.viewportOff[id]
+	}
+	if port := a.route.port(); port != "" {
+		id, label = "port:"+port, ":"+port
+		line = "- port: `" + port + "`"
+		meta = map[string]any{"kind": "port", "port": port}
+		if ep, found := a.ports(a.route.space)[port]; found && ep.URL != "" {
+			line += " (" + ep.URL + ")"
+			meta["url"] = ep.URL
+		}
+		return id, label, line, meta, !a.viewportOff[id]
+	}
+	return
+}
+
 func (a *app) viewport() map[string]any {
-	f := a.route.file()
-	if f == "" || a.viewportOff[f] || !a.hasWindow() {
+	_, _, line, meta, ok := a.viewportCtx()
+	if !ok {
 		return nil
 	}
-	clean := strings.NewReplacer("\r", "_", "\n", "_", "`", "_").Replace(f)
 	return map[string]any{
 		"type":  "text",
-		"text":  "Viewport:\n- file: `" + clean + "`",
-		"_meta": map[string]any{"attachmentKind": "viewport", "viewports": []map[string]any{{"kind": "file", "path": f}}},
+		"text":  "Viewport:\n" + line,
+		"_meta": map[string]any{"attachmentKind": "viewport", "viewports": []map[string]any{meta}},
 	}
 }
 
 // viewportChips are ViewportContextBlocks: the window's file over the text.
 func (a *app) viewportChips(c *ui.Context) {
-	f := a.route.file()
-	if f == "" || a.viewportOff[f] || !a.hasWindow() {
+	id, label, _, meta, ok := a.viewportCtx()
+	if !ok {
 		return
 	}
 	p := a.pal
+	glyph := map[string]string{"file": "file", "board": "layout-dashboard", "port": "globe"}[meta["kind"].(string)]
 	ui.Row(c.Key("viewport")).Padding(0, 6).Children(func() {
-		chip := ui.Row(c.Key(f)).Height(24).AlignItems(ui.Center).Radius(6).Border(1, p.borderSubtle.Alpha(0.7)).Background(p.bgContent.Alpha(0.55))
+		chip := ui.Row(c.Key(id)).Height(24).AlignItems(ui.Center).Radius(6).Border(1, p.borderSubtle.Alpha(0.7)).Background(p.bgContent.Alpha(0.55))
 		hover := chip.Hovered()
 		chip.Children(func() {
 			ui.Row(c).Gap(6).AlignItems(ui.Center).Padding(0, 8).Children(func() {
-				ui.Icon(c, icon("file")).Size(12, 12).TextColor(p.textTertiary)
-				ui.Text(c, filepath.Base(f)).FontSize(11).FontWeight(500).TextColor(p.textSecond).SingleLine().MaxWidth(240)
+				ui.Icon(c, icon(glyph)).Size(12, 12).TextColor(p.textTertiary)
+				ui.Text(c, label).FontSize(11).FontWeight(500).TextColor(p.textSecond).SingleLine().MaxWidth(240)
 			})
 			x := ui.ButtonBase(c.Key("x")).Size(24, 24).Center().Label(m("vctx_remove")).FocusRing(false).Children(func() {
 				ui.Icon(c, icon("x")).Size(12, 12).TextColor(p.textTertiary)
@@ -419,7 +449,7 @@ func (a *app) viewportChips(c *ui.Context) {
 				x.Opacity(0.45)
 			}
 			if x.Clicked() {
-				a.viewportOff[f] = true
+				a.viewportOff[id] = true
 			}
 		})
 	})

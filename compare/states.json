@@ -526,5 +526,14 @@
     "wait": 1500
    }
   ]
+ },
+ {
+  "name": "port-window",
+  "path": "/spaces/{SPACE}?window=port%3A3000",
+  "actions": [
+   {
+    "wait": 3000
+   }
+  ]
  }
 ]

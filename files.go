@@ -241,6 +241,13 @@ func (a *app) fileActions(spaceID, p string, dir bool) []menuItem {
 			a.fsPending = &fsCreate{space: spaceID, dir: path.Dir(p), kind: "rename", from: p, name: path.Base(p)}
 		}})
 	}
+	if a.can(spaceID, "app.manage") {
+		if dir {
+			items = append(items, menuItem{icon: "rocket", label: m("file_publish"), run: func() { a.openPublish(spaceID, "directory", p) }})
+		} else if ext := strings.ToLower(path.Ext(p)); ext == ".html" || ext == ".htm" || ext == ".board" {
+			items = append(items, menuItem{icon: "rocket", label: m("inline_publish_app"), run: func() { a.openPublish(spaceID, "file", p) }})
+		}
+	}
 	if !dir {
 		items = append(items, menuItem{icon: "download", label: m("file_download"), run: func() { a.downloadFile(spaceID, p) }})
 		items = append(items, menuItem{icon: "list-tree", label: m("inline_label_as"), run: func() {
