@@ -363,7 +363,7 @@ func (a *app) sessionOutputs(c *ui.Context, spaceID, sessionID string) {
 			files, ferr, _ := loadJSON[struct {
 				Files []sessionFile `json:"files"`
 			}](a, "session-files:"+sessionID, "/api/sessions/"+url.PathEscape(sessionID)+"/files?limit=200")
-			if (gen == nil && gerr == nil) || (files == nil && ferr == nil) {
+			if a.api != nil && ((gen == nil && gerr == nil) || (files == nil && ferr == nil)) {
 				cardGrid(c, 3, 4, 3, func(i int) { ui.Box(c.Key(i)).AspectRatio(1).Radius(6).Background(p.bgElevated) })
 				return
 			}

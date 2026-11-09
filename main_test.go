@@ -19,6 +19,9 @@ func demoApp(t *testing.T) *app {
 	a := newApp()
 	a.seenPath = ""
 	a.seen = map[string]time.Time{}
+	// The user's own preferences and custom theme stay out of the tests.
+	a.prefs.path, a.theme, a.customCSS = "", "system", ""
+	setLocale("zh-CN")
 	fixed := time.Date(2026, 11, 9, 8, 0, 0, 0, time.Local)
 	a.now = func() time.Time { return fixed }
 	loadDemo(a)

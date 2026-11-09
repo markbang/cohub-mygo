@@ -1,10 +1,12 @@
 # cohub-mygo
 
-这是 Cohub 桌面端的原型：用 [MyGo](https://mygo.egoist.dev) 的 native UI 按 Cohub web 的 `(app)` 布局和外观重新实现，界面全部由 MyGo 在 GPU 上绘制（macOS 用 Metal，Windows 用 D3D11，Linux 用 OpenGL）。
+这是 Cohub 的桌面客户端：用 [MyGo](https://mygo.egoist.dev) 的 native UI 按 cohub.live web 的 `(app)` 布局、文案和外观重新实现，界面全部由 MyGo 在 GPU 上绘制（macOS 用 Metal，Windows 用 D3D11，Linux 用 OpenGL）。
 
-- 不使用 WebView、HTML 或 JS，纯 Go 实现，不依赖 cgo。
-- 账号沿用 `cohub` CLI 的登录状态（`~/.config/cohub/auth.json`，token 过期时调用 `cohub auth token` 刷新），和现有桌面外壳一致。
-- 没有登录时显示演示数据。
+- 不使用 WebView、HTML 或 JS，纯 Go 实现，不依赖 cgo（`CGO_ENABLED=0`）。
+- 路由和 web 的 URL 一一对应（`/sessions/:id`、`/spaces/:id/sessions/:sid`、`/settings/billing?tab=plans` 等）。
+- 文案直接读 web 的 Paraglide 消息（`i18n/zh-CN.json`、`i18n/en.json`），中英文和 web 一致。
+- 主题在运行时解析 web 的主题 CSS（`themes/*.css`，oklch / color-mix / var()），还会套用 Home Space 的 `.cohub/theme.css` 自定义主题。
+- 账号沿用 `cohub` CLI 的登录状态（`~/.config/cohub/auth.json`，token 过期时调用 `cohub auth token` 刷新）。没有登录时显示演示数据。
 
 | 浅色 | 深色 | 窄窗口（< 768） |
 |---|---|---|
@@ -25,35 +27,52 @@ go tool mygo build             # 打包 dmg / 安装器 / AppImage
 
 | web | 这里 |
 |---|---|
-| 左上 rail：Logo、对话 / Space 切换、⌘K、收起侧栏 | `sidebar.go` `sidebarTop` |
-| 对话侧栏：Space chips、会话行（头像、标题、时间、预览、运行中 pill、未读红点）、账户行 | `chatsSidebar` / `sessionRow` / `accountRow` |
-| Space 目录：最近 / 全部 / 我的 / 置顶 / 已归档 | `spacesNavSidebar`、`spaces.go` |
-| 单个 Space：切换器、新建对话 ⌘O、设置 / 活动 / 存档、会话列表（来源标签） | `spaceSidebar`、`newChatView` |
-| 会话：面包屑头部、用户气泡、步骤 / 工具摘要、Markdown 回复（表格、代码高亮）、模型和 token 统计、流式运行中状态 | `session.go` |
-| Composer：多行输入（Enter 发送，Shift+Enter 换行）、附件、harness / 模型 chip、语音、发送 / 停止 | `composer` |
-| 右侧面板：本对话 / 文件 / 媒体 / 应用 | `view.go` `rightPanel` |
-| 窄窗口：顶部标题、chips、大号会话行、底部 tab 栏（对话 / Space / 账户），全屏会话页 | `compact.go` |
-| 主题：light / dark design tokens（oklch）、Geist 字体、Lucide 图标 | `theme.go`、`assets.go` |
+| 左上 rail：Logo、对话 / Space 切换、⌘K、收起侧栏（52px 收起栏） | `sidebar.go` `sidebarTop`、`collapsedRail` |
+| 对话侧栏：来源筛选（默认 Web App，含已归档）、最近 6 个 Space 的 chips、会话行、账户菜单 | `chatsSidebar`、`sourcePicker`、`chipBar`、`accountRow` |
+| Space 目录：最近 / 全部 / 我的 / 置顶 / 已归档（按加入时间排序）、身份色头像和首字母、行菜单（置顶、归档、钱包、设置） | `spaces.go`、`widgets.go` `avatarSeed` |
+| 单个 Space：切换器、新建对话、设置 / 活动 / 存档、标签、按来源分组的对话、应用、存档点、定时、任务 | `sidebar.go` `spaceSidebar`、`space.go` |
+| 会话：面包屑、用户气泡、步骤和工具过程、思考折叠、Markdown 回复、模型和 token 统计、流式运行、右侧 turn 导航条、回到最新 | `session.go` |
+| Composer：多行输入（Enter 发送）、harness / 模型选择对话框（档位、价格、视觉）、发送 / 停止 | `session.go` |
+| ⌘K 命令面板和 Space 选择器 | `palette.go` |
+| 右侧面板：本对话（生成的媒体、改动的文件）、文件树、媒体网格（按类型筛选）、应用、定时 | `view.go` `rightPanel`、`media.go`、`space.go` |
+| 窗口：文件、存档点、任务、定时任务详情 | `space.go` |
+| Space 设置：资料、访问、环境变量（值打码）、渠道、沙箱、钱包 | `spacesettings.go` |
+| 设置：常规（主题、语言）、活动（热力图、排行）、邀请、账单（余额 / 方案 / 兑换）、用户规则、渠道 | `settings.go`、`activity.go`、`billing.go`、`purchase.go` |
+| 新建 Space | `newspace.go` |
+| 窄窗口：列表页头、chips、大号会话行、底部 tab 栏、全屏会话页、侧面板浮层、抽屉 | `compact.go` |
+| 实时：订阅 `wss://gateway.cohub.live/ws` 的 `space:<id>`，收到事件后重新拉取 | `realtime.go` |
 
-数据来自 `/api/me`、`/api/spaces`、`/api/me/sessions`、`/api/spaces/:id/sessions`、`/api/sessions/:id/turns` 和 `turns/stream-snapshot`。发送调用 `POST /api/spaces/:id/prompt`，停止调用 `POST /api/sessions/:id/abort`。
+付款仍在 web 完成：方案页的「订阅 / 充值余额」会在浏览器打开 `cohub.live/settings/billing?tab=plans`。
+
+## 和 web 对比
+
+`compare/states.json` 列出约 40 个界面状态（路径、web 端操作、app 端操作）。
+
+```sh
+node tools/webshot/shot.mjs [正则]                      # Playwright 截 web（compare/web/）
+COHUB_LIVE=1 COMPARE=正则 go test -run Compare ./...    # 截 app 并拼成对照图（compare/side/）
+tools/crop.sh 名字 x y w h                              # 裁出同一区域上下对照
+```
+
+截图里有真实对话，`compare/web`、`compare/app`、`compare/side` 和 `compare/vars.json` 都在 gitignore 里，只留在本地。
 
 ## 还没做
 
-- **实时同步**：现在是轮询，正在运行的会话每 2 秒拉一次 turns 和 stream snapshot，列表每 16 秒刷新一次。web 用的是 realtime WebSocket（`packages/sdk/src/websocket.ts`）。
-- **本地缓存**：没有首屏缓存。web 端有 IndexedDB 缓存。
-- **未读状态**：只保存在本地（`~/.config/cohub-mygo/seen.json`），没有和服务端同步。
-- **以下功能没有实现**：工具调用详情展开、附件上传、模型和 harness 选择、⌘K 搜索、Board、文件树与预览、设置、标签、存档、i18n（目前只有中文）。
+- 实时事件只触发重新拉取，没有逐字增量合并；没有本地首屏缓存；未读状态只存在本地。
+- 附件上传、语音输入、Board、标签的「标记为…」、Space 设置里的编辑保存、钱包充值。
+- 只在 Linux（Xvfb + llvmpipe）上跑过真实窗口，没有在 macOS / Windows 的 GPU 上测过帧率和内存。
 
 ## 测试
 
 ```sh
-CGO_ENABLED=0 go test ./...                                   # 无窗口测试（ui.Tester）
-SNAPSHOT_DIR=screenshots go test ./...                        # 输出演示数据截图
-COHUB_LIVE=1 SNAPSHOT_DIR=screenshots go test -run Live ./... # 用真实账号截图（只留在本地，不提交）
-COHUB_CAPTURE=/tmp/shot.png go run .                          # 真窗口运行 12 秒后截图并退出
+CGO_ENABLED=0 go test ./...                     # 无窗口测试（ui.Tester）
+SNAPSHOT_DIR=screenshots go test ./...          # 输出演示数据截图
+COHUB_LIVE=1 go test -run Realtime ./...        # 用真实账号连 realtime 网关
+COHUB_CAPTURE=/tmp/shot.png go run .            # 真窗口运行 12 秒后截图并退出
 ```
 
 ## 资源
 
-- `fonts/`：Geist 和 Geist Mono，SIL OFL 1.1，见 `fonts/OFL.txt`。
+- `fonts/`：Geist、Geist Mono、Figtree，SIL OFL 1.1，见 `fonts/OFL.txt`。
 - `icons/`：Lucide v1.70，ISC 许可。
+- `themes/`、`i18n/`：从 Cohub web 复制的主题 CSS 和文案。
