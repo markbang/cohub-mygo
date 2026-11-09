@@ -172,6 +172,74 @@ func (a *app) sessionRow(c *ui.Context, s *Session) {
 	})
 	a.pressable(row, s.ID == a.route.sessionID())
 	row.OnClick(func() { a.openSession(s) })
+	a.rowActions(c, row, s, false)
+}
+
+// rowActions are a chat row's hover buttons, as SessionRow.svelte: insert
+// its reference (in a Space), rename it, archive or restore it. A rename
+// edits the title in a box over the row.
+func (a *app) rowActions(c *ui.Context, row ui.Element, s *Session, inSpace bool) {
+	p := a.pal
+	if a.rowRenaming == s.ID {
+		row.Children(func() {
+			ui.Row(c.Key("rename")).Absolute().Top(0).Left(0).Right(0).Bottom(0).AlignItems(ui.Center).Padding(0, 6).Background(p.sidebarBg).Children(func() {
+				in := ui.TextInputBase(c.Key("in"), &a.renameText).FontSize(13).Height(26).Padding(0, 6).Radius(4).Background(p.hoverStrong).Grow(1).AutoFocus().Label(m("sidebar_session_name"))
+				in.OnShortcut(0, ui.KeyEscape, func() { a.rowRenaming = "" })
+				if in.Submitted() {
+					t := strings.TrimSpace(a.renameText)
+					a.rowRenaming = ""
+					if t != s.Title {
+						old := s.Title
+						s.Title = t
+						a.act(func(ctx context.Context) error {
+							var title any = t
+							if t == "" {
+								title = nil
+							}
+							err := a.api.do(ctx, "PATCH", "/api/sessions/"+s.ID, map[string]any{"title": title}, nil)
+							if err != nil {
+								a.update(func() { s.Title = old })
+							}
+							return err
+						})
+					}
+				}
+			})
+		})
+		return
+	}
+	if !row.Hovered() || a.compact {
+		return
+	}
+	row.Children(func() {
+		ui.Row(c.Key("actions")).Absolute().Top(0).Bottom(0).Right(6).Gap(2).AlignItems(ui.Center).Children(func() {
+			btn := func(key, ic, label string) bool {
+				b := ui.ButtonBase(c.Key(key)).Size(24, 24).Center().Radius(5).Background(p.sidebarBg).Label(label).Tooltip(label).FocusRing(false).Children(func() {
+					ui.Icon(c, icon(ic)).Size(13, 13).TextColor(p.textTertiary)
+				})
+				if b.Hovered() {
+					b.Background(p.hoverStrong)
+				}
+				return b.Clicked()
+			}
+			if inSpace && btn("insert", "text-cursor-input", m("common_insert")) {
+				a.insertReference("/sessions/" + s.ID + ".jsonl")
+			}
+			if btn("rename", "pencil", m("common_rename")) {
+				a.rowRenaming, a.renameText = s.ID, s.Title
+			}
+			archived := s.ArchivedAt != nil
+			if archived || !s.running() {
+				ic, label := "archive", m("session_archive")
+				if archived {
+					ic, label = "archive-restore", m("session_unarchive")
+				}
+				if btn("archive", ic, label) {
+					a.setSessionArchived(s, !archived)
+				}
+			}
+		})
+	})
 }
 
 func (s *sessionSpace) avatarURL() string {
@@ -427,6 +495,7 @@ func (a *app) spaceSessionRow(c *ui.Context, s *Session, indent float32) {
 	}
 	row.Cursor(ui.CursorPointer)
 	row.OnClick(func() { a.openSession(s) })
+	a.rowActions(c, row, s, true)
 }
 
 // labelRow is a label of the tree, which opens into the chats it holds.

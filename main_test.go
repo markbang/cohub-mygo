@@ -501,3 +501,22 @@ func TestTurnNoticeStacks(t *testing.T) {
 	}
 	snapshot(t, tt, "desktop-notice")
 }
+
+func TestSessionRowActions(t *testing.T) {
+	a := demoApp(t)
+	tt := ui.NewTester(a.view, 1440, 900)
+	s := a.sessions[2]
+	r, ok := tt.Find(s.displayTitle())
+	if !ok {
+		t.Fatal("no row")
+	}
+	tt.Move(r.X+10, r.Y+5)
+	tt.Frame()
+	if err := tt.Click(m("common_rename")); err != nil {
+		t.Fatalf("%v: %q", err, tt.Texts())
+	}
+	if a.rowRenaming != s.ID {
+		t.Fatal("not renaming")
+	}
+	snapshot(t, tt, "desktop-row-rename")
+}

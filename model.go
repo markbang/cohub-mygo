@@ -101,6 +101,7 @@ type app struct {
 	viewportOff                  map[string]bool     // windows the user took out of the prompt's context
 	looseSessions                map[string]*Session // chats opened that no list holds
 	notices                      []*turnNotice       // finished turns the user did not see
+	rowRenaming                  string              // the chat row whose title is being edited
 	inHeader                     bool                // building a header: compact icon buttons grow to 40px
 	width                        float32             // the window's width, as media queries see it
 	purchase                     purchaseState
