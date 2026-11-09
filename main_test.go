@@ -262,6 +262,9 @@ func TestCompare(t *testing.T) {
 			a.sidebarOpen, a.spacesNav, a.spaceList = true, 0, ui.ListState{}
 			a.shareOpen, a.statsFor, a.labelTarget, a.renaming = false, "", nil, ""
 			a.draft = ""
+			for _, tl := range a.timelines {
+				tl.expanded = map[string]bool{}
+			}
 			a.theme = "light"
 			if s.Dark {
 				a.theme = "dark"
@@ -304,6 +307,9 @@ func TestCompare(t *testing.T) {
 					tt.Scroll(float32(w)/2, float32(h)/2, 0, float32(act["scroll"].(float64)))
 				case act["type"] != nil:
 					tt.Type(act["type"].(string))
+				case act["clickAt"] != nil:
+					xy := act["clickAt"].([]any)
+					tt.ClickAt(float32(xy[0].(float64)), float32(xy[1].(float64)))
 				}
 				settle()
 			}

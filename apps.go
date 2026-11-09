@@ -272,7 +272,7 @@ func (a *app) appsPanel(c *ui.Context, spaceID string) {
 					title := ap.title()
 					on := a.route.kind == routeSpaceApp && a.route.sub == ap.ID
 					row := ui.Row(c.Key(ap.ID)).Gap(10).AlignItems(ui.Center).Padding(5, 6).Radius(6).Cursor(ui.CursorPointer).Children(func() {
-						a.avatarSeed(c, "", title, ap.ID, 28, 8)
+						a.avatarSeed(c, ap.Meta.Icon, title, ap.ID, 28, 8)
 						ui.Column(c).Grow(1).MinWidth(0).Children(func() {
 							t := ui.Text(c, title).FontSize(12).SingleLine()
 							if ap.Status != "published" {

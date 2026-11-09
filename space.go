@@ -87,6 +87,7 @@ type appRec struct {
 	UpdatedAt     time.Time `json:"updatedAt"`
 	Meta          struct {
 		Title string `json:"title"`
+		Icon  string `json:"icon"`
 	} `json:"meta"`
 }
 
@@ -331,6 +332,7 @@ func (a *app) filesPanel(c *ui.Context, spaceID string) {
 			a.forgetPrefix("tree:" + spaceID)
 		}
 	})
+	a.portChips(c, spaceID)
 	tree := ui.Scroll(c.Key("tree")).Grow(1)
 	if edit {
 		if files := tree.DroppedFiles(); files != nil {
@@ -377,7 +379,7 @@ func (a *app) treeDir(c *ui.Context, spaceID, dir string, depth int) {
 		isDir := e.Type == "dir"
 		open := a.groupsOpen["fs:"+spaceID+":"+e.Path]
 		on := a.route.file() == e.Path
-		row := ui.Row(c.Key(e.Path)).Gap(6).AlignItems(ui.Center).Height(26).Padding(0, 6, 0, 6+float32(depth)*14).Radius(5).Children(func() {
+		row := ui.Row(c.Key(e.Path)).Gap(6).AlignItems(ui.Center).Height(30).Padding(0, 6, 0, 6+float32(depth)*14).Radius(5).Children(func() {
 			if isDir {
 				name := "chevron-right"
 				if open {

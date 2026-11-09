@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -197,6 +198,56 @@ func (a *app) webSurface(c *ui.Context, link string) {
 			ui.Text(c, m("x_port_external")).FontSize(12).LineHeight(1.6).TextColor(p.textTertiary).TextAlign(ui.Center)
 			if a.button(c, "external-link", m("port_open_external"), true).Clicked() {
 				c.OpenURL(link)
+			}
+		})
+	})
+}
+
+// portChips are the sandbox's ports above the files, as SpacePreviewPorts:
+// a chip opens the port's window, its arrow the browser.
+func (a *app) portChips(c *ui.Context, spaceID string) {
+	eps := a.ports(spaceID)
+	if len(eps) == 0 {
+		return
+	}
+	p := a.pal
+	var keys []string
+	for k := range eps {
+		keys = append(keys, k)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		x, _ := strconv.Atoi(keys[i])
+		y, _ := strconv.Atoi(keys[j])
+		return x < y
+	})
+	ui.Column(c.Key("ports")).Padding(8, 6).Gap(6).BorderWidth(0, 0, 1, 0).BorderColor(p.borderSubtle).Children(func() {
+		ui.Text(c, strings.ToUpper(m("ports_title"))).FontSize(11).LetterSpacing(1.5).TextColor(p.textTertiary)
+		ui.Row(c).Wrap().Gap(6).Children(func() {
+			for _, k := range keys {
+				k, ep := k, eps[k]
+				on := a.route.port() == k
+				fg, bd, bg, dot := p.textTertiary, p.borderSubtle, p.bgSurface, p.placeholder
+				switch {
+				case on:
+					fg, bd, bg = p.brand, p.brand.Alpha(0.6), p.brand.Alpha(0.1)
+				case ep.Status == "listening":
+					fg, bd, bg, dot = p.success, p.success.Alpha(0.35), p.success.Alpha(0.1), p.success
+				}
+				ui.Row(c.Key(k)).Height(24).AlignItems(ui.Center).Radius(999).Border(1, bd).Background(bg).Clip().Children(func() {
+					b := ui.ButtonBase(c.Key("open")).Row().Gap(6).AlignItems(ui.Center).Padding(0, 8).HeightPercent(100).FocusRing(false).Children(func() {
+						ui.Box(c).Size(6, 6).Radius(3).Background(dot)
+						ui.Text(c, ":"+k).FontSize(11).FontWeight(500).TextColor(fg)
+					})
+					if b.Clicked() {
+						a.openPort(spaceID, k)
+					}
+					x := ui.ButtonBase(c.Key("ext")).Size(24, 24).Center().BorderWidth(0, 0, 0, 1).BorderColor(fg.Alpha(0.1)).Label(m("port_open_external")).FocusRing(false).Children(func() {
+						ui.Icon(c, icon("external-link")).Size(12, 12).TextColor(fg.Alpha(0.55))
+					})
+					if x.Clicked() && ep.URL != "" {
+						c.OpenURL(ep.URL)
+					}
+				})
 			}
 		})
 	})
