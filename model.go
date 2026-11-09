@@ -65,10 +65,15 @@ type app struct {
 	back         []route
 	chip         string // the chats sidebar's Space filter, "" for all
 	spacesNav    int
+	chats        chatsFilter           // the inbox's source, "web" at first
+	chipSpaces   []string              // the chips, fixed once shown
+	chipChats    map[string][]*Session // a chip's chats by chip and filter
 	panelTab     int
 	theme        string // a built-in theme's name, or "system"
 	prefs        prefs
 	sidebarOpen  bool
+	inHeader     bool // building a header: compact icon buttons grow to 40px
+	compactPanel bool // the side panel, over the chat in the compact shell
 	panelOpen    bool
 	userMenu     bool
 	palette      paletteState
@@ -111,6 +116,8 @@ func newApp() *app {
 		modelChoices:  map[string]modelChoice{},
 		images:        newImageCache(),
 		sidebarOpen:   true,
+		chats:         chatsFilter{source: "web"},
+		chipChats:     map[string][]*Session{},
 		panelOpen:     true,
 		pal:           lightPalette(),
 		route:         route{kind: -1},
@@ -218,7 +225,8 @@ func (a *app) refresh() {
 	wg.Add(4)
 	go func() { defer wg.Done(); me, errs[0] = a.api.me(ctx) }()
 	go func() { defer wg.Done(); spaces, errs[1] = a.api.spaces(ctx) }()
-	go func() { defer wg.Done(); sessions, errs[2] = a.api.mySessions(ctx) }()
+	filter := a.chats
+	go func() { defer wg.Done(); sessions, errs[2] = a.api.mySessions(ctx, filter) }()
 	go func() { defer wg.Done(); models, _ = a.api.models(ctx) }()
 	wg.Wait()
 	a.update(func() {
@@ -233,7 +241,9 @@ func (a *app) refresh() {
 		sort.SliceStable(spaces, func(i, j int) bool { return spaces[i].activity().After(spaces[j].activity()) })
 		a.spaces = spaces
 		sort.SliceStable(sessions, func(i, j int) bool { return sessions[i].when().After(sessions[j].when()) })
-		a.sessions = sessions
+		if filter == a.chats {
+			a.sessions = sessions
+		}
 		if models != nil {
 			a.models = models
 		}
@@ -483,25 +493,51 @@ func (a *app) currentSpace() string {
 
 // chatSpaces are the chips above the chats: Spaces with recent chats, in
 // the order of their latest.
+// chatSpaces are the chips: the six Spaces used last, the chosen one
+// first when it is not among them (chats-inbox spaceChips).
 func (a *app) chatSpaces() []*Space {
-	var out []*Space
-	seen := map[string]bool{}
-	for _, s := range a.sessions {
-		if seen[s.SpaceID] {
-			continue
+	if a.chipSpaces == nil || len(a.chipSpaces) == 0 {
+		recent := a.filteredSpaces(0, "")
+		a.chipSpaces = nil
+		for _, sp := range recent {
+			if len(a.chipSpaces) == 6 {
+				break
+			}
+			a.chipSpaces = append(a.chipSpaces, sp.ID)
 		}
-		seen[s.SpaceID] = true
-		if sp := a.space(s.SpaceID); sp != nil {
+	}
+	var out []*Space
+	if a.chip != "" && !contains(a.chipSpaces, a.chip) {
+		if sp := a.space(a.chip); sp != nil {
+			out = append(out, sp)
+		}
+	}
+	for _, id := range a.chipSpaces {
+		if sp := a.space(id); sp != nil {
 			out = append(out, sp)
 		}
 	}
 	return out
 }
 
+// visibleSessions are the inbox's chats: the user's, or the chosen Space's.
 func (a *app) visibleSessions() []*Session {
 	if a.chip == "" {
 		return a.sessions
 	}
+	key := "chip:" + a.chip + ":" + a.chats.key()
+	if list, ok := a.chipChats[key]; ok {
+		return list
+	}
+	id, filter := a.chip, a.chats
+	a.once(key, func(ctx context.Context) {
+		list, err := a.api.spaceChats(ctx, id, filter)
+		if err != nil {
+			return
+		}
+		sort.SliceStable(list, func(i, j int) bool { return list[i].when().After(list[j].when()) })
+		a.update(func() { a.chipChats[key] = list })
+	})
 	var out []*Session
 	for _, s := range a.sessions {
 		if s.SpaceID == a.chip {
@@ -509,6 +545,18 @@ func (a *app) visibleSessions() []*Session {
 		}
 	}
 	return out
+}
+
+// setChatsFilter lists another source's chats, or the archived ones.
+func (a *app) setChatsFilter(f chatsFilter) {
+	if f == a.chats {
+		return
+	}
+	a.chats = f
+	a.sessionList = ui.ListState{}
+	if a.api != nil {
+		a.spawn(a.refresh)
+	}
 }
 
 func (a *app) filteredSpaces(nav int, query string) []*Space {

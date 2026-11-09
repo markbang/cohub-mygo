@@ -51,7 +51,7 @@ func (a *app) sidebarTop(c *ui.Context) {
 		if search.Clicked() {
 			a.palette.open(paletteAll)
 		}
-		if a.iconButton(c.Key("collapse"), "panel-left", m("sidebar_collapse"), false).Clicked() {
+		if a.iconButton(c.Key("collapse"), "panel-left-close", m("sidebar_collapse"), false).Clicked() {
 			a.sidebarOpen = false
 		}
 	})
@@ -59,9 +59,9 @@ func (a *app) sidebarTop(c *ui.Context) {
 
 func (a *app) chatsSidebar(c *ui.Context) {
 	p := a.pal
-	ui.Row(c).Height(38).Shrink(0).AlignItems(ui.Center).Gap(2).Padding(4, 8, 0, 12).Children(func() {
-		ui.Text(c, m("sidebar_chats")).FontSize(14).FontWeight(600).Grow(1)
-		a.iconButton(c.Key("filter"), "list-filter", m("x_filter"), false)
+	ui.Row(c).Height(40).Shrink(0).AlignItems(ui.Center).Gap(2).Padding(0, 6, 0, 12).Children(func() {
+		ui.Text(c, m("nav_tab_chats")).FontSize(13).FontWeight(600).Grow(1)
+		a.sourcePicker(c)
 		add := ui.ButtonBase(c.Key("new-chat")).Size(28, 28).Center().Radius(6).Label(m("x_new_chat_k")).FocusRing(false).Children(func() {
 			ui.Icon(c, icon("plus")).Size(16, 16).TextColor(p.brand)
 		})
@@ -72,19 +72,12 @@ func (a *app) chatsSidebar(c *ui.Context) {
 			a.newChat()
 		}
 	})
-	ui.ScrollHorizontal(c.Key("chips")).Shrink(0).Scrollbars(false).Padding(6, 6, 10, 6).Children(func() {
-		ui.Row(c).Gap(2).Children(func() {
-			a.spaceChip(c, "", m("sidebar_all"), "")
-			for _, sp := range a.chatSpaces() {
-				a.spaceChip(c, sp.ID, sp.Name, sp.avatar())
-			}
-		})
-	})
+	a.chipBar(c)
 	list := a.visibleSessions()
 	a.sessionList.Key = func(i int) any { return list[i].ID }
 	ui.List(c.Key("sessions"), &a.sessionList, len(list), func(i int) {
 		a.sessionRow(c, list[i])
-	}).Grow(1).Padding(0, 6, 6, 6).Gap(0).Children(func() {
+	}).Grow(1).Padding(6, 6, 6, 6).Gap(0).Children(func() {
 		if len(list) == 0 {
 			if a.status != "" && a.me == nil {
 				ui.Row(c).Gap(6).Padding(16, 10).Children(func() {
@@ -98,18 +91,44 @@ func (a *app) chatsSidebar(c *ui.Context) {
 	})
 }
 
+// chipBar is ChatsPane's FilterBar: All, then a chip per Space with chats.
+// FilterBar is 44px with a 16px inset below lg, 36px and 6px above.
+func (a *app) chipBar(c *ui.Context) {
+	h, x := float32(36), float32(6)
+	if a.compact {
+		h, x = 44, 16
+	}
+	ui.ScrollHorizontal(c.Key("chips")).Height(h).Shrink(0).Scrollbars(false).Padding(0, x).
+		BorderWidth(0, 0, 1, 0).BorderColor(a.pal.borderSubtle).Children(func() {
+		ui.Row(c).Height(h).Gap(4).AlignItems(ui.Center).Children(func() {
+			a.spaceChip(c, "", m("chats_space_all"), "")
+			for _, sp := range a.chatSpaces() {
+				a.spaceChip(c, sp.ID, sp.Name, sp.avatar())
+			}
+		})
+	})
+}
+
+// spaceChip is FilterChip.svelte: 32px tall below lg, 28px above.
 func (a *app) spaceChip(c *ui.Context, id, name, avatar string) {
 	p := a.pal
 	on := a.chip == id
-	b := ui.ButtonBase(c.Key("chip-"+id)).Row().Gap(5).AlignItems(ui.Center).Height(26).Padding(0, 6).Radius(6).Label(name).FocusRing(false).Children(func() {
+	h, r, x := float32(28), float32(6), float32(6)
+	if a.compact {
+		h, r, x = 32, 7, 8
+	}
+	b := ui.ButtonBase(c.Key("chip-"+id)).Row().Gap(6).AlignItems(ui.Center).Height(h).Padding(0, x).Radius(r).Label(name).FocusRing(false).Children(func() {
 		if id != "" {
-			a.avatarSeed(c, avatar, name, id, 16, 4)
+			a.avatarSeed(c, avatar, name, id, 16, 5)
 		}
-		col := p.textSecond
+		col := p.textTertiary
 		if on {
-			col = p.brand
+			col = p.brandMutedFg
 		}
-		ui.Text(c, name).FontSize(12).TextColor(col).SingleLine().MaxWidth(120)
+		ui.Text(c, name).FontSize(12).FontWeight(500).TextColor(col).SingleLine().MaxWidth(160)
+		if on && id != "" {
+			ui.Icon(c, icon("x")).Size(12, 12).TextColor(col.Alpha(0.7))
+		}
 	})
 	switch {
 	case on:
@@ -118,6 +137,9 @@ func (a *app) spaceChip(c *ui.Context, id, name, avatar string) {
 		b.Background(p.hover)
 	}
 	if b.Clicked() {
+		if on && id != "" {
+			id = ""
+		}
 		a.chip = id
 		a.sessionList = ui.ListState{}
 	}
@@ -601,7 +623,7 @@ func (a *app) collapsedRail(c *ui.Context) {
 				fn()
 			}
 		}
-		rail("panel-left", m("sidebar_expand"), false, func() { a.sidebarOpen = true })
+		rail("panel-left-open", m("sidebar_expand"), false, func() { a.sidebarOpen = true })
 		rail("search", m("sidebar_search_everywhere"), false, func() { a.palette.open(paletteAll) })
 		ui.Box(c).Height(8)
 		rail("message-square", m("sidebar_chats"), ar == areaChats, func() { a.go_(route{kind: routeSessions}) })
@@ -611,4 +633,89 @@ func (a *app) collapsedRail(c *ui.Context) {
 			a.avatar(c, a.me.Profile.AvatarURL, a.me.Profile.name(), 26, 13)
 		}
 	})
+}
+
+// sourcePicker is ChatsSourcePicker.svelte: the list-filter action, with
+// the source's name once it is not Web App, and its menu of sources.
+func (a *app) sourcePicker(c *ui.Context) {
+	p := a.pal
+	current := sourceName(a.chats.source)
+	if a.chats.archived {
+		current = m("chats_archived")
+	}
+	ic := "list-filter"
+	if a.chats.archived {
+		ic = "archive"
+	}
+	open := a.menus["source"]
+	plain := !a.chats.archived && a.chats.source == "web"
+	size, glyph := float32(28), float32(16)
+	if a.compact {
+		size, glyph = 40, 20
+	}
+	b := ui.ButtonBase(c.Key("source")).Row().Gap(6).AlignItems(ui.Center).Height(size).Radius(size / 5).Label(m("chats_source_current", "source", current)).FocusRing(false).Children(func() {
+		col := p.textTertiary
+		if open {
+			col = p.textSecond
+		}
+		ui.Icon(c, icon(ic)).Size(glyph, glyph).TextColor(col)
+		if !plain {
+			ui.Text(c, current).FontSize(12).TextColor(col).SingleLine().MaxWidth(120)
+		}
+	})
+	if plain {
+		b.Width(size).Center()
+	} else {
+		b.Padding(0, 8)
+	}
+	if open || b.Hovered() {
+		b.Background(p.hover)
+	}
+	if b.Clicked() {
+		open = !open
+	}
+	optH, optF := float32(28), float32(12)
+	if a.compact {
+		optH, optF = 40, 13
+	}
+	option := func(key, label, ic string, chosen bool, f chatsFilter) {
+		row := ui.Row(c.Key(key)).Height(optH).Gap(8).AlignItems(ui.Center).Padding(0, 8).Radius(6).Cursor(ui.CursorPointer).Children(func() {
+			if ic != "" {
+				ui.Icon(c, icon(ic)).Size(14, 14).TextColor(p.textTertiary)
+			}
+			col := p.textSecond
+			if chosen {
+				col = p.text
+			}
+			ui.Text(c, label).FontSize(optF).TextColor(col).Grow(1).MinWidth(0).SingleLine()
+			chk := ui.Icon(c, icon("check")).Size(14, 14).TextColor(p.brand)
+			if !chosen {
+				chk.Opacity(0)
+			}
+		})
+		if row.Hovered() {
+			row.Background(p.hover)
+		}
+		if row.Clicked() {
+			open = false
+			a.setChatsFilter(f)
+		}
+	}
+	sep := func(k string) { ui.Box(c.Key(k)).Height(1).Background(p.borderSubtle).Margin(4, 0) }
+	a.adaptivePopover(c, b, &open, 220, func() {
+		option("all", sourceName(""), "", a.chats == chatsFilter{}, chatsFilter{})
+		for _, g := range chatSourceGroups {
+			sep("sep-" + g.id)
+			if g.id != "other" {
+				ui.Text(c, m("chats_source_group_"+g.id)).FontSize(11).TextColor(p.placeholder).Padding(4, 8, 2, 8)
+			}
+			for _, s := range g.sources {
+				f := chatsFilter{source: s}
+				option(s, sourceName(s), "", a.chats == f, f)
+			}
+		}
+		sep("sep-archived")
+		option("archived", m("chats_archived"), "archive", a.chats.archived, chatsFilter{archived: true})
+	})
+	a.menus["source"] = open
 }

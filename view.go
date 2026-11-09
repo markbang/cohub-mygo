@@ -129,9 +129,18 @@ func (a *app) header(c *ui.Context, fn func()) {
 	if !a.panelOpen || !a.showsPanel() || a.compact {
 		right += bar.Right
 	}
-	ui.Row(c).Height(headerHeight).Shrink(0).Gap(4).AlignItems(ui.Center).
-		Padding(0, right, 0, 12).BorderWidth(0, 0, 1, 0).BorderColor(p.borderSubtle).
-		DragWindow().Children(fn)
+	h, left := float32(headerHeight), float32(12)
+	if a.compact {
+		// ColumnHeader's 2.75rem, with header-action's 40px targets.
+		h, left, right = 44, 6, 6+bar.Right
+	}
+	ui.Row(c).Height(h).Shrink(0).Gap(4).AlignItems(ui.Center).
+		Padding(0, right, 0, left).BorderWidth(0, 0, 1, 0).BorderColor(p.borderSubtle).
+		DragWindow().Children(func() {
+		a.inHeader = true
+		fn()
+		a.inHeader = false
+	})
 }
 
 func (a *app) emptyView(c *ui.Context) {
@@ -154,8 +163,18 @@ func (a *app) emptyView(c *ui.Context) {
 func (a *app) rightPanel(c *ui.Context) {
 	p := a.pal
 	bar := c.TitleBar()
+	width := float32(panelWidth)
+	if a.compact {
+		width = 0
+	}
 	tabs := []struct{ icon, label string }{{"message-square", m("side_panel_tab_session")}, {"copy", m("resource_app_files")}, {"images", m("side_panel_tab_media")}, {"layout-template", m("side_panel_tab_apps")}}
-	ui.Column(c).Width(panelWidth).Shrink(0).Background(p.bgPrimary).BorderWidth(0, 0, 0, 1).BorderColor(p.borderSubtle).Children(func() {
+	col := ui.Column(c).Shrink(0).Background(p.bgPrimary).BorderWidth(0, 0, 0, 1).BorderColor(p.borderSubtle)
+	if width > 0 {
+		col.Width(width)
+	} else {
+		col.Grow(1).MinHeight(0)
+	}
+	col.Children(func() {
 		ui.Row(c).Height(headerHeight).Shrink(0).AlignItems(ui.Center).Padding(0, 8+bar.Right, 0, 8).Gap(2).DragWindow().Children(func() {
 			for i, t := range tabs {
 				if i > 0 {
@@ -178,6 +197,12 @@ func (a *app) rightPanel(c *ui.Context) {
 				}
 				if b.Clicked() {
 					a.panelTab = i
+				}
+			}
+			if a.compact {
+				ui.Spacer(c)
+				if a.iconButton(c.Key("close-panel"), "x", m("side_panel_hide"), false).Clicked() {
+					a.compactPanel = false
 				}
 			}
 		})

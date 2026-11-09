@@ -11,27 +11,36 @@ import (
 // spacesView is the Space directory: a row per Space, newest activity first.
 func (a *app) spacesView(c *ui.Context) {
 	p := a.pal
-	a.header(c, func() {
-		if !a.compact {
-			a.headerLead(c)
+	actions := func() {
+		a.iconButton(c.Key("search"), "search", m("list_search"), false).OnClick(func() { a.palette.open(paletteSpaces) })
+		size, glyph := float32(28), float32(16)
+		if a.compact {
+			size, glyph = 40, 20
 		}
-		if a.status != "" && a.me == nil {
-			a.spinner(c, 13, p.textTertiary)
-			ui.Text(c, m("sync_connecting")).FontSize(13).FontWeight(500).Grow(1)
-		} else if a.compact {
-			a.logo(c, 30)
-			ui.Text(c, "Space").FontSize(17).FontWeight(600).Grow(1).MarginStart(6)
-		} else {
-			ui.Text(c, m("spaces_title")).FontSize(13).FontWeight(600).Grow(1).SingleLine()
-		}
-		a.iconButton(c.Key("search"), "search", m("command_placeholder_space"), false).OnClick(func() { a.palette.open(paletteSpaces) })
-		add := ui.ButtonBase(c.Key("new-space")).Size(28, 28).Center().Radius(6).Label(m("spaces_new")).FocusRing(false).Children(func() {
-			ui.Icon(c, icon("plus")).Size(16, 16).TextColor(p.brand)
+		add := ui.ButtonBase(c.Key("new-space")).Size(size, size).Center().Radius(size / 5).Label(m("spaces_new")).FocusRing(false).Children(func() {
+			ui.Icon(c, icon("plus")).Size(glyph, glyph).TextColor(p.brand)
 		})
 		if add.Hovered() {
 			add.Background(p.brandMuted)
 		}
-	})
+		if add.Clicked() {
+			a.go_(route{kind: routeNewSpace})
+		}
+	}
+	if a.compact {
+		a.compactListHeader(c, c.TitleBar(), m("spaces_title"), actions)
+	} else {
+		a.header(c, func() {
+			a.headerLead(c)
+			if a.status != "" && a.me == nil {
+				a.spinner(c, 13, p.textTertiary)
+				ui.Text(c, m("sync_connecting")).FontSize(13).FontWeight(500).Grow(1)
+			} else {
+				ui.Text(c, m("spaces_title")).FontSize(13).FontWeight(600).Grow(1).SingleLine()
+			}
+			actions()
+		})
+	}
 	if a.compact {
 		ui.ScrollHorizontal(c.Key("space-nav")).Shrink(0).Scrollbars(false).Padding(8, 12).Children(func() {
 			ui.Row(c).Gap(4).Children(func() {
@@ -172,7 +181,11 @@ func (a *app) spaceHome(c *ui.Context) {
 		a.headerLead(c)
 		ui.Text(c, m("sidebar_new_chat")).FontSize(13).TextColor(p.textSecond).Grow(1)
 		if !a.compact {
-			if a.iconButton(c.Key("panel"), "panel-right", m("x_side_panel"), false).Clicked() {
+			ic, lb := "panel-right-open", m("side_panel_show")
+			if a.panelOpen {
+				ic, lb = "panel-right-close", m("side_panel_hide")
+			}
+			if a.iconButton(c.Key("panel"), ic, lb, false).Clicked() {
 				a.panelOpen = !a.panelOpen
 			}
 		}

@@ -38,15 +38,16 @@ type palette struct {
 	hoverStrong ui.Color
 	active      ui.Color
 
-	brand       ui.Color
-	brandHover  ui.Color
-	brandMuted  ui.Color
-	brandBorder ui.Color
-	brandFg     ui.Color
-	brand900    ui.Color
-	brandBg     ui.Color // a chosen option's background
-	userBubble  ui.Color
-	selection   ui.Color
+	brand        ui.Color
+	brandHover   ui.Color
+	brandMuted   ui.Color
+	brandMutedFg ui.Color
+	brandBorder  ui.Color
+	brandFg      ui.Color
+	brand900     ui.Color
+	brandBg      ui.Color // a chosen option's background
+	userBubble   ui.Color
+	selection    ui.Color
 
 	success ui.Color
 	errorC  ui.Color

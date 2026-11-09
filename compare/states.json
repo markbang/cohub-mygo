@@ -284,5 +284,20 @@
   "name": "chat-custom",
   "path": "/sessions/{SESSION}",
   "custom": true
+ },
+ {
+  "name": "menu-source",
+  "path": "/sessions/{SESSION}",
+  "actions": [
+   {
+    "css": "button[aria-label='对话来源：Web App']",
+    "wait": 600
+   }
+  ],
+  "app": [
+   {
+    "clickLabel": "对话来源：Web App"
+   }
+  ]
  }
 ]

@@ -39,10 +39,18 @@ func (a *app) sessionView(c *ui.Context) {
 				ui.Text(c, "/").FontSize(13).TextColor(p.placeholder)
 			}
 		}
+		if a.compact && s != nil {
+			name, av := a.spaceName(s.SpaceID)
+			sp := a.avatarSeed(c, av, name, s.SpaceID, 20, 6)
+			sp.Cursor(ui.CursorPointer).OnClick(func() { a.openSpace(s.SpaceID) })
+		}
 		ui.Text(c, title).FontSize(13).SingleLine().Grow(1).MinWidth(0).TextColor(p.textSecond)
 		if a.compact {
 			a.iconButton(c.Key("share"), "share-2", m("referral_share"), false)
 			a.moreMenu(c, s)
+			if a.iconButton(c.Key("panel"), "panel-right-open", m("side_panel_show"), false).Clicked() {
+				a.compactPanel = true
+			}
 			return
 		}
 		share := ui.ButtonBase(c.Key("share")).Row().Gap(6).AlignItems(ui.Center).Height(28).Padding(0, 8).Radius(6).Label(m("referral_share")).FocusRing(false).Children(func() {
@@ -53,7 +61,11 @@ func (a *app) sessionView(c *ui.Context) {
 			share.Background(p.hover)
 		}
 		a.moreMenu(c, s)
-		if a.iconButton(c.Key("panel"), "panel-right", m("x_side_panel"), false).Clicked() {
+		ic, lb := "panel-right-open", m("side_panel_show")
+		if a.panelOpen {
+			ic, lb = "panel-right-close", m("side_panel_hide")
+		}
+		if a.iconButton(c.Key("panel"), ic, lb, false).Clicked() {
 			a.panelOpen = !a.panelOpen
 		}
 	})

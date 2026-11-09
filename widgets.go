@@ -209,12 +209,16 @@ func monoSizes(size float32) (pair, single float32) {
 // header and toolbar buttons.
 func (a *app) iconButton(c *ui.Context, name, label string, active bool) ui.Element {
 	p := a.pal
-	b := ui.ButtonBase(c).Size(28, 28).Radius(6).Center().Label(label).Tooltip(label).FocusRing(false).Children(func() {
+	size, radius, glyph := float32(28), float32(6), float32(16)
+	if a.compact && a.inHeader {
+		size, radius, glyph = 40, 8, 20
+	}
+	b := ui.ButtonBase(c).Size(size, size).Radius(radius).Center().Label(label).Tooltip(label).FocusRing(false).Children(func() {
 		col := p.textTertiary
 		if active {
 			col = p.text
 		}
-		ui.Icon(c, icon(name)).Size(16, 16).TextColor(col)
+		ui.Icon(c, icon(name)).Size(glyph, glyph).TextColor(col)
 	})
 	switch {
 	case active:
@@ -371,5 +375,16 @@ func (a *app) spinner(c *ui.Context, size float32, col ui.Color) ui.Element {
 func (a *app) logo(c *ui.Context, size float32) ui.Element {
 	return ui.Box(c).Size(size, size).Radius(size * 0.22).Background(a.pal.brand).Center().Shrink(0).Children(func() {
 		ui.Text(c, "C").FontSize(size * 0.5).FontWeight(600).TextColor(a.pal.brandFg)
+	})
+}
+
+// adaptivePopover is AdaptivePopover.svelte above lg: a menu surface 6px
+// from the anchor, padded 4px, scrolling past 420px.
+func (a *app) adaptivePopover(c *ui.Context, anchor ui.Element, open *bool, width float32, build func()) {
+	p := a.pal
+	ui.PopoverBase(c, anchor, open, func(panel ui.Element) {
+		panel.Width(width).Radius(8).Background(p.bgElevated).Border(1, p.borderSubtle).
+			Shadow(0, 10, 24, 0, ui.RGBA(0, 0, 0, 0.12)).Margin(6, 0, 6, 0)
+		ui.Scroll(c.Key("pop-scroll")).MaxHeight(420).Padding(4).Children(build)
 	})
 }

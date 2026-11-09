@@ -345,6 +345,7 @@ var paletteFields = []struct {
 	{"brand", func(p *palette) *ui.Color { return &p.brand }},
 	{"brand-hover", func(p *palette) *ui.Color { return &p.brandHover }},
 	{"brand-muted", func(p *palette) *ui.Color { return &p.brandMuted }},
+	{"brand-muted-fg", func(p *palette) *ui.Color { return &p.brandMutedFg }},
 	{"brand-border", func(p *palette) *ui.Color { return &p.brandBorder }},
 	{"brand-contrast-fg", func(p *palette) *ui.Color { return &p.brandFg }},
 	{"brand-900", func(p *palette) *ui.Color { return &p.brand900 }},
