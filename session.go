@@ -390,6 +390,10 @@ func (a *app) processView(c *ui.Context, sessionID string, t *Turn, tl *sessionT
 			a.stepEntries(c, t, msgs)
 		}
 	}
+	if running && !open && len(tl.liveDone) > 0 && (tl.liveTurn == "" || tl.liveTurn == t.ID) {
+		// The steps done so far, as the web shows the running turn's.
+		a.stepEntries(c, t, tl.liveDone)
+	}
 	if running {
 		if len(live) == 0 {
 			ui.Row(c.Key("working")).Gap(8).AlignItems(ui.Center).Padding(4, msgInset).Children(func() {

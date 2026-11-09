@@ -535,5 +535,14 @@
     "wait": 3000
    }
   ]
+ },
+ {
+  "name": "settings-channels-new",
+  "path": "/settings/channels/new",
+  "actions": [
+   {
+    "wait": 2500
+   }
+  ]
  }
 ]

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -29,7 +30,8 @@ type sessionTurns struct {
 	live      string
 	liveTurn  string
 	liveSteps []Block
-	patch     *patchState // the running turn's message, as patches build it
+	liveDone  []*StepMessage // the running turn's messages done so far
+	patch     *patchState    // the running turn's message, as patches build it
 	// steps are the loaded intermediate messages of turns, by turn ID.
 	steps    map[string][]*StepMessage
 	expanded map[string]bool
@@ -391,7 +393,7 @@ func (a *app) loadTurns(sessionID string) {
 		tl.turns, tl.hasMore = page.Turns, page.HasMore
 		switch {
 		case snap == nil || snap.Snapshot == nil || snap.Snapshot.Current == nil:
-			tl.live, tl.liveSteps, tl.patch = "", nil, nil
+			tl.live, tl.liveSteps, tl.patch, tl.liveDone = "", nil, nil, nil
 		case tl.patch != nil && tl.patch.turnID == snap.Snapshot.TurnID && snap.Snapshot.Seq < tl.patch.seq:
 			// Patches got further than the snapshot, which was read
 			// before them: keep what they built.
@@ -401,6 +403,12 @@ func (a *app) loadTurns(sessionID string) {
 				ps.appendPath = *ap
 			}
 			tl.patch = ps
+			tl.liveDone = nil
+			for i, im := range snap.Snapshot.IntermediateMessages {
+				if len(im.Content) > 0 {
+					tl.liveDone = append(tl.liveDone, &StepMessage{ID: firstNonEmpty(im.MessageID, fmt.Sprint("live", i)), Sequence: i, Content: im.Content})
+				}
+			}
 			tl.liveSteps = ps.content()
 			tl.live = joinText(tl.liveSteps)
 			tl.liveTurn = snap.Snapshot.TurnID

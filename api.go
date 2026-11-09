@@ -361,7 +361,10 @@ type streamSnapshot struct {
 			Content    []map[string]any `json:"content"`
 			AppendPath *string          `json:"appendPath"`
 		} `json:"current"`
-		IntermediateMessages []json.RawMessage `json:"intermediateMessages"`
+		IntermediateMessages []struct {
+			MessageID string  `json:"messageId"`
+			Content   []Block `json:"content"`
+		} `json:"intermediateMessages"`
 	} `json:"snapshot"`
 }
 
