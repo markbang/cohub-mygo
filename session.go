@@ -46,6 +46,9 @@ func (a *app) sessionView(c *ui.Context) {
 			sp.Cursor(ui.CursorPointer).OnClick(func() { a.openSpace(s.SpaceID) })
 		}
 		a.sessionTitle(c, s, title)
+		if s != nil && !a.compact {
+			a.presenceStack(c, s.SpaceID)
+		}
 		if a.compact {
 			a.shareButton(c, s)
 			a.moreMenu(c, s)

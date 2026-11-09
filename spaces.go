@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"sort"
 	"strings"
 
 	"github.com/egoist/mygo/ui"
@@ -180,6 +182,7 @@ func (a *app) spaceHome(c *ui.Context) {
 	a.header(c, func() {
 		a.headerLead(c)
 		ui.Text(c, m("sidebar_new_chat")).FontSize(13).TextColor(p.textSecond).Grow(1)
+		a.presenceStack(c, id)
 		if !a.compact {
 			ic, lb := "panel-right-open", m("side_panel_show")
 			if a.panelOpen {
@@ -213,11 +216,51 @@ func (a *app) spaceHome(c *ui.Context) {
 			if sp.Description != "" {
 				ui.Text(c, sp.Description).FontSize(14).LineHeight(1.7).TextColor(p.textSecond)
 			}
-			if o := sp.OwnerProfile; o != nil {
-				ui.Row(c).Gap(4).AlignItems(ui.Center).Children(func() {
-					ui.Text(c, "Created by").FontSize(14).TextColor(p.textSecond)
-					a.avatar(c, o.AvatarURL, o.name(), 18, 9)
-					ui.Text(c, o.name()).FontSize(14).FontWeight(500)
+			mem, _, _ := loadJSON[spaceMembers](a, "members:"+id, "/api/spaces/"+url.PathEscape(id)+"/members")
+			var others []*Profile
+			if mem != nil {
+				type m2 struct {
+					role, id string
+					p        *Profile
+				}
+				var list []m2
+				for _, it := range mem.Items {
+					if it.Profile != nil && (sp.OwnerProfile == nil || it.UserID != sp.OwnerProfile.UserUUID) {
+						list = append(list, m2{it.Role, it.UserID, it.Profile})
+					}
+				}
+				sort.SliceStable(list, func(i, j int) bool {
+					if list[i].role != list[j].role {
+						return list[i].role < list[j].role
+					}
+					return list[i].id < list[j].id
+				})
+				for _, x := range list {
+					others = append(others, x.p)
+				}
+			}
+			if o := sp.OwnerProfile; o != nil || len(others) > 0 {
+				ui.Row(c.Key("people")).Gap(4).AlignItems(ui.Center).Wrap().Children(func() {
+					person := func(pr *Profile) {
+						ui.Row(c.Key(pr.UserUUID+pr.name())).Gap(4).AlignItems(ui.Center).Margin(0, 4, 0, 0).Children(func() {
+							a.avatar(c, pr.AvatarURL, pr.name(), 18, 9)
+							ui.Text(c, pr.name()).FontSize(14).FontWeight(500)
+						})
+					}
+					if o != nil {
+						ui.Text(c, "Created by").FontSize(14).TextColor(p.textSecond)
+						person(o)
+					}
+					if len(others) > 0 {
+						lead := "with"
+						if o == nil {
+							lead = "Members include"
+						}
+						ui.Text(c, lead).FontSize(14).TextColor(p.textSecond).Margin(0, 4, 0, 0)
+						for _, pr := range others {
+							person(pr)
+						}
+					}
 					ui.Text(c, "·").FontSize(14).TextColor(p.textTertiary)
 				})
 			}
