@@ -23,6 +23,7 @@ var locale = "zh-CN"
 // extraMessages are the app's words the web's catalogs lack, as
 // zh-CN and en.
 var extraMessages = map[string][2]string{
+	"x_runtime_offline":   {"本机运行时离线", "The local runtime is offline"},
 	"x_name":              {"名称", "Name"},
 	"x_sign_out_detail":   {"会同时退出 cohub 命令行的登录。", "This also signs the cohub CLI out."},
 	"x_login_hint":        {"Cohub 桌面版与 cohub 命令行共用账号。登录会在浏览器里确认。", "Cohub for desktop shares its account with the cohub CLI. You confirm the sign-in in your browser."},

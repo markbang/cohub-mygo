@@ -685,10 +685,10 @@ func (a *app) composer(c *ui.Context, running bool) {
 				if a.iconButton(c.Key("attach"), "plus", m("feedback_add_files"), false).Clicked() {
 					a.pickAttachments()
 				}
-				if h := a.composerHarness(); h != "" && h != "cohub" {
-					a.pill(c.Key("harness"), harnessName(h), "", func() { a.harnessIcon(c, h, 14) })
+				a.harnessPicker(c)
+				if a.harnessChoice().harness == "cohub" {
+					a.modelPicker(c)
 				}
-				a.modelPicker(c)
 				ui.Spacer(c)
 				listening := a.voice != nil && a.voice.active
 				label := m("composer_start_voice")

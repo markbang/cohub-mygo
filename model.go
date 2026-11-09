@@ -107,6 +107,7 @@ type app struct {
 	login                        loginState
 	helpOpen                     bool
 	commerce                     *commerceForm
+	harnesses                    map[string]harnessState // the composer's harness by chat or Space
 	feedback                     feedbackForm
 	lastG                        time.Time
 	inHeader                     bool    // building a header: compact icon buttons grow to 40px
@@ -166,6 +167,7 @@ func newApp() *app {
 		looseSessions: map[string]*Session{},
 		cpTab:         map[string]int{},
 		boardViews:    map[string]*boardView{},
+		harnesses:     map[string]harnessState{},
 		spaceEdits:    map[string]*spaceEdit{},
 		walletForms:   map[string]*walletForm{},
 		panelOpen:     true,
@@ -748,6 +750,9 @@ func (a *app) send() {
 		at.status, at.progress = "uploading", 0
 	}
 	model := a.composerModel()
+	if h := a.harnessChoice(); h.harness != "cohub" {
+		model = modelChoice{provider: h.provider, id: h.model, harness: h.harness, approval: h.approval}
+	}
 	viewport := a.viewport()
 	inSpace := a.route.area() == areaSpace
 	a.spawn(func() {

@@ -233,7 +233,7 @@ func (m *Model) levels() []string {
 	return out
 }
 
-type modelChoice struct{ provider, id, level string }
+type modelChoice struct{ provider, id, level, harness, approval string }
 
 // Label is a Space's label, with the system's source, user and channel trees.
 type Label struct {
@@ -588,6 +588,12 @@ func (cl *client) prompt(ctx context.Context, spaceID, sessionID string, content
 	}
 	if model.level != "" {
 		in["thinkingLevel"] = model.level
+	}
+	if model.harness != "" && model.harness != "cohub" {
+		in["harness"] = model.harness
+		if model.approval != "" {
+			in["approvalMode"] = model.approval
+		}
 	}
 	var out struct {
 		SessionID string `json:"sessionId"`
