@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
+	"image"
 	"image/png"
 	"os"
 	"os/exec"
@@ -391,4 +393,35 @@ func TestSpaceRowMenuArchives(t *testing.T) {
 	if !target.IsArchived || a.menus["space-row:"+target.ID] {
 		t.Fatalf("%s not archived, or the menu stayed open; route %v menus %v", target.Name, a.route, a.menus)
 	}
+}
+
+func TestComposerTakesDroppedFiles(t *testing.T) {
+	a := demoApp(t)
+	tt := ui.NewTester(a.view, 1440, 900)
+	dir := t.TempDir()
+	img := image.NewRGBA(image.Rect(0, 0, 40, 30))
+	for i := range img.Pix {
+		img.Pix[i] = 200
+	}
+	var buf bytes.Buffer
+	png.Encode(&buf, img)
+	pic := filepath.Join(dir, "shot.png")
+	os.WriteFile(pic, buf.Bytes(), 0o644)
+	doc := filepath.Join(dir, "notes.txt")
+	os.WriteFile(doc, []byte("hello"), 0o644)
+	if !tt.DropFiles(600, 800, pic, doc) {
+		t.Fatal("the composer did not take the files")
+	}
+	tt.Frame()
+	if len(a.attachments) != 2 || a.attachments[0].kind != attachmentImage || a.attachments[0].mime != "image/jpeg" || a.attachments[1].kind != attachmentFile {
+		t.Fatalf("attachments %+v", a.attachments)
+	}
+	if !tt.HasText("notes.txt") {
+		t.Fatal("no file tile")
+	}
+	content := promptContent("look", a.attachments, map[string]string{a.attachments[0].id: "https://x/a.jpg", a.attachments[1].id: "https://x/n.txt"}, []string{"/tmp/uploads/u/shot.jpg", "/tmp/uploads/u/notes.txt"})
+	if len(content) != 2 || !strings.Contains(content[0]["text"].(string), "Files:\n- `/tmp/uploads/u/shot.jpg`") || content[1]["type"] != "image" {
+		t.Fatalf("content %v", content)
+	}
+	snapshot(t, tt, "desktop-composer-attachments")
 }

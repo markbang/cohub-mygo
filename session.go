@@ -674,7 +674,14 @@ func (a *app) composer(c *ui.Context, running bool) {
 		}
 		card := ui.Column(c.Key("composer")).FillWidth().MaxWidth(832).Margin(0, ui.Auto).Radius(16).
 			Background(p.bgInput).Border(1, p.brandBorder).Padding(14, 12, 12, 12).Gap(12)
+		if files := card.DroppedFiles(); files != nil {
+			a.addAttachmentPaths(files)
+		}
+		if card.FileDragOver() {
+			card.Border(2, p.brand)
+		}
 		card.Children(func() {
+			a.attachmentStrip(c)
 			in := ui.TextAreaBase(c.Key("draft"), &a.draft).Lines(2, 10).Placeholder(m("composer_placeholder")).Label(m("x_message")).PlaceholderColor(p.placeholder).
 				FontSize(14).LineHeight(1.55).Padding(0, 9)
 			if !a.compact {
@@ -687,17 +694,22 @@ func (a *app) composer(c *ui.Context, running bool) {
 					k.SetText(a.draft)
 					return true
 				}
+				if k.Key == ui.KeyV && (k.Mods == ui.Cmd || k.Mods == ui.Ctrl) && a.pasteImage() {
+					return true
+				}
 				return false
 			})
 			ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
-				a.iconButton(c.Key("attach"), "plus", m("feedback_add_files"), false)
+				if a.iconButton(c.Key("attach"), "plus", m("feedback_add_files"), false).Clicked() {
+					a.pickAttachments()
+				}
 				if h := a.composerHarness(); h != "" && h != "cohub" {
 					a.pill(c.Key("harness"), harnessName(h), "", func() { a.harnessIcon(c, h, 14) })
 				}
 				a.modelPicker(c)
 				ui.Spacer(c)
 				a.iconButton(c.Key("mic"), "mic", m("x_voice"), false)
-				empty := strings.TrimSpace(a.draft) == ""
+				empty := strings.TrimSpace(a.draft) == "" && len(a.attachments) == 0
 				send := ui.ButtonBase(c.Key("send")).Size(36, 36).Radius(18).Center().FocusRing(false).Children(func() {
 					switch {
 					case running:

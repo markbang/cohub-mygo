@@ -575,8 +575,8 @@ func (cl *client) snapshot(ctx context.Context, sessionID string) (*streamSnapsh
 }
 
 // prompt sends text to a session of a space, or to a new one without sessionID.
-func (cl *client) prompt(ctx context.Context, spaceID, sessionID, text string, model modelChoice) (string, error) {
-	in := map[string]any{"content": []map[string]string{{"type": "text", "text": text}}, "source": "web"}
+func (cl *client) prompt(ctx context.Context, spaceID, sessionID string, content []map[string]any, model modelChoice) (string, error) {
+	in := map[string]any{"content": content, "source": "web", "clientMessageId": newID()}
 	if sessionID != "" {
 		in["sessionId"] = sessionID
 	}

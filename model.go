@@ -72,8 +72,9 @@ type app struct {
 	theme        string // a built-in theme's name, or "system"
 	prefs        prefs
 	sidebarOpen  bool
-	inHeader     bool    // building a header: compact icon buttons grow to 40px
-	width        float32 // the window's width, as media queries see it
+	attachments  []*attachment // the composer's files, before they are sent
+	inHeader     bool          // building a header: compact icon buttons grow to 40px
+	width        float32       // the window's width, as media queries see it
 	purchase     purchaseState
 	redeem       redeemState
 	subsPage     int
@@ -612,8 +613,13 @@ func (a *app) filteredSpaces(nav int, query string) []*Space {
 // route's Space.
 func (a *app) send() {
 	text := strings.TrimSpace(a.draft)
-	if text == "" || a.sending {
+	if (text == "" && len(a.attachments) == 0) || a.sending {
 		return
+	}
+	for _, at := range a.attachments {
+		if at.status == "uploading" {
+			return
+		}
 	}
 	sessionID := a.route.sessionID()
 	spaceID := a.currentSpace()
@@ -627,18 +633,49 @@ func (a *app) send() {
 	}
 	a.sending, a.sendErr = true, ""
 	a.draft = ""
+	ats := a.attachments
+	for _, at := range ats {
+		at.status, at.progress = "uploading", 0
+	}
+	model := a.composerModel()
 	inSpace := a.route.area() == areaSpace
 	a.spawn(func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		defer cancel()
-		id, err := a.api.prompt(ctx, spaceID, sessionID, text, a.composerModel())
+		urls := map[string]string{}
+		var err error
+		for _, at := range ats {
+			at := at
+			var u string
+			u, err = a.api.uploadAttachment(ctx, spaceID, sessionID, at, func(f float64) {
+				a.update(func() { at.progress = f })
+			})
+			if err != nil {
+				break
+			}
+			urls[at.id] = u
+		}
+		var sandbox []string
+		if err == nil && len(ats) > 0 {
+			// The sandbox copy is extra: the public URLs carry the files
+			// without it.
+			sandbox, _ = a.api.materialize(ctx, spaceID, sessionID, ats, urls)
+		}
+		var id string
+		if err == nil {
+			id, err = a.api.prompt(ctx, spaceID, sessionID, promptContent(text, ats, urls, sandbox), model)
+		}
 		a.update(func() {
 			a.sending = false
 			if err != nil {
 				a.sendErr = err.Error()
 				a.draft = text
+				for _, at := range ats {
+					at.status = "failed"
+				}
 				return
 			}
+			a.attachments = nil
 			if id != "" && sessionID == "" {
 				if inSpace {
 					a.go_(route{kind: routeSpaceSession, space: spaceID, session: id})
