@@ -66,21 +66,82 @@ func (a *app) sessionView(c *ui.Context) {
 	if a.compact {
 		pad = 16
 	}
-	ui.List(c.Key("timeline-"+id), &a.timeline, len(turns), func(i int) {
-		ui.Column(c).FillWidth().MaxWidth(chatMaxWidth).Margin(0, ui.Auto).Gap(10).Children(func() {
-			a.turnView(c, id, turns[i], tl)
+	ui.Box(c.Key("timeline-box")).Grow(1).MinHeight(0).Children(func() {
+		ui.List(c.Key("timeline-"+id), &a.timeline, len(turns), func(i int) {
+			ui.Column(c).FillWidth().MaxWidth(chatMaxWidth).Margin(0, ui.Auto).Gap(10).Children(func() {
+				a.turnView(c, id, turns[i], tl)
+			})
+		}).Fill().Padding(28, pad, 32, pad).Gap(28).Scrollbars(a.compact).Children(func() {
+			switch {
+			case !tl.loaded && a.api != nil:
+				ui.Column(c).Grow(1).Center().Children(func() { a.spinner(c, 18, p.textTertiary) })
+			case tl.err != "":
+				ui.Text(c, tl.err).FontSize(12).TextColor(p.errorC).Margin(ui.Auto)
+			case len(turns) == 0:
+				ui.Text(c, "还没有消息").FontSize(13).TextColor(p.textTertiary).Margin(ui.Auto)
+			}
 		})
-	}).Grow(1).Padding(28, pad, 32, pad).Gap(28).Children(func() {
-		switch {
-		case !tl.loaded && a.api != nil:
-			ui.Column(c).Grow(1).Center().Children(func() { a.spinner(c, 18, p.textTertiary) })
-		case tl.err != "":
-			ui.Text(c, tl.err).FontSize(12).TextColor(p.errorC).Margin(ui.Auto)
-		case len(turns) == 0:
-			ui.Text(c, "还没有消息").FontSize(13).TextColor(p.textTertiary).Margin(ui.Auto)
+		if !a.compact && len(turns) > 0 {
+			a.turnRail(c, turns)
+		}
+		if len(turns) > 0 && !a.timeline.AtEnd() {
+			down := ui.ButtonBase(c.Key("to-end")).Size(32, 32).Radius(16).Center().Background(p.bgPrimary).Border(1, p.borderSubtle).
+				Shadow(0, 4, 12, 0, ui.RGBA(0, 0, 0, 0.08)).Label(m("x_to_latest")).FocusRing(false).Children(func() {
+				ui.Icon(c, icon("arrow-down")).Size(16, 16).TextColor(p.textSecond)
+			})
+			down.Attach(ui.AnchorBottom, ui.AnchorBottom).Bottom(12)
+			if down.Clicked() {
+				a.timeline.ScrollToEnd()
+			}
 		}
 	})
 	a.composer(c, s != nil && s.running() || lastRunning(tl))
+}
+
+// turnRail is TurnRail.svelte: a hairline down the timeline's right with a
+// mark for each turn, the one in view in the brand's color.
+func (a *app) turnRail(c *ui.Context, turns []*Turn) {
+	p := a.pal
+	first, last := a.timeline.Visible()
+	n := len(turns)
+	line := p.borderSubtle.Alpha(0.65)
+	thumb := p.placeholder.Alpha(0.35)
+	ui.Box(c.Key("rail")).Attach(ui.AnchorTopRight, ui.AnchorTopRight).Top(4).Right(4).Width(28).HeightPercent(97).PassThrough().
+		Draw(func(pt *ui.Painter, r ui.Rect) {
+			pt.Fill(ui.Rect{X: r.X + r.W - 14, Y: r.Y, W: 1, H: r.H}, line, 0)
+			if n > 1 && last >= first {
+				top := r.H * float32(first) / float32(n)
+				h := max(r.H*float32(last-first+1)/float32(n), 24)
+				pt.Fill(ui.Rect{X: r.X + r.W - 15, Y: r.Y + min(top, r.H-h), W: 3, H: h}, thumb, 1.5)
+			}
+		}).Children(func() {
+		for i, t := range turns {
+			cur := i == first
+			col := p.placeholder.Alpha(0.85)
+			switch t.Status {
+			case "failed":
+				col = p.errorC
+			case "running":
+				col = p.success
+			}
+			w, h := float32(6), float32(10)
+			if cur {
+				w, h = 12, 20
+			}
+			top := float32(0)
+			if n > 1 {
+				top = float32(i) / float32(n-1) * 94
+			}
+			mark := ui.ButtonBase(c.Key(t.ID)).Absolute().TopPercent(top).Right(2).Size(24, h+4).Center().
+				Label(fmt.Sprintf("Turn %d", t.Sequence)).FocusRing(false).Children(func() {
+				ui.Box(c).Size(w, h).Radius(w / 2).Background(col).Border(1, p.chatBg.Over(p.bgPrimary).Alpha(0.9))
+			})
+			idx := i
+			if mark.Clicked() {
+				a.timeline.ScrollTo(idx, ui.Start)
+			}
+		}
+	})
 }
 
 // headerLead is what starts a header: the sidebar's toggle when it is

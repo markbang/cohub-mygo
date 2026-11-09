@@ -198,6 +198,20 @@ func (a *app) navRow(c *ui.Context, iconName, label string, on bool, height floa
 	row.OnClick(fn)
 }
 
+// actionRow is a Space's action under its new chat: a small icon and a
+// 12 px label, tertiary until hovered.
+func (a *app) actionRow(c *ui.Context, iconName, label string, fn func()) {
+	p := a.pal
+	row := ui.Row(c.Key(label)).Gap(8).AlignItems(ui.Center).Height(30).Padding(0, 6).Radius(5).Children(func() {
+		ui.Icon(c, icon(iconName)).Size(14, 14).TextColor(p.textTertiary)
+		ui.Text(c, label).FontSize(12).FontWeight(500).TextColor(p.textTertiary).SingleLine()
+	})
+	if row.Hovered() {
+		row.Background(p.hover)
+	}
+	row.Cursor(ui.CursorPointer).OnClick(fn)
+}
+
 // spacesNavSidebar is the Space directory's filters.
 func (a *app) spacesNavSidebar(c *ui.Context) {
 	ui.Column(c).Grow(1).Padding(8, 6).Gap(2).BorderWidth(1, 0, 0, 0).BorderColor(a.pal.borderSubtle).Children(func() {
@@ -219,7 +233,7 @@ func (a *app) spaceSidebar(c *ui.Context) {
 	ui.Column(c).Shrink(0).BorderWidth(1, 0, 1, 0).BorderColor(p.borderSubtle).Padding(0, 6).Children(func() {
 		sw := ui.Row(c.Key("switcher")).Gap(8).AlignItems(ui.Center).Height(46).Padding(0, 6).Radius(6).Children(func() {
 			a.avatar(c, av, name, 26, 6)
-			ui.Text(c, name).FontSize(14).FontWeight(600).SingleLine().Grow(1).MinWidth(0)
+			ui.Text(c, name).FontSize(13).FontWeight(500).SingleLine().Grow(1).MinWidth(0)
 			ui.Icon(c, icon("chevron-down")).Size(14, 14).TextColor(p.textTertiary)
 		})
 		a.pressable(sw, false)
@@ -229,16 +243,16 @@ func (a *app) spaceSidebar(c *ui.Context) {
 		ui.Column(c).Padding(8, 6, 8, 6).Gap(1).Children(func() {
 			nb := ui.Row(c.Key("new")).Gap(6).AlignItems(ui.Center).Height(32).Padding(0, 8).Radius(7).Background(p.brandMuted).Border(1, p.brandBorder).Margin(0, 0, 4, 0).Cursor(ui.CursorPointer).Children(func() {
 				ui.Icon(c, icon("plus")).Size(14, 14).TextColor(p.brand)
-				ui.Text(c, "新建对话").FontSize(13).TextColor(p.brand).Grow(1)
+				ui.Text(c, m("sidebar_new_chat")).FontSize(12).FontWeight(500).TextColor(p.brand).Grow(1)
 				ui.Text(c, "⌘O").FontSize(10).TextColor(p.brand).Padding(1, 4).Radius(4).Border(1, p.brandBorder)
 			})
 			if nb.Hovered() {
 				nb.Background(p.brand.Alpha(0.15))
 			}
 			nb.OnClick(func() { a.go_(route{kind: routeSpace, space: spaceID}) })
-			a.navRow(c, "settings", m("nav_settings"), false, 33, func() { a.go_(route{kind: routeSpaceSettings, space: spaceID, sub: "profile"}) })
-			a.navRow(c, "activity", m("nav_activity"), false, 33, func() { a.go_(route{kind: routeSpaceActivity, space: spaceID}) })
-			a.navRow(c, "save", m("sidebar_new_save"), false, 33, func() {
+			a.actionRow(c, "settings", m("nav_settings"), func() { a.go_(route{kind: routeSpaceSettings, space: spaceID, sub: "profile"}) })
+			a.actionRow(c, "activity", m("nav_activity"), func() { a.go_(route{kind: routeSpaceActivity, space: spaceID}) })
+			a.actionRow(c, "save", m("sidebar_new_save"), func() {
 				a.go_(route{kind: routeSpaceCheckpoint, space: spaceID, sub: "new"})
 			})
 			ui.Box(c).Height(14)
@@ -341,29 +355,55 @@ func (a *app) chatsSection(c *ui.Context, spaceID string) {
 		ui.Row(c).Padding(8).Children(func() { a.spinner(c, 12, p.textTertiary) })
 		return
 	}
-	for _, s := range list {
+	limit, ok := a.pages.json["more:"+spaceID].(int)
+	if !ok {
+		limit = 20
+	}
+	for i, s := range list {
+		if i >= limit {
+			more := ui.ButtonBase(c.Key("more")).Height(28).Radius(6).Center().FocusRing(false).Children(func() {
+				ui.Text(c, m("sidebar_show_more")).FontSize(12).TextColor(p.textTertiary)
+			})
+			if more.Hovered() {
+				more.Background(p.hover)
+			}
+			if more.Clicked() {
+				a.pages.json["more:"+spaceID] = limit + 20
+			}
+			break
+		}
 		a.spaceSessionRow(c, s, 0)
 	}
 }
 
 func (a *app) spaceSessionRow(c *ui.Context, s *Session, indent float32) {
 	p := a.pal
-	row := ui.Row(c.Key(s.ID)).Gap(6).AlignItems(ui.Center).Height(30).Padding(0, 6, 0, 6+indent).Radius(6).Children(func() {
-		ui.Text(c, s.displayTitle()).FontSize(13).SingleLine().Grow(1).MinWidth(0)
-		if src := sourceLabel(s.Source); src != "" {
-			ui.Text(c, src).FontSize(10).FontWeight(500).TextColor(p.textTertiary).Padding(1, 5).Radius(3).Background(p.hoverStrong).Shrink(0)
-		}
-		switch {
-		case s.running():
-			a.spinner(c, 11, p.brand)
-		default:
+	on := s.ID == a.route.sessionID()
+	row := ui.Column(c.Key(s.ID)).Gap(2).Justify(ui.Center).MinHeight(30).Padding(5, 6, 5, 6+indent).Radius(6).Children(func() {
+		ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
+			t := ui.Text(c, s.displayTitle()).FontSize(13).TextColor(p.textTertiary).SingleLine().Grow(1).MinWidth(0)
+			if on {
+				t.TextColor(p.text).FontWeight(500)
+			}
+			if src := sourceLabel(s.Source); src != "" {
+				ui.Text(c, src).FontSize(10).FontWeight(500).TextColor(p.textTertiary).Padding(1, 5).Radius(3).Background(p.hoverStrong).Shrink(0)
+			}
 			ui.Text(c, relTime(s.when(), a.now())).FontSize(10).TextColor(p.placeholder).Shrink(0)
-		}
-		if a.unread(s) {
-			a.dot(c, p.errorC, 6)
+			if a.unread(s) {
+				a.dot(c, p.errorC, 6)
+			}
+		})
+		if s.running() {
+			ui.Row(c).Children(func() { a.runningPill(c, s.ActiveTurn.StartedAt) })
 		}
 	})
-	a.pressable(row, s.ID == a.route.sessionID())
+	if row.Hovered() && !on {
+		row.Background(p.hover)
+	}
+	if on {
+		row.Background(p.active)
+	}
+	row.Cursor(ui.CursorPointer)
 	row.OnClick(func() { a.openSession(s) })
 }
 
