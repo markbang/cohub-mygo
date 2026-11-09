@@ -1,9 +1,7 @@
 package main
 
 import (
-	"fmt"
 	"net/url"
-	"strings"
 
 	"github.com/egoist/mygo/ui"
 )
@@ -151,69 +149,6 @@ func (a *app) selectBox(c *ui.Context, key string, value *string, options []stri
 	ui.Select(c.Key(key), value, options).Width(112).Height(32)
 }
 
-func (a *app) spaceProfile(c *ui.Context, d *spaceDetail) {
-	p := a.pal
-	a.settingsHeading(c, m("space_section_profile"), m("space_profile_desc"), nil)
-	ui.Row(c.Key("id")).Gap(16).AlignItems(ui.Start).Padding(24, 0).Children(func() {
-		av := ""
-		if d.PublicProfile != nil {
-			av = d.PublicProfile.AvatarURL
-		}
-		ui.Column(c).Width(64).AlignItems(ui.Center).Gap(6).Children(func() {
-			a.avatarSeed(c, av, d.Name, a.route.space, 56, 28)
-			ui.Row(c).Gap(4).AlignItems(ui.Center).Children(func() {
-				ui.Icon(c, icon("upload")).Size(12, 12).TextColor(p.textTertiary)
-				ui.Text(c, m("space_change")).FontSize(11).TextColor(p.textTertiary)
-			})
-		})
-		ui.Column(c).Grow(1).Gap(6).Padding(2, 0).Children(func() {
-			ui.Text(c, d.Name).FontSize(15).FontWeight(500)
-			kv := func(k, v string, edit bool) {
-				ui.Row(c.Key(k)).Gap(6).AlignItems(ui.Center).Children(func() {
-					ui.Text(c, strings.ToUpper(k)).FontSize(11).LetterSpacing(0.6).TextColor(p.textTertiary)
-					ui.Text(c, v).FontSize(11).Font(fontMono).TextColor(p.textTertiary)
-					ui.Icon(c, icon("copy")).Size(12, 12).TextColor(p.textTertiary)
-					if edit {
-						ui.Icon(c, icon("pencil")).Size(12, 12).TextColor(p.textTertiary)
-					}
-				})
-			}
-			kv(m("space_id"), d.ID[:8]+"…"+d.ID[len(d.ID)-4:], false)
-			owner := "username"
-			if d.OwnerProfile != nil && d.OwnerProfile.Username != "" {
-				owner = d.OwnerProfile.Username
-			}
-			kv(m("space_url"), "/"+owner+"/"+d.Slug, true)
-		})
-	})
-	ui.Column(c.Key("desc")).Gap(8).Padding(24, 0).BorderWidth(1, 0, 0, 0).BorderColor(p.borderSubtle).Children(func() {
-		ui.Text(c, m("space_description")).FontSize(13).FontWeight(500)
-		key := "space-desc:" + d.ID
-		draft, ok := a.pages.json[key].(string)
-		if !ok {
-			draft = d.Description
-		}
-		ui.TextArea(c.Key("area"), &draft).Lines(3, 8).Placeholder(m("space_what_for")).FontSize(13)
-		a.pages.json[key] = draft
-		save := ui.ButtonBase(c.Key("save")).Height(32).Padding(0, 12).Radius(5).Background(p.brand).Center().AlignSelf(ui.Start).FocusRing(false).Children(func() {
-			ui.Text(c, m("space_save")).FontSize(12).FontWeight(500).TextColor(p.brandFg)
-		})
-		if strings.TrimSpace(draft) == strings.TrimSpace(d.Description) {
-			save.Opacity(0.5)
-		}
-	})
-	ui.Row(c.Key("sticker")).Gap(16).AlignItems(ui.Center).Padding(16, 0).BorderWidth(1, 0, 1, 0).BorderColor(p.borderSubtle).Children(func() {
-		ui.Column(c).Grow(1).Gap(2).Children(func() {
-			ui.Text(c, m("space_like_sticker")).FontSize(13)
-			ui.Text(c, m("space_like_sticker_hint")).FontSize(12).TextColor(p.textTertiary)
-		})
-		ui.Box(c).Size(36, 36).Radius(6).Border(1, p.borderSubtle).Center().Children(func() {
-			ui.Icon(c, icon("heart")).Size(16, 16).TextColor(p.errorC)
-		})
-		a.button(c, "upload", m("space_upload"), false)
-	})
-}
-
 type spaceAccess struct {
 	SignedIn  *string `json:"signed_in_user"`
 	Anonymous *string `json:"anonymous_user"`
@@ -240,130 +175,6 @@ func roleLabel(r *string) string {
 		return m("space_role_host")
 	}
 	return *r
-}
-
-func (a *app) spaceAccess(c *ui.Context, d *spaceDetail) {
-	p := a.pal
-	acc, _, _ := loadJSON[spaceAccess](a, "access:"+d.ID, sp(d.ID)+"/access")
-	mem, _, _ := loadJSON[spaceMembers](a, "members:"+d.ID, sp(d.ID)+"/members")
-	ui.Column(c.Key("access")).Padding(40, 0, 0, 0).BorderWidth(1, 0, 0, 0).BorderColor(p.borderSubtle).Children(func() {
-		a.settingsHeading(c, m("space_section_access"), m("space_access_desc"), func() {
-			a.button(c, "link", m("space_invite"), true)
-		})
-		ui.Box(c).Height(16)
-		signed, anon := m("space_role_no_access"), m("space_role_no_access")
-		if acc != nil {
-			signed, anon = roleLabel(acc.SignedIn), roleLabel(acc.Anonymous)
-		}
-		opts := []string{m("space_role_no_access"), m("space_role_guest"), m("space_role_builder")}
-		a.settingsRow(c, m("space_signed_in_users"), m("space_access_any_signed_in"), func() { a.selectBox(c, "signed", &signed, opts) })
-		a.settingsRow(c, m("space_access_anon"), m("space_access_no_account"), func() { a.selectBox(c, "anon", &anon, opts[:2]) })
-		guest := m("space_guest_page_default")
-		a.settingsRow(c, m("space_guest_page"), m("space_guest_page_hint"), func() { a.selectBox(c, "guest", &guest, []string{guest}) })
-		count := 0
-		if mem != nil {
-			count = len(mem.Items)
-		}
-		ui.Row(c.Key("members-h")).Gap(4).Padding(16, 0, 8, 0).BorderWidth(1, 0, 0, 0).BorderColor(p.borderSubtle).Children(func() {
-			ui.Text(c, m("space_members_caption")).FontSize(13).FontWeight(500)
-			ui.Text(c, fmt.Sprintf("· %d", count)).FontSize(13).TextColor(p.textTertiary)
-		})
-		if mem != nil {
-			for _, it := range mem.Items {
-				ui.Row(c.Key(it.UserID)).Gap(10).AlignItems(ui.Center).Height(44).Children(func() {
-					a.avatar(c, it.Profile.AvatarURL, it.Profile.name(), 28, 14)
-					ui.Text(c, it.Profile.name()).FontSize(13).Grow(1)
-					role := it.Role
-					ui.Text(c, roleLabel(&role)).FontSize(12).TextColor(p.textTertiary)
-				})
-			}
-		}
-	})
-}
-
-func (a *app) spaceEnv(c *ui.Context, d *spaceDetail) {
-	p := a.pal
-	a.settingsHeading(c, m("space_section_env"), m("space_env_desc"), nil)
-	ui.Row(c.Key("vars-h")).Padding(24, 0, 8, 0).Children(func() {
-		ui.Text(c, m("space_variables")).FontSize(13).FontWeight(500).Grow(1)
-		ui.Text(c, m("space_available_to_process")).FontSize(11).TextColor(p.textTertiary)
-	})
-	ui.Column(c.Key("vars")).Radius(6).Border(1, p.borderSubtle).Children(func() {
-		if len(d.Meta.ExtraEnv) == 0 {
-			ui.Text(c, m("space_no_vars")).FontSize(12).TextColor(p.textTertiary).Padding(16)
-		}
-		for i, e := range d.Meta.ExtraEnv {
-			row := ui.Row(c.Key(e.Name)).Gap(12).AlignItems(ui.Center).Padding(10, 12)
-			if i > 0 {
-				row.BorderWidth(1, 0, 0, 0).BorderColor(p.borderSubtle)
-			}
-			row.Children(func() {
-				ui.Text(c, e.Name).FontSize(12).Font(fontMono).Width(200).SingleLine()
-				ui.Text(c, strings.Repeat("•", 12)).FontSize(12).Font(fontMono).TextColor(p.textTertiary).Grow(1)
-				ui.Icon(c, icon("eye")).Size(14, 14).TextColor(p.textTertiary)
-				ui.Icon(c, icon("trash-2")).Size(14, 14).TextColor(p.textTertiary)
-			})
-		}
-	})
-	ui.Row(c.Key("mounted-h")).Padding(28, 0, 8, 0).Children(func() {
-		ui.Text(c, m("space_mounted_spaces")).FontSize(13).FontWeight(500).Grow(1)
-		ui.Text(c, m("space_mounted_readonly")).FontSize(11).TextColor(p.textTertiary)
-	})
-	ui.Text(c.Key("mounted"), m("space_no_mounted")).FontSize(12).TextColor(p.textTertiary).Padding(16).Radius(6).Border(1, p.borderSubtle)
-}
-
-func (a *app) spaceChannels(c *ui.Context, d *spaceDetail) {
-	p := a.pal
-	list, _, _ := loadJSON[[]channel](a, "channels", "/api/channels")
-	a.settingsHeading(c, m("space_section_channels"), m("space_channels_desc"), nil)
-	ui.Column(c.Key("bound")).Margin(24, 0, 0, 0).Radius(6).Border(1, p.borderSubtle).Children(func() {
-		n := 0
-		if list != nil {
-			for _, ch := range *list {
-				if ch.BoundSpace == nil || ch.BoundSpace.ID != d.ID {
-					continue
-				}
-				n++
-				ui.Row(c.Key(ch.ID)).Gap(10).AlignItems(ui.Center).Padding(10, 12).Children(func() {
-					a.dot(c, providerColor(ch.Provider, p), 8)
-					ui.Text(c, ch.Name).FontSize(13).Grow(1)
-					ui.Text(c, m("space_unbind")).FontSize(12).TextColor(p.textTertiary)
-				})
-			}
-		}
-		if n == 0 {
-			ui.Text(c, m("space_no_channels")).FontSize(12).TextColor(p.textTertiary).Padding(16)
-		}
-	})
-}
-
-func (a *app) spaceSandbox(c *ui.Context, d *spaceDetail) {
-	p := a.pal
-	a.settingsHeading(c, m("space_section_sandbox"), m("space_sandbox_desc"), nil)
-	ui.Box(c).Height(16)
-	sb := d.Meta.Config.Sandbox
-	a.settingsRow(c, m("channels_col_status"), "", func() {
-		ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
-			col := p.placeholder
-			if d.SandboxStatus == "running" || d.SandboxStatus == "ready" {
-				col = p.success
-			}
-			a.dot(c, col, 7)
-			ui.Text(c, d.SandboxStatus).FontSize(12).Font(fontMono)
-		})
-	})
-	a.settingsRow(c, m("x_spec"), "", func() { ui.Text(c, sb.Spec).FontSize(12).Font(fontMono) })
-	a.settingsRow(c, m("x_provider"), "", func() { ui.Text(c, sb.Provider).FontSize(12).Font(fontMono) })
-	img := sb.Image
-	if img == "" {
-		img = "default"
-	}
-	a.settingsRow(c, m("sandbox_image"), "", func() { ui.Text(c, img).FontSize(12).Font(fontMono) })
-	ttl := "—"
-	if sb.AutoDestroy.TTLSeconds > 0 {
-		ttl = fmt.Sprintf("%s · %dh", sb.AutoDestroy.Mode, sb.AutoDestroy.TTLSeconds/3600)
-	}
-	a.settingsRow(c, m("x_auto_destroy"), "", func() { ui.Text(c, ttl).FontSize(12).Font(fontMono) })
 }
 
 type walletSummary struct {

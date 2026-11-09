@@ -23,6 +23,8 @@ var locale = "zh-CN"
 // extraMessages are the app's words the web's catalogs lack, as
 // zh-CN and en.
 var extraMessages = map[string][2]string{
+	"x_reveal":            {"显示", "Show"},
+	"x_restart":           {"重启", "Restart"},
 	"x_source":            {"源码", "Source"},
 	"x_maximize":          {"最大化", "Maximize"},
 	"x_edit":              {"编辑", "Edit"},

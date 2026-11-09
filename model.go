@@ -89,6 +89,7 @@ type app struct {
 	cpTab        map[string]int // a save's tab: changes, files
 	copiedValue  string
 	forking      string // the turn a fork is being made from
+	spaceEdits   map[string]*spaceEdit
 	confirmBox   *confirmBox
 	windowWide   bool            // the window takes the main column's room
 	viewportOff  map[string]bool // windows the user took out of the prompt's context
@@ -147,6 +148,7 @@ func newApp() *app {
 		editors:       map[string]*fileEdit{},
 		viewportOff:   map[string]bool{},
 		cpTab:         map[string]int{},
+		spaceEdits:    map[string]*spaceEdit{},
 		panelOpen:     true,
 		pal:           lightPalette(),
 		route:         route{kind: -1},
