@@ -123,8 +123,9 @@ func (a *app) spacesView(c *ui.Context) {
 				if more.Clicked() {
 					a.menus[key] = !open
 				}
-				if open {
+				if t := a.labelTarget; open || t != nil && t.kind == "space" && t.ref == sp.ID {
 					menuAt, menuSpace = more, sp
+					more.Opacity(1)
 				}
 			}
 		})
@@ -155,7 +156,7 @@ func (a *app) spaceRowMenu(c *ui.Context, anchor ui.Element, sp *Space) {
 	items := []menuItem{
 		{icon: pin, label: pinL, run: func() { a.setSpacePinned(sp.ID, !sp.IsPinned) }},
 		{icon: arch, label: archL, run: func() { a.setSpaceArchived(sp.ID, !sp.IsArchived) }},
-		{icon: "tag", label: m("spaces_label_add") + "…"},
+		{icon: "tag", label: m("spaces_label_add") + "…", run: func() { a.labelTarget = &labelTarget{kind: "space", ref: sp.ID} }},
 		{icon: "wallet", label: m("wallet_title"), run: func() { a.go_(route{kind: routeSpaceWallet, space: sp.ID}) }},
 	}
 	if sp.Relation != "public" {
@@ -165,6 +166,9 @@ func (a *app) spaceRowMenu(c *ui.Context, anchor ui.Element, sp *Space) {
 	items = append(items, menuItem{icon: "circle-check", label: m("spaces_select")})
 	a.menuWidth(c, anchor, &open, 200, items)
 	a.menus[key] = open
+	if t := a.labelTarget; t != nil && t.kind == "space" && t.ref == sp.ID {
+		a.labelPicker(c, anchor)
+	}
 }
 
 // spaceHome is a Space with no chat open: its card, and the composer

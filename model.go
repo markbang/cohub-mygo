@@ -108,6 +108,7 @@ type app struct {
 	helpOpen                     bool
 	commerce                     *commerceForm
 	harnesses                    map[string]harnessState // the composer's harness by chat or Space
+	newLabelFor, newLabelName    string
 	feedback                     feedbackForm
 	lastG                        time.Time
 	inHeader                     bool    // building a header: compact icon buttons grow to 40px

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"net/url"
 	"strings"
 	"time"
 
@@ -382,9 +383,31 @@ func (a *app) labelsSection(c *ui.Context, spaceID string) {
 		}
 	})
 	if !a.sectionHead(c, "labels", "tag", m("sidebar_labels"), func() {
-		ui.Icon(c, icon("plus")).Size(12, 12).TextColor(p.placeholder)
+		add := ui.ButtonBase(c.Key("new-label")).Size(18, 18).Center().Radius(4).Label(m("sidebar_new_label")).FocusRing(false).Children(func() {
+			ui.Icon(c, icon("plus")).Size(12, 12).TextColor(p.placeholder)
+		})
+		if add.Clicked() {
+			a.newLabelFor, a.newLabelName = spaceID, ""
+			a.groupsOpen["labels"] = true
+		}
 	}) {
 		return
+	}
+	if a.newLabelFor == spaceID {
+		ui.Row(c.Key("new-label-row")).Height(30).Padding(0, 6, 0, 24).AlignItems(ui.Center).Children(func() {
+			in := ui.TextInputBase(c.Key("name"), &a.newLabelName).Placeholder(m("sidebar_new_label")).PlaceholderColor(p.placeholder).
+				FontSize(12).Height(24).Padding(0, 6).Radius(4).Border(1, p.brand).Grow(1).AutoFocus().Label(m("sidebar_new_label"))
+			in.OnShortcut(0, ui.KeyEscape, func() { a.newLabelFor = "" })
+			if in.Submitted() {
+				name := strings.TrimSpace(a.newLabelName)
+				a.newLabelFor = ""
+				if name != "" {
+					a.act(func(ctx context.Context) error {
+						return a.api.do(ctx, "POST", "/api/spaces/"+spaceID+"/labels", map[string]any{"labelRef": name}, nil)
+					}, "labels:"+spaceID)
+				}
+			}
+		})
 	}
 	var user []*Label
 	for _, l := range a.labels[spaceID] {
@@ -392,7 +415,7 @@ func (a *app) labelsSection(c *ui.Context, spaceID string) {
 			user = append(user, l)
 		}
 	}
-	if len(user) == 0 {
+	if len(user) == 0 && a.newLabelFor != spaceID {
 		ui.Text(c, m("sidebar_no_labels")).FontSize(12).TextColor(p.textTertiary).Padding(6, 24)
 		return
 	}
@@ -513,6 +536,21 @@ func (a *app) labelRow(c *ui.Context, spaceID string, l *Label, ref string, dept
 	})
 	a.pressable(row, false)
 	row.OnClick(func() { a.groupsOpen[key] = !open })
+	if l.Source == "user" && row.Hovered() {
+		row.Children(func() {
+			del := ui.ButtonBase(c.Key("del")).Absolute().Top(5).Right(6).Size(20, 20).Center().Radius(4).Background(p.sidebarBg).Label(m("common_delete")).FocusRing(false).Children(func() {
+				ui.Icon(c, icon("trash-2")).Size(12, 12).TextColor(p.textTertiary)
+			})
+			if del.Clicked() {
+				name := a.labelName(l)
+				a.confirm(m("common_delete"), m("sidebar_delete_label_confirm", "label", name), m("common_delete"), func() {
+					a.act(func(ctx context.Context) error {
+						return a.api.do(ctx, "DELETE", "/api/spaces/"+spaceID+"/labels/by-ref?ref="+url.QueryEscape(ref), nil, nil)
+					}, "labels:"+spaceID)
+				})
+			}
+		})
+	}
 	if !open {
 		return
 	}

@@ -335,7 +335,22 @@ func (a *app) labelPicker(c *ui.Context, anchor ui.Element) {
 	p := a.pal
 	t := a.labelTarget
 	key := "res-labels:" + t.space + ":" + t.kind + ":" + t.ref
-	res, err, _ := loadJSON[resourceLabels](a, key, "/api/spaces/"+url.PathEscape(t.space)+"/resources/"+t.kind+"/labels?resourceRef="+url.QueryEscape(t.ref))
+	var res *resourceLabels
+	var err error
+	if t.space == "" {
+		// The user's own labels, on a Space of the directory.
+		labels, lerr, _ := loadJSON[resourceLabels](a, "me-labels", "/api/me/labels")
+		as, aerr, _ := loadJSON[resourceLabels](a, key, "/api/me/resources/"+t.kind+"/labels?resourceRef="+url.QueryEscape(t.ref))
+		err = lerr
+		if err == nil {
+			err = aerr
+		}
+		if labels != nil && as != nil {
+			res = &resourceLabels{Labels: labels.Labels, Assignments: as.Assignments}
+		}
+	} else {
+		res, err, _ = loadJSON[resourceLabels](a, key, "/api/spaces/"+url.PathEscape(t.space)+"/resources/"+t.kind+"/labels?resourceRef="+url.QueryEscape(t.ref))
+	}
 	var labels []labelRow
 	assigned := map[string]bool{}
 	if res != nil {
@@ -429,8 +444,11 @@ func (a *app) labelPicker(c *ui.Context, anchor ui.Element) {
 						t.newName, t.creating = "", false
 						t.selected[name] = true
 						a.act(func(ctx context.Context) error {
+							if t.space == "" {
+								return a.api.do(ctx, "POST", "/api/me/labels", map[string]any{"labelRef": name}, nil)
+							}
 							return a.api.do(ctx, "POST", "/api/spaces/"+url.PathEscape(t.space)+"/labels", map[string]any{"labelRef": name}, nil)
-						}, key, "labels:"+t.space)
+						}, key, "labels:"+t.space, "me-labels")
 					}
 				})
 			}
@@ -463,8 +481,32 @@ func (a *app) labelPicker(c *ui.Context, anchor ui.Element) {
 					}
 					sort.Strings(refs)
 					t.saving = true
+					var before []string
+					if res != nil {
+						for _, l := range labels {
+							if assigned[l.label.ID] && l.label.Source == "user" {
+								before = append(before, l.ref)
+							}
+						}
+					}
 					a.act(func(ctx context.Context) error {
-						err := a.api.do(ctx, "PUT", "/api/spaces/"+url.PathEscape(t.space)+"/resources/"+t.kind+"/labels?resourceRef="+url.QueryEscape(t.ref), map[string]any{"labelRefs": refs}, nil)
+						var err error
+						if t.space == "" {
+							var add, remove []string
+							for _, r := range refs {
+								if !contains(before, r) {
+									add = append(add, r)
+								}
+							}
+							for _, r := range before {
+								if !contains(refs, r) {
+									remove = append(remove, r)
+								}
+							}
+							err = a.api.do(ctx, "PATCH", "/api/me/resources/"+t.kind+"/labels/batch", map[string]any{"resourceRefs": []string{t.ref}, "addLabelRefs": add, "removeLabelRefs": remove}, nil)
+						} else {
+							err = a.api.do(ctx, "PUT", "/api/spaces/"+url.PathEscape(t.space)+"/resources/"+t.kind+"/labels?resourceRef="+url.QueryEscape(t.ref), map[string]any{"labelRefs": refs}, nil)
+						}
 						a.update(func() {
 							t.saving = false
 							if err == nil && a.labelTarget == t {
