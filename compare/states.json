@@ -467,5 +467,14 @@
     "wait": 2500
    }
   ]
+ },
+ {
+  "name": "invite-unavailable",
+  "path": "/invite/nonexistent-token-0000",
+  "actions": [
+   {
+    "wait": 2500
+   }
+  ]
  }
 ]

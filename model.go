@@ -109,6 +109,8 @@ type app struct {
 	commerce                     *commerceForm
 	harnesses                    map[string]harnessState // the composer's harness by chat or Space
 	newLabelFor, newLabelName    string
+	inviteBusy                   bool
+	inviteErr                    string
 	selectedSpaces               map[string]bool
 	feedback                     feedbackForm
 	lastG                        time.Time
@@ -1002,38 +1004,21 @@ func (a *app) setSpaceFlags(id string, flip func(*Space), patch map[string]any) 
 // resolveSlug opens a Space by its URL, /username/slug, accepting an
 // invitation first when the link carries one.
 func (a *app) resolveSlug(sub string) {
+	if strings.Contains(sub, "/w/") {
+		// A published web app runs in the browser, beside its Space.
+		a.openURL("https://cohub.live/" + sub)
+		sub, _, _ = strings.Cut(sub, "/w/")
+	}
 	a.act(func(ctx context.Context) error {
-		var id string
-		if token, ok := strings.CutPrefix(sub, "invite/"); ok {
-			sub = "/join/" + token
+		user, slug, _ := strings.Cut(sub, "/")
+		var sp Space
+		if err := a.api.do(ctx, "GET", "/api/spaces/by-slug/"+url.PathEscape(user)+"/"+url.PathEscape(slug), nil, &sp); err != nil {
+			return err
 		}
-		head, token, invite := strings.Cut(sub, "/join/")
-		if invite {
-			var out struct {
-				SpaceID string `json:"spaceId"`
-			}
-			if err := a.api.do(ctx, "POST", "/api/invite/"+url.PathEscape(token)+"/accept", nil, &out); err != nil {
-				return err
-			}
-			id = out.SpaceID
-		}
-		if id == "" && head != "" {
-			user, slug, _ := strings.Cut(head, "/")
-			var sp Space
-			if err := a.api.do(ctx, "GET", "/api/spaces/by-slug/"+url.PathEscape(user)+"/"+url.PathEscape(slug), nil, &sp); err != nil {
-				return err
-			}
-			id = sp.ID
-		}
-		if id != "" {
-			a.update(func() {
-				a.route = route{kind: routeSpace, space: id}
-				a.show(a.route)
-			})
-			if invite {
-				a.refresh()
-			}
-		}
+		a.update(func() {
+			a.route = route{kind: routeSpace, space: sp.ID}
+			a.show(a.route)
+		})
 		return nil
 	})
 }

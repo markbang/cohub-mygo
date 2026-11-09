@@ -24,7 +24,8 @@ const (
 	routeSpaceCron                        // /spaces/:id/cronjobs/:cid (or new)
 	routeSpaceApp                         // /spaces/:id/apps/:appId
 	routeSettings                         // /settings/:section
-	routeSlug                             // /:username/:slug(/join/:token), a Space by its URL
+	routeSlug                             // /:username/:slug, a Space by its URL
+	routeInvite                           // /invite/:token, /spaces/:id/join/:token, /:username/:slug/join/:token
 )
 
 // route is where the window is, in the web app's URL scheme, so that
@@ -88,8 +89,10 @@ func parseRoute(p string) route {
 			}
 		case "activity":
 			r.kind = routeSpaceActivity
-		case "wallet":
+		case "wallet", "fund":
 			r.kind = routeSpaceWallet
+		case "join":
+			return route{kind: routeInvite, sub: at(3)}
 		case "files":
 			if f := strings.Join(parts[3:], "/"); f != "" {
 				r.win = "file:" + f
@@ -105,7 +108,9 @@ func parseRoute(p string) route {
 		}
 		return r
 	case "invite":
-		return route{kind: routeSlug, sub: "invite/" + at(1)}
+		return route{kind: routeInvite, sub: at(1)}
+	case "referrals":
+		return route{kind: routeSettings, sub: "referrals"}
 	case "settings":
 		s := at(1)
 		if s == "" {
@@ -114,11 +119,13 @@ func parseRoute(p string) route {
 		return route{kind: routeSettings, sub: s}
 	}
 	if at(0) != "" && at(1) != "" {
-		sub := at(0) + "/" + at(1)
 		if at(2) == "join" && at(3) != "" {
-			sub += "/join/" + at(3)
+			return route{kind: routeInvite, sub: at(3)}
 		}
-		return route{kind: routeSlug, sub: sub}
+		if at(2) == "w" && at(3) != "" {
+			return route{kind: routeSlug, sub: at(0) + "/" + at(1) + "/w/" + at(3)}
+		}
+		return route{kind: routeSlug, sub: at(0) + "/" + at(1)}
 	}
 	return route{kind: routeSessions}
 }
@@ -169,10 +176,9 @@ func (r route) path() string {
 	case routeSettings:
 		return "/settings/" + r.sub
 	case routeSlug:
-		if strings.HasPrefix(r.sub, "invite/") {
-			return "/" + r.sub
-		}
 		return "/" + r.sub
+	case routeInvite:
+		return "/invite/" + r.sub
 	}
 	return "/sessions"
 }
@@ -191,7 +197,7 @@ func (r route) area() area {
 	switch r.kind {
 	case routeSessions, routeSession, routeNewSession:
 		return areaChats
-	case routeSpaces, routeNewSpace:
+	case routeSpaces, routeNewSpace, routeInvite:
 		return areaSpaces
 	case routeSettings:
 		return areaSettings

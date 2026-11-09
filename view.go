@@ -44,6 +44,12 @@ func (a *app) view(c *ui.Context) {
 		a.loginView(c)
 		return
 	}
+	if a.route.kind == routeInvite {
+		// A public page, full window as the web's.
+		ui.Column(c).Fill().Background(a.pal.bgPrimary).Children(func() { a.invitePage(c) })
+		a.toastView(c)
+		return
+	}
 	if a.compact {
 		a.compactView(c)
 		a.paletteView(c)
@@ -146,6 +152,8 @@ func (a *app) page(c *ui.Context) {
 		a.spaceHome(c)
 	case routeSettings:
 		a.settingsPage(c)
+	case routeInvite:
+		a.invitePage(c)
 	default:
 		a.emptyView(c)
 	}
