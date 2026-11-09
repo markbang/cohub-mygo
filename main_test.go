@@ -186,6 +186,7 @@ type compareState struct {
 	Path    string           `json:"path"`
 	Size    []int            `json:"size"`
 	Dark    bool             `json:"dark"`
+	Custom  bool             `json:"custom"`
 	Actions []map[string]any `json:"actions"`
 	App     []map[string]any `json:"app"`
 }
@@ -226,6 +227,8 @@ func TestCompare(t *testing.T) {
 	if a.status != "" {
 		t.Fatal(a.status)
 	}
+	a.loadCustomTheme()
+	custom := a.customCSS
 	for _, s := range states {
 		if !only.MatchString(s.Name) {
 			continue
@@ -242,6 +245,10 @@ func TestCompare(t *testing.T) {
 				a.theme = "dark"
 			}
 			a.compact = w < compactWidth
+			a.customCSS = ""
+			if s.Custom {
+				a.customCSS = custom
+			}
 			a.navigate(fill(s.Path))
 			tt := ui.NewTesterWith(a.view, w, h, ui.TesterOptions{Dark: s.Dark})
 			settle := func() {
@@ -316,5 +323,28 @@ func TestRealtimeConnects(t *testing.T) {
 	t.Logf("events %v", a.rt.seen)
 	if !a.rt.rooms["space:daf9537a-1c37-4953-9499-8ad794d9d5f4"] {
 		t.Errorf("rooms %v", a.rt.rooms)
+	}
+}
+
+func TestThemesMatchWeb(t *testing.T) {
+	// Values the web computes (getComputedStyle) for the light theme.
+	p := buildPalette("light", "")
+	if p.dark || p.bgPrimary != ui.RGBA(255, 255, 255, 1) || p.brand != ui.RGBA(207, 66, 50, 1) {
+		t.Errorf("light: dark %v bg %v brand %v", p.dark, p.bgPrimary, p.brand)
+	}
+	for _, name := range themeNames {
+		p := buildPalette(name, "")
+		if p.text == (ui.Color{}) || p.bgPrimary == (ui.Color{}) || p.brand == (ui.Color{}) {
+			t.Errorf("%s: unresolved %+v", name, p)
+		}
+	}
+	if !buildPalette("dark", "").dark || buildPalette("solarized-light", "").dark || !buildPalette("neta-pixel-dark", "").dark {
+		t.Error("color schemes")
+	}
+	custom := `:root,[data-theme]{color-scheme:light;--font-sans:"Maple Mono NF CN";--brand:#0088cc}
+:root:not([data-theme]),[data-theme="dark"]{color-scheme:dark}`
+	c := buildPalette("dark", custom)
+	if !c.dark || c.brand != ui.RGBA(0, 136, 204, 1) || !strings.HasPrefix(c.font, "Maple Mono NF CN") {
+		t.Errorf("custom over dark: dark %v brand %v font %q", c.dark, c.brand, c.font)
 	}
 }

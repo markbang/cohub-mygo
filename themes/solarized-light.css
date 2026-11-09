@@ -1,0 +1,244 @@
+/* --- Solarized Light Theme --- */
+[data-theme="solarized-light"] {
+	color-scheme: light;
+	/* Solarized base palette reference:
+	   base03 #002b36, base02 #073642, base01 #586e75, base00 #657b83,
+	   base0 #839496, base1 #93a1a1, base2 #eee8d5, base3 #fdf6e3. */
+	--neutral-0: oklch(31% 0.026 195);
+	--neutral-5: oklch(38% 0.026 195);
+	--neutral-10: oklch(45% 0.026 195);
+	--neutral-20: oklch(52% 0.024 195);
+	--neutral-30: oklch(61% 0.023 195);
+	--neutral-40: oklch(72% 0.022 195);
+	--neutral-50: oklch(82% 0.022 92);
+	--neutral-60: oklch(87% 0.026 92);
+	--neutral-70: oklch(91% 0.03 92);
+	--neutral-80: oklch(94% 0.032 92);
+	--neutral-90: oklch(96% 0.034 92);
+	--neutral-95: oklch(97.5% 0.036 92);
+	--neutral-100: oklch(98.5% 0.038 92);
+
+	/* Brand scale — Solarized blue, deepened for light surfaces. */
+	--brand-50: oklch(95% 0.025 235);
+	--brand-100: oklch(88% 0.045 235);
+	--brand-200: oklch(78% 0.075 235);
+	--brand-300: oklch(67% 0.105 235);
+	--brand-400: oklch(55% 0.135 235);
+	--brand-500: oklch(48% 0.145 235);
+	--brand-600: oklch(42% 0.13 235);
+	--brand-700: oklch(35% 0.105 235);
+	--brand-800: oklch(29% 0.08 235);
+	--brand-900: oklch(23% 0.055 235);
+	--brand-bg: color-mix(in srgb, var(--brand) 9%, var(--bg-primary));
+
+	/* Semantic colors — Solarized accents, contrast-calibrated for light bg. */
+	--success-400: oklch(46% 0.115 125);
+	--success-500: oklch(39% 0.12 125);
+	--success-700: oklch(31% 0.09 125);
+	--success-900: oklch(91% 0.04 125);
+
+	--warning-400: oklch(51% 0.12 82);
+	--warning-500: oklch(43% 0.125 82);
+	--warning-700: oklch(33% 0.095 82);
+	--warning-900: oklch(92% 0.045 82);
+
+	--error-400: oklch(46% 0.16 25);
+	--error-500: oklch(39% 0.17 25);
+	--error-700: oklch(29% 0.12 25);
+	--error-fg: var(--neutral-100);
+	--error-900: oklch(91% 0.045 25);
+
+	--info-400: oklch(48% 0.12 205);
+	--info-500: oklch(41% 0.13 205);
+	--info-700: oklch(31% 0.1 205);
+	--info-900: oklch(91% 0.04 205);
+
+	/* Backgrounds */
+	--bg-primary: var(--neutral-100);
+	--bg-content: var(--neutral-95);
+	--bg-surface: var(--neutral-90);
+	--bg-surface-hover: var(--neutral-80);
+	--bg-elevated: var(--neutral-100);
+	--bg-subtle: var(--bg-surface-hover);
+	--bg-input: var(--neutral-100);
+	--bg-code: var(--neutral-90);
+	--bg-header-alt: var(--neutral-90);
+
+	/* Text */
+	--text-primary: var(--neutral-0);
+	--text-reading: var(--neutral-5);
+	--text-secondary: var(--neutral-10);
+	--text-tertiary: var(--neutral-20);
+	--text-placeholder: var(--neutral-30);
+	--text-disabled: var(--neutral-40);
+
+	/* Borders */
+	--border-primary: var(--neutral-50);
+	--border-default: var(--border-primary);
+	--border-subtle: var(--neutral-60);
+	--border-strong: var(--neutral-40);
+
+	/* Interactive states */
+	--bg-hover: oklch(35% 0.03 80 / 0.07);
+	--bg-hover-strong: oklch(35% 0.03 80 / 0.14);
+	--bg-active: oklch(35% 0.03 80 / 0.21);
+
+	/* Scrollbar */
+	--scrollbar-thumb: var(--neutral-40);
+	--scrollbar-thumb-hover: var(--neutral-20);
+
+	/* Selection */
+	--selection-bg: color-mix(in srgb, var(--brand) 18%, var(--bg-primary));
+	--divider-muted: color-mix(in srgb, var(--border-subtle) 62%, transparent);
+
+	/* Brand semantics */
+	--brand: var(--brand-400);
+	--brand-hover: var(--brand-500);
+	--brand-soft: var(--brand-700);
+	--brand-contrast-fg: var(--neutral-100);
+	--brand-muted-fg: var(--brand-500);
+	--brand-muted: color-mix(in srgb, var(--brand) 9%, transparent);
+	--brand-muted-hover: color-mix(in srgb, var(--brand) 14%, transparent);
+	--brand-border: color-mix(in srgb, var(--brand) 20%, transparent);
+
+	/* Overlays */
+	--overlay-scrim: oklch(0% 0 0 / 0.48);
+	--overlay-scrim-strong: oklch(0% 0 0 / 0.78);
+	--overlay-control-bg: oklch(100% 0 0 / 0.12);
+	--overlay-control-bg-hover: oklch(100% 0 0 / 0.22);
+	--overlay-control-text: oklch(98% 0.003 92);
+
+	/* Provider colors */
+	--provider-discord: oklch(54% 0.17 275);
+	--provider-discord-bg: color-mix(
+		in srgb,
+		var(--provider-discord) 10%,
+		transparent
+	);
+	--provider-discord-bg-hover: color-mix(
+		in srgb,
+		var(--provider-discord) 14%,
+		transparent
+	);
+	--provider-discord-border: color-mix(
+		in srgb,
+		var(--provider-discord) 22%,
+		transparent
+	);
+	--provider-discord-border-hover: color-mix(
+		in srgb,
+		var(--provider-discord) 42%,
+		transparent
+	);
+	--provider-feishu: oklch(52% 0.12 220);
+	--provider-feishu-bg: color-mix(
+		in srgb,
+		var(--provider-feishu) 10%,
+		transparent
+	);
+	--provider-feishu-bg-hover: color-mix(
+		in srgb,
+		var(--provider-feishu) 14%,
+		transparent
+	);
+	--provider-feishu-border: color-mix(
+		in srgb,
+		var(--provider-feishu) 22%,
+		transparent
+	);
+	--provider-feishu-border-hover: color-mix(
+		in srgb,
+		var(--provider-feishu) 42%,
+		transparent
+	);
+	--provider-wechat: oklch(43% 0.12 145);
+	--provider-wechat-bg: color-mix(
+		in srgb,
+		var(--provider-wechat) 10%,
+		transparent
+	);
+	--provider-wechat-bg-hover: color-mix(
+		in srgb,
+		var(--provider-wechat) 14%,
+		transparent
+	);
+	--provider-wechat-border: color-mix(
+		in srgb,
+		var(--provider-wechat) 22%,
+		transparent
+	);
+	--provider-wechat-border-hover: color-mix(
+		in srgb,
+		var(--provider-wechat) 42%,
+		transparent
+	);
+
+	/* Effects */
+	--shadow-subtle: oklch(20% 0.02 195 / 0.08);
+	--shadow-medium: oklch(20% 0.02 195 / 0.16);
+	--shadow-strong: oklch(20% 0.02 195 / 0.24);
+	--brand-ring: color-mix(in srgb, var(--brand) 24%, transparent);
+	--mask-opaque: black;
+	--identity-l: 52%;
+	--identity-c: 0.11;
+
+	/* App background */
+	--app-bg-image: none;
+	--app-bg-overlay: none;
+	--app-bg-size: auto;
+	--app-bg-position: center;
+	--app-bg-repeat: repeat;
+
+	/* Sidebar */
+	--sidebar-bg: var(--bg-primary);
+	--sidebar-border: var(--border-subtle);
+	--sidebar-item-bg: transparent;
+	--sidebar-item-hover-bg: var(--bg-hover);
+	--sidebar-item-active-bg: var(--bg-active);
+	--sidebar-item-active-fg: var(--text-primary);
+	--sidebar-item-radius: 6px;
+	--sidebar-primary-action-bg: var(--brand-muted);
+	--sidebar-primary-action-bg-hover: var(--brand-muted-hover);
+	--sidebar-primary-action-fg: var(--brand-muted-fg);
+	--sidebar-primary-action-border: var(--brand-border);
+	--sidebar-primary-action-radius: 7px;
+
+	/* Chat */
+	--chat-bg: var(--bg-content);
+	--chat-panel-bg: var(--bg-content);
+	--chat-panel-border: var(--border-subtle);
+	--chat-user-message-bg: color-mix(in srgb, var(--brand) 5%, transparent);
+	--chat-user-message-fg: var(--text-primary);
+	--chat-user-message-max-width: min(52rem, 100%);
+	--chat-user-message-radius: 0.75rem;
+	--chat-user-message-tail-radius: 0.375rem;
+	--chat-content-max-width: 56rem;
+	--chat-msg-inset: 0.5rem;
+	--chat-assistant-message-bg: transparent;
+	--chat-assistant-message-fg: var(--text-primary);
+	--chat-composer-bg: color-mix(in srgb, var(--bg-content) 92%, transparent);
+	--chat-composer-bg-focus: color-mix(
+		in srgb,
+		var(--bg-content) 96%,
+		transparent
+	);
+	--chat-composer-border: color-mix(
+		in srgb,
+		var(--border-subtle) 70%,
+		transparent
+	);
+	--chat-composer-border-focus: color-mix(
+		in srgb,
+		var(--brand) 25%,
+		transparent
+	);
+	--chat-composer-radius: 28px;
+	--chat-composer-placeholder: var(--text-placeholder);
+
+	/* Data visualizations */
+	--heatmap-0: var(--bg-elevated);
+	--heatmap-1: color-mix(in srgb, var(--brand) 30%, transparent);
+	--heatmap-2: color-mix(in srgb, var(--brand) 48%, transparent);
+	--heatmap-3: color-mix(in srgb, var(--brand) 66%, transparent);
+	--heatmap-4: color-mix(in srgb, var(--brand) 84%, transparent);
+}

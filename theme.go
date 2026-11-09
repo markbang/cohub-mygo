@@ -1,7 +1,6 @@
 package main
 
 import (
-	"strings"
 
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/markdown"
@@ -13,6 +12,7 @@ type palette struct {
 	name string
 	dark bool
 	font string
+	mono string
 
 	bgPrimary      ui.Color // sidebar, panels
 	bgContent      ui.Color // main column
@@ -58,35 +58,14 @@ type palette struct {
 	popHead ui.Color
 }
 
-func lightPalette() *palette { return themePalette("light") }
-func darkPalette() *palette  { return themePalette("dark") }
+func lightPalette() *palette { return buildPalette("light", "") }
+func darkPalette() *palette  { return buildPalette("dark", "") }
 
-// themePalette returns a built-in theme with what it leaves out derived.
-func themePalette(name string) *palette {
-	mk, ok := builtinThemes[name]
-	if !ok {
-		mk = builtinThemes["light"]
-	}
-	p := mk()
-	p.font = strings.NewReplacer("Geist Variable", "Geist", "Figtree Variable", "Figtree").Replace(p.font)
-	if p.dark {
-		p.font += ", Noto Sans CJK SC"
-	}
-	if p.sidebarBg == (ui.Color{}) {
-		p.sidebarBg = p.bgPrimary
-	}
-	if p.chatBg == (ui.Color{}) {
-		p.chatBg = p.bgContent
-	}
-	solid := p.bgSurface.Over(p.bgPrimary)
-	p.popBg = solid.MixOklab(p.text, 0.06)
-	p.popHead = solid.MixOklab(p.text, 0.035)
-	return p
-}
-
-var fontSans = "Geist, PingFang SC, Noto Sans CJK SC, Microsoft YaHei, sans-serif"
-
-const fontMono = "Geist Mono, SF Mono, Noto Sans Mono CJK SC, monospace"
+// fontSans and fontMono are the palette's families, for text set apart.
+var (
+	fontSans = "Geist, PingFang SC, Noto Sans CJK SC, sans-serif"
+	fontMono = "Geist Mono, Noto Sans Mono CJK SC, monospace"
+)
 
 // apply makes the window's widgets follow the palette.
 func (p *palette) apply(c *ui.Context) {
@@ -118,15 +97,20 @@ func (p *palette) metaText() ui.Color { return p.placeholder.Alpha(0.55) }
 // applyTheme picks the palette of the appearance and gives it to the window.
 func (a *app) applyTheme(c *ui.Context) {
 	name := a.theme
-	if _, ok := builtinThemes[name]; !ok {
+	if !contains(themeNames, name) {
 		name = "light"
 		if c.Theme().Dark {
 			name = "dark"
 		}
 	}
-	if name != a.pal.name {
-		a.pal = themePalette(name)
-		fontSans = a.pal.font
+	custom := ""
+	if a.customThemeOn() {
+		custom = a.customCSS
+	}
+	if key := name + "\x00" + custom; key != a.palKey {
+		a.palKey = key
+		a.pal = buildPalette(name, custom)
+		fontSans, fontMono = a.pal.font, a.pal.mono
 	}
 	a.pal.apply(c)
 	a.md.Theme = a.markdownTheme(c)
@@ -136,7 +120,7 @@ func (a *app) applyTheme(c *ui.Context) {
 // color, quiet code blocks and tables with hairlines.
 func (a *app) markdownTheme(c *ui.Context) *markdown.Theme {
 	p := a.pal
-	key := p.name
+	key := a.palKey
 	if a.mdTheme != nil && a.mdThemeKey == key {
 		return a.mdTheme
 	}
@@ -149,8 +133,8 @@ func (a *app) markdownTheme(c *ui.Context) *markdown.Theme {
 	for i, h := range []struct{ size, top, bottom float32 }{{1.35, 0.2, 0.55}, {1.18, 1.35, 0.5}, {1.05, 1.15, 0.4}, {1, 1, 0.35}, {1, 1, 0.35}, {1, 1, 0.35}} {
 		t.Headings[i] = markdown.HeadingStyle{Size: h.size, Weight: 600, Color: p.text, Top: h.top, Bottom: h.bottom}
 	}
-	t.Font = fontSans
-	t.CodeFont = fontMono
+	t.Font = p.font
+	t.CodeFont = p.mono
 	t.Text, t.Muted, t.Strong = p.textReading, p.textTertiary, p.text
 	t.StrongWeight = 600
 	t.Link = p.brand

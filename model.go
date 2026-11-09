@@ -89,6 +89,9 @@ type app struct {
 	mdTheme     *markdown.Theme
 	mdThemeKey  string
 	pal         *palette
+	palKey      string
+	customCSS   string // the Home Space's .cohub/theme.css
+	homeSpace   string
 	compact     bool
 }
 
@@ -127,6 +130,9 @@ func newApp() *app {
 			a.theme = a.prefs.Theme
 		}
 		setLocale(a.prefs.Lang)
+		if b, err := os.ReadFile(filepath.Join(dir, "cohub-mygo", "theme.css")); err == nil {
+			a.customCSS = string(b)
+		}
 	}
 	return a
 }
@@ -191,6 +197,7 @@ func (a *app) start() {
 	a.api = cl
 	a.status = "连接中…"
 	a.spawn(a.refresh)
+	a.spawn(a.loadCustomTheme)
 	if !a.sync {
 		go a.poll()
 		a.startRealtime()
@@ -682,4 +689,33 @@ func (ic *imageCache) wait(d time.Duration) {
 
 func lastRunning(tl *sessionTurns) bool {
 	return tl != nil && len(tl.turns) > 0 && tl.turns[len(tl.turns)-1].running()
+}
+
+// loadCustomTheme reads the Home Space's .cohub/theme.css, the custom theme
+// the web lays over every page, and keeps a copy for the next start.
+func (a *app) loadCustomTheme() {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	var home Space
+	if err := a.api.get(ctx, "/api/me/spaces/by-slug/home", &home); err != nil || home.ID == "" {
+		return
+	}
+	var f fsFile
+	css := ""
+	if err := a.api.get(ctx, sp(home.ID)+"/fs/file?path=.cohub/theme.css", &f); err == nil && f.Kind == "text" {
+		css = f.Content
+	}
+	a.update(func() {
+		a.homeSpace = home.ID
+		a.customCSS = css
+	})
+	if dir, err := os.UserConfigDir(); err == nil && !a.sync {
+		path := filepath.Join(dir, "cohub-mygo", "theme.css")
+		if css == "" {
+			os.Remove(path)
+		} else {
+			os.MkdirAll(filepath.Dir(path), 0o755)
+			os.WriteFile(path, []byte(css), 0o644)
+		}
+	}
 }

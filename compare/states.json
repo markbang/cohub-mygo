@@ -277,5 +277,10 @@
     "click": "置顶"
    }
   ]
+ },
+ {
+  "name": "chat-custom",
+  "path": "/sessions/{SESSION}",
+  "custom": true
  }
 ]

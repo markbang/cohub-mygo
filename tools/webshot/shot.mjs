@@ -44,7 +44,8 @@ for (const s of states) {
   }, { token, user: who.user ?? {}, dark: !!s.dark });
   const page = await ctx.newPage();
   const path = fill(s.path);
-  await page.goto("https://cohub.live" + path + (path.includes("?") ? "&" : "?") + "theme=safe", { waitUntil: "networkidle", timeout: 60000 }).catch(() => {});
+  const safe = s.custom ? "" : (path.includes("?") ? "&" : "?") + "theme=safe";
+  await page.goto("https://cohub.live" + path + safe, { waitUntil: "networkidle", timeout: 60000 }).catch(() => {});
   await page.waitForTimeout(2500);
   for (const a of s.actions ?? []) {
     try {

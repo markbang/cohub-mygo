@@ -1,0 +1,462 @@
+@import "./themes/dark.css";
+@import "./themes/light.css";
+@import "./themes/solarized-dark.css";
+@import "./themes/solarized-light.css";
+@import "./themes/neta-studio.css";
+@import "./themes/neta-pixel.css";
+@import "./themes/neta-pixel-dark.css";
+
+/* ============================================================
+   Board shape palette
+   Driven by current data-theme tokens. Space `.cohub/theme.css`
+   can override any of these to recolor board shapes end-to-end.
+   ============================================================ */
+:where(:root, [data-theme]) {
+	/* Shared fallbacks; individual themes only override where semantics differ. */
+	--status-running: var(--success-400);
+	--activity: var(--brand);
+	--control-accent: var(--brand);
+	--menu-shadow: 0 10px 24px
+		color-mix(in srgb, var(--overlay-scrim-strong) 16%, transparent);
+	--toolbar-shadow: 0 8px 20px
+		color-mix(in srgb, var(--overlay-scrim-strong) 14%, transparent);
+	--indicator-radius: 999px;
+	--indicator-easing: ease-in-out;
+	--menu-radius: 8px;
+	--tab-key-selected-bg: var(--bg-elevated);
+	--toast-shadow: 0 8px 24px
+		color-mix(in srgb, var(--overlay-scrim-strong) 18%, transparent);
+	--dialog-radius: 12px;
+	--dialog-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+	--dialog-backdrop-filter: none;
+	--chat-user-message-border: transparent;
+	--board-bg: var(--bg-primary);
+	--board-card: var(--bg-surface);
+	--board-selection-accent: var(--brand);
+	--board-backdrop-pattern: dots;
+	--board-backdrop-pattern-color: color-mix(in srgb, var(--border-subtle) 70%, var(--board-bg));
+	--board-backdrop-pattern-pitch: 24;
+	--board-backdrop-pattern-size: 2;
+	--board-backdrop-image: "";
+}
+
+:root,
+[data-theme] {
+	/* Headers, chips and rows share one content edge: gutter + row padding. */
+	--list-gutter-x: 8px;
+	--list-row-pad-x: 8px;
+	--list-content-x: calc(var(--list-gutter-x) + var(--list-row-pad-x));
+	--list-chip-inset: var(--list-row-pad-x);
+	--list-row-radius: var(--sidebar-item-radius);
+	--list-row-gap: 12px;
+	--list-row-hover-bg: var(--sidebar-item-hover-bg);
+	--list-row-active-bg: var(--sidebar-item-active-bg);
+	--list-tree-guide: var(--color-border-default);
+	--list-tree-width: 1.5px;
+
+	--board-color-brand-stroke: var(--brand);
+	--board-color-brand-fill: var(--brand);
+	--board-color-brand-label: var(--text-primary);
+
+	--board-color-neutral-stroke: var(--text-tertiary);
+	--board-color-neutral-fill: var(--text-tertiary);
+	--board-color-neutral-label: var(--text-primary);
+
+	--board-color-black-stroke: #000000;
+	--board-color-black-fill: #000000;
+	--board-color-black-label: var(--text-primary);
+
+	--board-color-white-stroke: #ffffff;
+	--board-color-white-fill: #ffffff;
+	--board-color-white-label: var(--text-primary);
+
+	--board-color-blue-stroke: var(--info-400);
+	--board-color-blue-fill: var(--info-400);
+	--board-color-blue-label: var(--text-primary);
+
+	--board-color-green-stroke: var(--success-400);
+	--board-color-green-fill: var(--success-400);
+	--board-color-green-label: var(--text-primary);
+
+	--board-color-amber-stroke: var(--warning-400);
+	--board-color-amber-fill: var(--warning-400);
+	--board-color-amber-label: var(--text-primary);
+
+	--board-color-violet-stroke: var(--identity-7);
+	--board-color-violet-fill: var(--identity-7);
+	--board-color-violet-label: var(--text-primary);
+
+	--board-color-rose-stroke: var(--error-400);
+	--board-color-rose-fill: var(--error-400);
+	--board-color-rose-label: var(--text-primary);
+
+	/* Identity tones; themes set `--identity-l` / `--identity-c`. */
+	--identity-1: oklch(var(--identity-l) var(--identity-c) 25);
+	--identity-2: oklch(var(--identity-l) var(--identity-c) 65);
+	--identity-3: oklch(var(--identity-l) var(--identity-c) 105);
+	--identity-4: oklch(var(--identity-l) var(--identity-c) 150);
+	--identity-5: oklch(var(--identity-l) var(--identity-c) 195);
+	--identity-6: oklch(var(--identity-l) var(--identity-c) 245);
+	--identity-7: oklch(var(--identity-l) var(--identity-c) 290);
+	--identity-8: oklch(var(--identity-l) var(--identity-c) 340);
+}
+
+@media (min-width: 960px) {
+	:root,
+	[data-theme] {
+		--list-gutter-x: 6px;
+		--list-row-pad-x: 6px;
+		--list-content-x: 12px;
+		--list-chip-inset: 0px;
+		--list-row-gap: 10px;
+	}
+}
+
+.list-compact {
+	--list-gutter-x: 6px;
+	--list-row-pad-x: 6px;
+	--list-content-x: 12px;
+	--list-chip-inset: 0px;
+	--list-row-gap: 10px;
+}
+
+/* Row heights mirror LIST_ROW_HEIGHT in list-page/list-row.ts. */
+@layer base {
+	[data-density] {
+		--list-row-height: 52px;
+		--list-avatar-size: 36px;
+		--list-title-size: 14px;
+		--list-title-leading: 18px;
+		--list-text-gap: 2px;
+		--list-subtitle-size: 12px;
+		--list-subtitle-leading: 16px;
+		--list-meta-size: 11px;
+		--list-title-color: var(--color-text-primary);
+		--list-title-weight: 500;
+		--list-subtitle-color: var(--color-text-tertiary);
+		--list-meta-color: var(--color-text-placeholder);
+	}
+
+	[data-density="comfortable"] {
+		--list-row-height: 60px;
+		--list-avatar-size: 40px;
+		--list-title-size: 16px;
+		--list-title-leading: 20px;
+		--list-text-gap: 3px;
+		--list-subtitle-size: 14px;
+		--list-subtitle-leading: 18px;
+		--list-meta-size: 12px;
+		--list-subtitle-color: color-mix(
+			in oklab,
+			var(--color-text-tertiary) 60%,
+			var(--color-text-placeholder)
+		);
+	}
+
+	[data-density="dense"] {
+		--list-row-height: auto;
+		--list-title-size: 13px;
+		--list-title-leading: 16px;
+		--list-subtitle-size: 10px;
+		--list-subtitle-leading: 14px;
+		--list-meta-size: 9.5px;
+		--list-title-color: var(--color-text-tertiary);
+		--list-title-weight: 400;
+		--list-subtitle-color: var(--color-text-placeholder);
+		--list-meta-color: color-mix(
+			in oklab,
+			var(--color-text-placeholder) 70%,
+			transparent
+		);
+	}
+}
+
+/* ============================================================
+   Tailwind v4 @theme — semantic design tokens
+   ============================================================ */
+@theme {
+	/* Breakpoints — px only: Tailwind sorts mixed units wrongly. */
+	--breakpoint-sm: 640px;
+	--breakpoint-md: 768px;
+	--breakpoint-lg: 960px;
+	--breakpoint-xl: 1280px;
+	--breakpoint-2xl: 1536px;
+
+	/* Fonts */
+	--font-sans: "Geist Variable", "Geist", system-ui, -apple-system, sans-serif;
+	--font-mono: "Geist Mono Variable", "Geist Mono", "Fira Code", ui-monospace, monospace;
+
+	--spacing-workspace: 2rem;
+
+	/* Motion; mirrored in $lib/motion.ts */
+	--ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+	--ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+
+	/* Backgrounds */
+	--color-bg-primary: var(--bg-primary);
+	--color-bg-content: var(--bg-content);
+	--color-bg-surface: var(--bg-surface);
+	--color-bg-surface-hover: var(--bg-surface-hover);
+	--color-bg-elevated: var(--bg-elevated);
+	--color-bg-subtle: var(--bg-subtle);
+	--color-bg-input: var(--bg-input);
+	--color-bg-code: var(--bg-code);
+	--color-bg-header-alt: var(--bg-header-alt);
+	--color-bg-hover: var(--bg-hover);
+	--color-bg-hover-strong: var(--bg-hover-strong);
+	--color-bg-active: var(--bg-active);
+	--color-app-bg: var(--bg-primary);
+	--color-sidebar-bg: var(--sidebar-bg);
+	--color-sidebar-border: var(--sidebar-border);
+	--color-sidebar-item-hover: var(--sidebar-item-hover-bg);
+	--color-sidebar-item-active: var(--sidebar-item-active-bg);
+	--color-sidebar-primary-action: var(--sidebar-primary-action-bg);
+	--color-sidebar-primary-action-hover: var(--sidebar-primary-action-bg-hover);
+	--color-chat-bg: var(--chat-bg);
+	--color-chat-panel: var(--chat-panel-bg);
+	--color-chat-user-message: var(--chat-user-message-bg);
+	--color-chat-composer: var(--chat-composer-bg);
+	--color-chat-composer-focus: var(--chat-composer-bg-focus);
+	--color-board-bg: var(--board-bg);
+
+	/* Text */
+	--color-text-primary: var(--text-primary);
+	--color-text-reading: var(--text-reading);
+	--color-text-secondary: var(--text-secondary);
+	--color-text-tertiary: var(--text-tertiary);
+	--color-text-placeholder: var(--text-placeholder);
+	--color-text-disabled: var(--text-disabled);
+
+	/* Borders */
+	--color-border-primary: var(--border-primary);
+	--color-border-default: var(--border-default);
+	--color-border-strong: var(--border-strong);
+	--color-border-subtle: var(--border-subtle);
+	--color-chat-panel-border: var(--chat-panel-border);
+	--color-chat-composer-border: var(--chat-composer-border);
+	--color-chat-composer-border-focus: var(--chat-composer-border-focus);
+	--color-sidebar-primary-action-border: var(--sidebar-primary-action-border);
+
+	/* Brand */
+	--color-brand: var(--brand);
+	--color-brand-hover: var(--brand-hover);
+	--color-brand-soft: var(--brand-soft);
+	--color-brand-bg: var(--brand-bg);
+	--color-brand-contrast-fg: var(--brand-contrast-fg);
+	--color-brand-muted-fg: var(--brand-muted-fg);
+	--color-brand-muted: var(--brand-muted);
+	--color-brand-muted-hover: var(--brand-muted-hover);
+	--color-brand-border: var(--brand-border);
+
+	/* Overlays */
+	--color-overlay-scrim: var(--overlay-scrim);
+	--color-overlay-scrim-strong: var(--overlay-scrim-strong);
+	--color-overlay-control: var(--overlay-control-bg);
+	--color-overlay-control-hover: var(--overlay-control-bg-hover);
+	--color-overlay-control-text: var(--overlay-control-text);
+
+	/* Providers */
+	--color-provider-discord: var(--provider-discord);
+	--color-provider-discord-bg: var(--provider-discord-bg);
+	--color-provider-discord-bg-hover: var(--provider-discord-bg-hover);
+	--color-provider-discord-border: var(--provider-discord-border);
+	--color-provider-discord-border-hover: var(--provider-discord-border-hover);
+	--color-provider-feishu: var(--provider-feishu);
+	--color-provider-feishu-bg: var(--provider-feishu-bg);
+	--color-provider-feishu-bg-hover: var(--provider-feishu-bg-hover);
+	--color-provider-feishu-border: var(--provider-feishu-border);
+	--color-provider-feishu-border-hover: var(--provider-feishu-border-hover);
+	--color-provider-wechat: var(--provider-wechat);
+	--color-provider-wechat-bg: var(--provider-wechat-bg);
+	--color-provider-wechat-bg-hover: var(--provider-wechat-bg-hover);
+	--color-provider-wechat-border: var(--provider-wechat-border);
+	--color-provider-wechat-border-hover: var(--provider-wechat-border-hover);
+
+	/* Semantic */
+	--color-success: var(--success-500);
+	--color-success-soft: var(--success-700);
+	--color-success-bg: var(--success-900);
+	--color-warning: var(--warning-500);
+	--color-warning-soft: var(--warning-700);
+	--color-warning-bg: var(--warning-900);
+	--color-error: var(--error-500);
+	--color-error-fg: var(--error-fg);
+	--color-error-soft: var(--error-700);
+	--color-error-bg: var(--error-900);
+	--color-info: var(--info-500);
+	--color-info-soft: var(--info-700);
+	--color-info-bg: var(--info-900);
+
+	/* Data visualizations */
+	--color-heatmap-0: var(--heatmap-0);
+	--color-heatmap-1: var(--heatmap-1);
+	--color-heatmap-2: var(--heatmap-2);
+	--color-heatmap-3: var(--heatmap-3);
+	--color-heatmap-4: var(--heatmap-4);
+
+	/* Status */
+	--color-status-running: var(--status-running);
+	--color-status-starting: var(--warning-400);
+	--color-status-error: var(--error-400);
+	--color-status-hibernated: var(--neutral-40);
+	--color-status-hibernating: var(--info-400);
+	--color-status-unknown: var(--text-placeholder);
+}
+
+/* Theme switch transition — only enabled for explicit settings clicks. */
+:root {
+	--theme-transition-x: 50vw;
+	--theme-transition-y: 50vh;
+	--theme-transition-radius: 150vmax;
+	--theme-transition-duration: 640ms;
+	--theme-transition-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+html[data-theme-transition="circle"],
+html[data-theme-transition="circle"] *,
+html[data-theme-transition="circle"] *::before,
+html[data-theme-transition="circle"] *::after {
+	transition: none;
+}
+
+html[data-theme-transition="circle"]::view-transition-group(root) {
+	animation-duration: var(--theme-transition-duration);
+	animation-timing-function: var(--theme-transition-ease);
+}
+
+html[data-theme-transition="circle"]::view-transition-old(root) {
+	animation: none;
+	mix-blend-mode: normal;
+}
+
+html[data-theme-transition="circle"]::view-transition-new(root) {
+	animation: theme-circle-reveal var(--theme-transition-duration)
+		var(--theme-transition-ease) both;
+	mix-blend-mode: normal;
+}
+
+@keyframes theme-circle-reveal {
+	from {
+		clip-path: circle(0 at var(--theme-transition-x) var(--theme-transition-y));
+	}
+	to {
+		clip-path: circle(
+			var(--theme-transition-radius) at var(--theme-transition-x)
+				var(--theme-transition-y)
+		);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	html[data-theme-transition="circle"]::view-transition-group(root),
+	html[data-theme-transition="circle"]::view-transition-old(root),
+	html[data-theme-transition="circle"]::view-transition-new(root) {
+		animation-duration: 1ms;
+	}
+}
+
+/* ============================================================
+   Mobile session push (IM-style) — Chats list ↔ session detail
+   Uses View Transitions API; only active when data-nav-transition
+   is set by navigation-transition.ts for compact viewports.
+
+   Scope the morph to the main content surface (not the whole root)
+   so chrome / drawers do not slide with the page. Theme circle
+   transitions still use root and are gated on a different attr.
+   ============================================================ */
+
+/* Promote the main surface into its own VT group only while active. */
+html[data-nav-transition] .mobile-session-vt-surface {
+	view-transition-name: cohub-session-surface;
+}
+
+/* Root: keep a static snapshot so shell chrome does not slide. */
+html[data-nav-transition="session-forward"]::view-transition-group(root),
+html[data-nav-transition="session-back"]::view-transition-group(root),
+html[data-nav-transition="session-forward"]::view-transition-old(root),
+html[data-nav-transition="session-forward"]::view-transition-new(root),
+html[data-nav-transition="session-back"]::view-transition-old(root),
+html[data-nav-transition="session-back"]::view-transition-new(root) {
+	animation: none;
+}
+
+html[data-nav-transition="session-forward"]::view-transition-group(cohub-session-surface),
+html[data-nav-transition="session-back"]::view-transition-group(cohub-session-surface) {
+	animation: none;
+}
+
+html[data-nav-transition="session-forward"]::view-transition-old(cohub-session-surface),
+html[data-nav-transition="session-forward"]::view-transition-new(cohub-session-surface),
+html[data-nav-transition="session-back"]::view-transition-old(cohub-session-surface),
+html[data-nav-transition="session-back"]::view-transition-new(cohub-session-surface) {
+	animation-duration: var(--motion-panel-duration);
+	animation-timing-function: var(--ease-out);
+	animation-fill-mode: both;
+}
+
+/* Forward: session covers the list from the right (IM push). */
+html[data-nav-transition="session-forward"]::view-transition-old(cohub-session-surface) {
+	animation-name: cohub-session-nav-exit-left;
+	z-index: 0;
+}
+
+html[data-nav-transition="session-forward"]::view-transition-new(cohub-session-surface) {
+	animation-name: cohub-session-nav-enter-right;
+	z-index: 1;
+}
+
+/* Back: session slides off to the right; list reappears underneath. */
+html[data-nav-transition="session-back"]::view-transition-old(cohub-session-surface) {
+	animation-name: cohub-session-nav-exit-right;
+	z-index: 1;
+}
+
+html[data-nav-transition="session-back"]::view-transition-new(cohub-session-surface) {
+	animation-name: cohub-session-nav-enter-left;
+	z-index: 0;
+}
+
+@keyframes cohub-session-nav-enter-right {
+	from {
+		transform: translate3d(100%, 0, 0);
+	}
+	to {
+		transform: translate3d(0, 0, 0);
+	}
+}
+
+@keyframes cohub-session-nav-exit-left {
+	from {
+		transform: translate3d(0, 0, 0);
+	}
+	to {
+		transform: translate3d(-28%, 0, 0);
+	}
+}
+
+@keyframes cohub-session-nav-enter-left {
+	from {
+		transform: translate3d(-28%, 0, 0);
+	}
+	to {
+		transform: translate3d(0, 0, 0);
+	}
+}
+
+@keyframes cohub-session-nav-exit-right {
+	from {
+		transform: translate3d(0, 0, 0);
+	}
+	to {
+		transform: translate3d(100%, 0, 0);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	html[data-nav-transition="session-forward"]::view-transition-old(cohub-session-surface),
+	html[data-nav-transition="session-forward"]::view-transition-new(cohub-session-surface),
+	html[data-nav-transition="session-back"]::view-transition-old(cohub-session-surface),
+	html[data-nav-transition="session-back"]::view-transition-new(cohub-session-surface) {
+		animation-duration: 1ms;
+	}
+}

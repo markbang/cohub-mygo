@@ -1,0 +1,261 @@
+/* --- Neta Studio Theme --- */
+/* Mirrors the live Neta Studio chat chrome: graphite panels, cream controls,
+   soft cream hairlines, a restrained teal status accent, and its tiled board
+   backdrop. */
+[data-theme="neta-studio"] {
+	color-scheme: dark;
+
+	/* Studio ink + panel scale. Top values match --studio-main; lower
+	   values mirror panel/detail surfaces from chat and gallery mode. */
+	--neutral-0: #f8f1e5;
+	--neutral-5: #ece1d2;
+	--neutral-10: rgba(236, 225, 210, 0.82);
+	--neutral-20: rgba(236, 225, 210, 0.68);
+	--neutral-30: rgba(236, 225, 210, 0.48);
+	--neutral-40: rgba(236, 225, 210, 0.3);
+	--neutral-50: #505050;
+	--neutral-60: #333333;
+	--neutral-70: #252325;
+	--neutral-80: #131216;
+	--neutral-90: #0a0a0a;
+	--neutral-95: #050605;
+	--neutral-100: #000000;
+
+	/* Brand scale — cream active controls, matching StudioModeTabs and
+	   Chat/Skills active pills. Teal is reserved for info/status accents. */
+	--brand-50: #fffaf0;
+	--brand-100: #f8f1e5;
+	--brand-200: #f4ecd9;
+	--brand-300: #ece1d2;
+	--brand-400: #ece1d2;
+	--brand-500: #f4ecd9;
+	--brand-600: #d8c5aa;
+	--brand-700: rgba(236, 225, 210, 0.68);
+	--brand-800: rgba(236, 225, 210, 0.3);
+	--brand-900: rgba(236, 225, 210, 0.11);
+	--brand-bg: rgba(246, 241, 231, 0.08);
+
+	/* Semantic colors — kept legible on graphite surfaces. */
+	--success-400: oklch(76% 0.11 150);
+	--success-500: #7ccf9a;
+	--success-700: var(--success-500);
+	--success-900: rgb(124 207 154 / 0.14);
+
+	--warning-400: oklch(82% 0.12 82);
+	--warning-500: #e3b65f;
+	--warning-700: var(--warning-500);
+	--warning-900: rgb(227 182 95 / 0.14);
+
+	--error-400: oklch(70% 0.15 30); /* Neta sync-error family */
+	--error-500: #e0726c;
+	--error-700: var(--error-500);
+	--error-fg: var(--neutral-0);
+	--error-900: rgb(224 114 108 / 0.14);
+
+	--info-400: #8ceae2;
+	--info-500: #6ee1d8;
+	--info-700: var(--info-500);
+	--info-900: rgb(110 225 216 / 0.14);
+
+	/* Backgrounds — chat/detail glass first, shell second. */
+	--bg-primary: #050605;
+	--bg-content: rgb(7 9 8 / 0.72);
+	--bg-surface: rgb(255 255 255 / 0.06);
+	--bg-surface-hover: rgb(236 225 210 / 0.18);
+	--bg-elevated: var(--neutral-80);
+	--bg-subtle: rgb(255 255 255 / 0.06);
+	--bg-input: var(--neutral-70);
+	--bg-code: #050605;
+	--bg-header-alt: #0a0a0a;
+
+	/* Text — Studio cream ink opacity ladder. */
+	--text-primary: var(--neutral-0);
+	--text-reading: var(--neutral-5);
+	--text-secondary: var(--neutral-20);
+	--text-tertiary: var(--neutral-30);
+	--text-placeholder: rgba(242, 237, 228, 0.46);
+	--text-disabled: var(--neutral-40);
+
+	/* Cream hairlines over dark glass. */
+	--border-primary: rgba(236, 225, 210, 0.18);
+	--border-default: var(--border-primary);
+	--border-subtle: rgba(236, 225, 210, 0.1);
+	--border-strong: rgba(236, 225, 210, 0.26);
+
+	/* Interactive states — Neta Studio uses translucent cream washes. */
+	--bg-hover: rgb(236 225 210 / 0.11);
+	--bg-hover-strong: rgb(236 225 210 / 0.11);
+	--bg-active: rgb(236 225 210 / 0.18);
+
+	/* Scrollbar */
+	--scrollbar-thumb: rgba(236, 225, 210, 0.085);
+	--scrollbar-thumb-hover: rgba(236, 225, 210, 0.105);
+
+	/* Selection */
+	--selection-bg: color-mix(in srgb, var(--brand) 30%, transparent);
+	--divider-muted: color-mix(in srgb, var(--border-subtle) 65%, transparent);
+
+	/* Brand semantics */
+	--brand: var(--brand-400);
+	--brand-hover: var(--brand-500);
+	--brand-soft: var(--brand-700);
+	--brand-contrast-fg: #050605;
+	--brand-muted-fg: var(--text-reading);
+	--brand-muted: rgba(246, 241, 231, 0.08);
+	--brand-muted-hover: rgba(246, 241, 231, 0.11);
+	--brand-border: rgba(236, 225, 210, 0.26);
+
+	/* Overlays */
+	--overlay-scrim: oklch(0% 0 0 / 0.62);
+	--overlay-scrim-strong: oklch(0% 0 0 / 0.86);
+	--overlay-control-bg: oklch(100% 0 0 / 0.1);
+	--overlay-control-bg-hover: oklch(100% 0 0 / 0.18);
+	--overlay-control-text: var(--neutral-0);
+
+	/* Provider colors */
+	--provider-discord: oklch(62% 0.16 275);
+	--provider-discord-bg: color-mix(
+		in srgb,
+		var(--provider-discord) 10%,
+		transparent
+	);
+	--provider-discord-bg-hover: color-mix(
+		in srgb,
+		var(--provider-discord) 14%,
+		transparent
+	);
+	--provider-discord-border: color-mix(
+		in srgb,
+		var(--provider-discord) 22%,
+		transparent
+	);
+	--provider-discord-border-hover: color-mix(
+		in srgb,
+		var(--provider-discord) 42%,
+		transparent
+	);
+	--provider-feishu: oklch(70% 0.12 220);
+	--provider-feishu-bg: color-mix(
+		in srgb,
+		var(--provider-feishu) 10%,
+		transparent
+	);
+	--provider-feishu-bg-hover: color-mix(
+		in srgb,
+		var(--provider-feishu) 14%,
+		transparent
+	);
+	--provider-feishu-border: color-mix(
+		in srgb,
+		var(--provider-feishu) 22%,
+		transparent
+	);
+	--provider-feishu-border-hover: color-mix(
+		in srgb,
+		var(--provider-feishu) 42%,
+		transparent
+	);
+	--provider-wechat: oklch(72% 0.14 160);
+	--provider-wechat-bg: color-mix(
+		in srgb,
+		var(--provider-wechat) 10%,
+		transparent
+	);
+	--provider-wechat-bg-hover: color-mix(
+		in srgb,
+		var(--provider-wechat) 14%,
+		transparent
+	);
+	--provider-wechat-border: color-mix(
+		in srgb,
+		var(--provider-wechat) 22%,
+		transparent
+	);
+	--provider-wechat-border-hover: color-mix(
+		in srgb,
+		var(--provider-wechat) 42%,
+		transparent
+	);
+
+	/* Effects */
+	--shadow-subtle: oklch(0% 0 0 / 0.12);
+	--shadow-medium: oklch(0% 0 0 / 0.24);
+	--shadow-strong: oklch(0% 0 0 / 0.38);
+	--brand-ring: color-mix(in srgb, var(--brand) 28%, transparent);
+	--status-running: #6ee1d8;
+	--mask-opaque: black;
+	--identity-l: 78%;
+	--identity-c: 0.12;
+
+	/* App background — Neta Studio slate board texture. Opaque navigation and
+	   chat surfaces keep the reading layer calm above it. */
+	--app-bg-image: url("https://neta.art/studio/03834db7-ab27-40e6-8da8-1783002a4fcf.webp");
+	--app-bg-overlay: none;
+	--app-bg-size: auto;
+	--app-bg-position: center;
+	--app-bg-repeat: repeat;
+
+	/* Sidebar */
+	--sidebar-bg: #1a191a;
+	--sidebar-border: rgba(236, 225, 210, 0.1);
+	--sidebar-item-bg: transparent;
+	--sidebar-item-hover-bg: rgba(236, 225, 210, 0.08);
+	--sidebar-item-active-bg: rgba(246, 241, 231, 0.14);
+	--sidebar-item-active-fg: var(--text-primary);
+	--sidebar-item-radius: 7px;
+	--sidebar-primary-action-bg: #ece1d2;
+	--sidebar-primary-action-bg-hover: #f8f1e5;
+	--sidebar-primary-action-fg: #0b0a0c;
+	--sidebar-primary-action-border: transparent;
+	--sidebar-primary-action-radius: 9999px;
+
+	/* Chat */
+	--chat-bg: #1a191a;
+	--chat-panel-bg: rgba(19, 18, 22, 0.95);
+	--chat-panel-border: rgba(236, 225, 210, 0.09);
+	--chat-user-message-bg: rgba(255, 255, 255, 0.08);
+	--chat-user-message-fg: var(--text-primary);
+	--chat-user-message-max-width: min(42rem, 85%);
+	--chat-user-message-radius: 12px;
+	--chat-user-message-tail-radius: 12px;
+	--chat-content-max-width: 48rem;
+	--chat-msg-inset: 0.5rem;
+	--chat-assistant-message-bg: transparent;
+	--chat-assistant-message-fg: var(--text-primary);
+	--chat-composer-bg: rgba(242, 237, 228, 0.065);
+	--chat-composer-bg-focus: rgba(242, 237, 228, 0.08);
+	--chat-composer-border: rgba(243, 231, 210, 0.08);
+	--chat-composer-border-focus: rgba(236, 225, 210, 0.26);
+	--chat-composer-radius: 18px;
+	--chat-composer-placeholder: rgba(242, 237, 228, 0.4);
+
+	/* Board */
+	--board-card: var(--neutral-80);
+	--board-selection-accent: #3b82f6;
+	--board-selection-outset: 0;
+	--board-frame-label-size: 16;
+	--board-backdrop-pattern: none;
+	--board-backdrop-image: "/board/neta-studio.webp";
+	--board-backdrop-image-width: 1422;
+	--board-backdrop-image-height: 1000;
+
+	/* Data visualizations */
+	--heatmap-0: var(--bg-elevated);
+	--heatmap-1: color-mix(in srgb, var(--info-500) 35%, transparent);
+	--heatmap-2: color-mix(in srgb, var(--info-500) 55%, transparent);
+	--heatmap-3: color-mix(in srgb, var(--info-500) 75%, transparent);
+	--heatmap-4: color-mix(in srgb, var(--info-500) 95%, transparent);
+}
+
+[data-theme="neta-studio"] .new-chat-collapsed {
+	border: 1px solid var(--sidebar-primary-action-border);
+	border-radius: var(--sidebar-primary-action-radius);
+	background: var(--sidebar-primary-action-bg);
+	color: var(--sidebar-primary-action-fg);
+	box-shadow: 0 6px 16px rgb(0 0 0 / 18%);
+
+	&:hover {
+		background: var(--sidebar-primary-action-bg-hover);
+		color: var(--sidebar-primary-action-fg);
+	}
+}
