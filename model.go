@@ -38,6 +38,7 @@ type sessionTurns struct {
 type app struct {
 	win *mygo.Window
 	api *client
+	rt  *realtime
 	now func() time.Time
 	// sync runs loads when the test flushes them instead of on goroutines.
 	sync    bool
@@ -192,6 +193,7 @@ func (a *app) start() {
 	a.spawn(a.refresh)
 	if !a.sync {
 		go a.poll()
+		a.startRealtime()
 	}
 }
 
@@ -228,6 +230,9 @@ func (a *app) refresh() {
 		if models != nil {
 			a.models = models
 		}
+		if a.rt != nil {
+			a.rt.watch(a.currentSpace())
+		}
 		if a.route.kind == routeSessions && len(sessions) > 0 && !a.compact {
 			a.go_(route{kind: routeSession, session: sessions[0].ID})
 		}
@@ -253,10 +258,11 @@ func (a *app) poll() {
 			close(done)
 		})
 		<-done
-		if sessionID != "" && running {
+		live := a.rt.live()
+		if sessionID != "" && running && (!live || i%3 == 0) {
 			a.loadTurns(sessionID)
 		}
-		if i%8 == 0 {
+		if i%8 == 0 && (!live || i%16 == 0) {
 			a.refresh()
 			if spaceID != "" {
 				a.loadSpaceSessions(spaceID)
@@ -370,6 +376,9 @@ func (a *app) show(r route) {
 		if a.api != nil {
 			a.spawn(func() { a.loadTurns(id) })
 		}
+	}
+	if a.rt != nil {
+		a.rt.watch(a.currentSpace())
 	}
 	if sp := a.route.space; sp != "" && a.route.area() == areaSpace {
 		a.once("space-sessions:"+sp, func(context.Context) { a.loadSpaceSessions(sp) })

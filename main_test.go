@@ -288,3 +288,33 @@ func TestCompare(t *testing.T) {
 		})
 	}
 }
+
+// TestRealtimeConnects checks the gateway takes the account's token:
+// COHUB_LIVE=1 go test -run Realtime.
+func TestRealtimeConnects(t *testing.T) {
+	if os.Getenv("COHUB_LIVE") == "" {
+		t.Skip("COHUB_LIVE not set")
+	}
+	cl, err := newClient()
+	if err != nil {
+		t.Skip(err)
+	}
+	a := newApp()
+	a.api = cl
+	a.startRealtime()
+	a.rt.watch("daf9537a-1c37-4953-9499-8ad794d9d5f4", "e0b76505-50ad-4899-8ff6-22e8c874569f")
+	deadline := time.Now().Add(15 * time.Second)
+	for !a.rt.live() && time.Now().Before(deadline) {
+		time.Sleep(100 * time.Millisecond)
+	}
+	if !a.rt.live() {
+		t.Fatalf("not connected: %s", a.rt.lastStatus)
+	}
+	time.Sleep(6 * time.Second)
+	a.rt.mu.Lock()
+	defer a.rt.mu.Unlock()
+	t.Logf("events %v", a.rt.seen)
+	if !a.rt.rooms["space:daf9537a-1c37-4953-9499-8ad794d9d5f4"] {
+		t.Errorf("rooms %v", a.rt.rooms)
+	}
+}
