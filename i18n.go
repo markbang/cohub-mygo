@@ -23,6 +23,13 @@ var locale = "zh-CN"
 // extraMessages are the app's words the web's catalogs lack, as
 // zh-CN and en.
 var extraMessages = map[string][2]string{
+	"x_sign_out_detail": {"会同时退出 cohub 命令行的登录。", "This also signs the cohub CLI out."},
+	"x_login_hint":        {"Cohub 桌面版与 cohub 命令行共用账号。登录会在浏览器里确认。", "Cohub for desktop shares its account with the cohub CLI. You confirm the sign-in in your browser."},
+	"x_login_code":        {"在浏览器中确认这个代码", "Confirm this code in your browser"},
+	"x_login_waiting":     {"等待浏览器确认…", "Waiting for the browser…"},
+	"x_login_failed":      {"登录没有完成，请重试。", "The sign-in did not finish. Try again."},
+	"x_login_no_cli":      {"需要 cohub 命令行：npm i -g @neta-art/cohub-cli", "This needs the cohub CLI: npm i -g @neta-art/cohub-cli"},
+	"x_login_demo":        {"先看看演示", "Look at the demo first"},
 	"x_reveal":            {"显示", "Show"},
 	"x_restart":           {"重启", "Restart"},
 	"x_source":            {"源码", "Source"},

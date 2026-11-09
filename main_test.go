@@ -520,3 +520,28 @@ func TestSessionRowActions(t *testing.T) {
 	}
 	snapshot(t, tt, "desktop-row-rename")
 }
+
+func TestLoginScreen(t *testing.T) {
+	a := demoApp(t)
+	a.login.needed = true
+	tt := ui.NewTester(a.view, 1440, 900)
+	if !tt.HasText(m("app_auth_sign_in")) {
+		t.Fatalf("texts %q", tt.Texts())
+	}
+	snapshot(t, tt, "desktop-login")
+	if err := tt.Click(m("x_login_demo")); err != nil {
+		t.Fatal(err)
+	}
+	if a.login.needed {
+		t.Fatal("the demo did not open")
+	}
+}
+
+func TestTypingIsNotAShortcut(t *testing.T) {
+	a := demoApp(t)
+	tt := ui.NewTester(a.view, 1440, 900)
+	tt.Type("jkgG")
+	if a.draft != "jkgG" {
+		t.Fatalf("draft %q", a.draft)
+	}
+}

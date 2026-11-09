@@ -8,6 +8,7 @@ import (
 // loadDemo fills the app with data shaped as the API's, for tests and for
 // running without a Cohub account.
 func loadDemo(a *app) {
+	a.spaces, a.sessions = nil, nil
 	now := a.now()
 	at := func(d time.Duration) time.Time { return now.Add(-d) }
 	me := &Profile{UserUUID: "u1", Username: "bangwu", DisplayName: "bangwu"}

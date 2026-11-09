@@ -651,12 +651,14 @@ func (a *app) accountRow(c *ui.Context) {
 			items = append(items, menuItem{icon: "settings", label: m("nav_settings"), run: func() { a.go_(route{kind: routeSettings, sub: "general"}) }})
 		}
 		items = append(items,
-			menuItem{icon: "chart-column", label: m("sidebar_trending")},
-			menuItem{icon: "message-square-text", label: m("sidebar_feedback")},
-			menuItem{icon: "log-out", label: m("sidebar_sign_out")},
+			menuItem{icon: "chart-column", label: m("sidebar_trending"), run: func() { a.openURL("https://cohub.live/trending") }},
+			menuItem{icon: "message-square-text", label: m("sidebar_feedback"), run: func() { a.feedback = feedbackForm{open: true} }},
+			menuItem{icon: "log-out", label: m("sidebar_sign_out"), run: a.signOut},
 		)
 		a.menuWidth(c, who, &a.userMenu, sidebarWidth-12, items)
-		a.iconButton(c.Key("help"), "circle-help", m("sidebar_help"), false)
+		if a.iconButton(c.Key("help"), "circle-help", m("sidebar_help"), false).Clicked() {
+			a.helpOpen = true
+		}
 	})
 }
 

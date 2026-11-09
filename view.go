@@ -23,6 +23,9 @@ func (a *app) view(c *ui.Context) {
 	c.OnShortcut(ui.Cmd, ui.KeyK, func() { a.palette.toggle(paletteAll) })
 	c.OnShortcut(ui.Cmd, ui.KeyComma, func() { a.go_(route{kind: routeSettings, sub: "general"}) })
 	c.OnShortcut(ui.Cmd, ui.KeyBracketLeft, func() { a.goBack() })
+	c.OnShortcut(ui.Cmd|ui.Shift, ui.KeyM, func() { a.menus["model"] = true })
+	c.OnShortcut(ui.Ctrl|ui.Alt, ui.KeyRight, func() { a.panelOpen = !a.panelOpen })
+	a.pageKeys(c)
 
 	w, _ := c.Size()
 	a.width = w
@@ -36,6 +39,10 @@ func (a *app) view(c *ui.Context) {
 		if !compact && a.route.kind == routeSessions {
 			a.show(a.route)
 		}
+	}
+	if a.login.needed {
+		a.loginView(c)
+		return
 	}
 	if a.compact {
 		a.compactView(c)
@@ -71,6 +78,8 @@ func (a *app) view(c *ui.Context) {
 	})
 	a.noticesView(c)
 	a.paletteView(c)
+	a.helpView(c)
+	a.feedbackView(c)
 	a.confirmView(c)
 	a.toastView(c)
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
@@ -103,8 +104,12 @@ type app struct {
 	notices                      []*turnNotice         // finished turns the user did not see
 	rowRenaming                  string                // the chat row whose title is being edited
 	boardViews                   map[string]*boardView // each board's pan and zoom
-	inHeader                     bool                  // building a header: compact icon buttons grow to 40px
-	width                        float32               // the window's width, as media queries see it
+	login                        loginState
+	helpOpen                     bool
+	feedback                     feedbackForm
+	lastG                        time.Time
+	inHeader                     bool    // building a header: compact icon buttons grow to 40px
+	width                        float32 // the window's width, as media queries see it
 	purchase                     purchaseState
 	redeem                       redeemState
 	subsPage                     int
@@ -241,6 +246,11 @@ func (a *app) reload(key string) { delete(a.loading, key) }
 func (a *app) start() {
 	cl, err := newClient()
 	if err != nil {
+		if errors.Is(err, errNoAccount) {
+			// No account yet: sign in through the CLI's device login.
+			a.login.needed = true
+			return
+		}
 		a.status = err.Error()
 		loadDemo(a)
 		return
