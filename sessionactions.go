@@ -41,8 +41,7 @@ func (a *app) act(fn func(ctx context.Context) error, reload ...string) {
 		err := fn(ctx)
 		a.update(func() {
 			if err != nil {
-				a.toast = err.Error()
-				a.toastAt = time.Now()
+				a.toast, a.toastAt, a.toastOK = err.Error(), time.Now(), false
 				return
 			}
 			for _, k := range reload {

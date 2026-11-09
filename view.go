@@ -87,7 +87,11 @@ func (a *app) toastView(c *ui.Context) {
 	p := a.pal
 	ui.Row(c.Key("toast")).Attach(ui.AnchorBottom, ui.AnchorBottom).Bottom(24).MaxWidth(480).Gap(8).AlignItems(ui.Center).
 		Padding(10, 14).Radius(10).Background(p.bgElevated).Border(1, p.borderSubtle).Shadow(0, 10, 30, 0, ui.RGBA(0, 0, 0, 0.15)).Children(func() {
-		ui.Icon(c, icon("circle-alert")).Size(14, 14).TextColor(p.errorC)
+		if a.toastOK {
+			ui.Icon(c, icon("circle-check")).Size(14, 14).TextColor(p.success)
+		} else {
+			ui.Icon(c, icon("circle-alert")).Size(14, 14).TextColor(p.errorC)
+		}
 		ui.Text(c, a.toast).FontSize(12).TextColor(p.text).MaxLines(3)
 	})
 }
@@ -256,4 +260,9 @@ func (a *app) rightPanel(c *ui.Context) {
 		})
 		ui.Column(c).Grow(1).MinHeight(0).Children(func() { a.panelContent(c, tab) })
 	})
+}
+
+// notify shows a toast that something went well.
+func (a *app) notify(msg string) {
+	a.toast, a.toastAt, a.toastOK = msg, time.Now(), true
 }

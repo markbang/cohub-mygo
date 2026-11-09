@@ -148,14 +148,27 @@ func (a *app) generalSettings(c *ui.Context) {
 			}
 			ui.Column(c).Width(64).AlignItems(ui.Center).Gap(6).Shrink(0).Children(func() {
 				a.avatar(c, av, name, 56, 28)
-				ui.Row(c).Gap(4).AlignItems(ui.Center).Children(func() {
+				ch := ui.ButtonBase(c.Key("avatar")).Row().Gap(4).AlignItems(ui.Center).Label(m("common_change")).FocusRing(false).Children(func() {
 					ui.Icon(c, icon("upload")).Size(12, 12).TextColor(p.textTertiary)
 					ui.Text(c, m("common_change")).FontSize(11).TextColor(p.textTertiary)
 				})
+				if ch.Clicked() {
+					a.pickAvatar("user_avatar", "", func(ctx context.Context, u string) error {
+						err := a.api.do(ctx, "PATCH", "/api/me/profile", map[string]any{"avatarUrl": u}, nil)
+						if err == nil {
+							a.refresh()
+						}
+						return err
+					})
+				}
 			})
 			ui.Column(c).Grow(1).MinWidth(0).Gap(6).Padding(2, 0).Children(func() {
-				ui.Text(c, name).FontSize(15).FontWeight(500)
-				ui.Text(c, "@"+user).FontSize(12).TextColor(p.textTertiary)
+				a.profileField(c, "displayName", name, name, 15, 500)
+				label := "@" + user
+				if user == "" {
+					label = m("settings_username")
+				}
+				a.profileField(c, "username", label, user, 12, 400)
 				kv := func(k, v string, copy bool) {
 					ui.Row(c.Key(k)).Gap(6).AlignItems(ui.Center).Children(func() {
 						ui.Text(c, k).FontSize(11).LetterSpacing(0.6).TextColor(p.textTertiary)
@@ -362,7 +375,12 @@ func (a *app) referralsPage(c *ui.Context) {
 				if cp.Clicked() {
 					c.WriteClipboard(url)
 				}
-				ui.Row(c.Key("share")).Gap(6).AlignItems(ui.Center).Height(36).Padding(0, 12).Radius(5).Border(1, p.borderSubtle).Children(func() {
+				sh := ui.ButtonBase(c.Key("share")).Row().Gap(6).AlignItems(ui.Center).Height(36).Padding(0, 12).Radius(5).Border(1, p.borderSubtle).FocusRing(false)
+				if sh.Clicked() {
+					c.WriteClipboard(m("referral_try_title") + " — " + m("referral_share_text", "amount", fmt.Sprintf("US$%.2f", d.Reward.InviteeUSD)) + " " + url)
+					a.notify(m("referral_copied"))
+				}
+				sh.Children(func() {
 					ui.Icon(c, icon("share-2")).Size(14, 14).TextColor(p.textSecond)
 					ui.Text(c, m("referral_share")).FontSize(12).TextColor(p.textSecond)
 				})
@@ -384,10 +402,20 @@ func (a *app) referralsPage(c *ui.Context) {
 		ui.Row(c.Key("list-head")).AlignItems(ui.Center).Padding(0, 0, 12, 0).Children(func() {
 			ui.Text(c, m("page_title_referrals")).FontSize(13).FontWeight(500)
 			ui.Text(c, fmt.Sprintf(" · %d", d.Summary.Total)).FontSize(13).TextColor(p.textTertiary).Grow(1)
-			ui.Row(c).Gap(6).AlignItems(ui.Center).Padding(0, 8).Children(func() {
+			rot := ui.ButtonBase(c.Key("rotate")).Row().Gap(6).AlignItems(ui.Center).Height(32).Padding(0, 8).Radius(5).FocusRing(false).Children(func() {
 				ui.Icon(c, icon("refresh-cw")).Size(12, 12).TextColor(p.textTertiary)
 				ui.Text(c, m("referral_replace_link")).FontSize(11).TextColor(p.textTertiary)
 			})
+			if rot.Hovered() {
+				rot.Background(p.hover)
+			}
+			if rot.Clicked() {
+				a.confirm(m("referral_replace_link"), m("referral_rotate_confirm"), m("referral_replace_link"), func() {
+					a.act(func(ctx context.Context) error {
+						return a.api.do(ctx, "POST", "/api/me/referrals/code/rotate", map[string]any{}, nil)
+					}, "referrals")
+				})
+			}
 		})
 		ui.Column(c.Key("list")).BorderWidth(1, 0, 1, 0).BorderColor(p.borderSubtle).Children(func() {
 			if len(d.Items) == 0 {
@@ -441,7 +469,9 @@ func (a *app) rulesPage(c *ui.Context) {
 			if a.button(c, "refresh-cw", m("rules_refresh"), false).Clicked() {
 				a.reload("rules")
 			}
-			a.button(c, "external-link", m("rules_open_home"), true)
+			if a.button(c, "external-link", m("rules_open_home"), true).Clicked() {
+				a.openHome()
+			}
 		})
 		ui.Row(c.Key("warn")).Gap(10).Padding(12).Radius(6).Background(p.warning.Alpha(0.12)).Margin(20, 0, 0, 0).Children(func() {
 			ui.Icon(c, icon("shield-alert")).Size(16, 16).TextColor(p.warning)
@@ -507,8 +537,11 @@ func (a *app) channelsPage(c *ui.Context) {
 				ui.Text(c, m("page_title_channels")).FontSize(18).FontWeight(600)
 				ui.Text(c, m("channels_description")).FontSize(13).TextColor(p.textTertiary)
 			})
-			a.button(c, "plus", m("channels_add"), true)
+			if a.button(c, "plus", m("channels_add"), true).Clicked() {
+				a.channelNew = channelForm{open: true}
+			}
 		})
+		a.channelDialog(c)
 		if list == nil || !ok {
 			a.loadingBlock(c, err, 160)
 			return
@@ -573,11 +606,16 @@ func (a *app) channelsPage(c *ui.Context) {
 							ui.Text(c, m("channels_not_bound")).FontSize(12).TextColor(p.placeholder)
 						}
 					}, func() {
-						col := p.placeholder
-						if ch.BoundSpace == nil {
-							col = p.textSecond
+						id := ch.ID
+						del := ui.ButtonBase(c.Key("del")).Size(24, 24).Center().Radius(5).Label(m("channels_delete_title")).FocusRing(false).Children(func() {
+							ui.Icon(c, icon("trash-2")).Size(14, 14).TextColor(p.textSecond)
+						})
+						if del.Hovered() {
+							del.Background(p.errorC.Alpha(0.08))
 						}
-						ui.Icon(c, icon("trash-2")).Size(14, 14).TextColor(col)
+						if del.Clicked() {
+							a.deleteChannel(id)
+						}
 					})
 				})
 			}
@@ -600,3 +638,83 @@ func providerColor(provider string, p *palette) ui.Color {
 }
 
 var _ = markdown.View
+
+// profileField is the general settings' name or handle: text that a
+// click turns into a box, saved with Enter.
+func (a *app) profileField(c *ui.Context, field, shown, value string, size float32, weight int) {
+	p := a.pal
+	if a.editingProfile == field {
+		ui.Row(c.Key("edit-" + field)).Gap(6).AlignItems(ui.Center).Children(func() {
+			in := ui.TextInputBase(c.Key("in"), &a.profileDraft).FontSize(size).Height(size+16).Padding(0, 8).Radius(5).
+				Border(1, p.brand.Alpha(0.4)).Background(p.bgInput).Grow(1).AutoFocus().Label(field)
+			save := func() {
+				v := strings.TrimSpace(a.profileDraft)
+				a.editingProfile = ""
+				if v == value {
+					return
+				}
+				a.act(func(ctx context.Context) error {
+					in := map[string]any{field: v}
+					if field == "username" && v == "" {
+						in[field] = nil
+					}
+					if field == "displayName" && v == "" {
+						return fmt.Errorf("%s", m("settings_display_name_required"))
+					}
+					err := a.api.do(ctx, "PATCH", "/api/me/profile", in, nil)
+					if err == nil {
+						a.refresh()
+					}
+					return err
+				})
+			}
+			if in.Submitted() {
+				save()
+			}
+			in.OnShortcut(0, ui.KeyEscape, func() { a.editingProfile = "" })
+			if a.iconButton(c.Key("ok"), "check", m("common_save"), false).Clicked() {
+				save()
+			}
+			if a.iconButton(c.Key("no"), "x", m("common_cancel"), false).Clicked() {
+				a.editingProfile = ""
+			}
+		})
+		return
+	}
+	row := ui.Row(c.Key("show-"+field)).Gap(6).AlignItems(ui.Center).AlignSelf(ui.Start).Padding(1, 4).Margin(0, 0, 0, -4).Radius(5).Cursor(ui.CursorPointer)
+	hover := row.Hovered()
+	row.Children(func() {
+		col := p.text
+		if size < 14 {
+			col = p.textTertiary
+		}
+		if hover {
+			col = p.brand
+		}
+		ui.Text(c, shown).FontSize(size).FontWeight(weight).TextColor(col)
+		pen := ui.Icon(c, icon("pencil")).Size(12, 12).TextColor(p.placeholder)
+		if !hover {
+			pen.Opacity(0)
+		}
+	})
+	if hover {
+		row.Background(p.hover)
+	}
+	if row.Clicked() {
+		a.editingProfile, a.profileDraft = field, value
+	}
+}
+
+// openHome opens the user's Home Space, making it first if need be.
+func (a *app) openHome() {
+	a.act(func(ctx context.Context) error {
+		var out struct {
+			Space *Space `json:"space"`
+		}
+		err := a.api.do(ctx, "POST", "/api/me/spaces/home", map[string]any{}, &out)
+		if err == nil && out.Space != nil {
+			a.update(func() { a.openSpace(out.Space.ID) })
+		}
+		return err
+	})
+}

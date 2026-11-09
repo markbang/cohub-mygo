@@ -265,7 +265,7 @@ func (a *app) spaceAccess(c *ui.Context, d *spaceDetail) {
 					var out invitation
 					err := a.api.do(ctx, "POST", sp(d.ID)+"/invitations", map[string]any{"role": "builder"}, &out)
 					if err == nil {
-						a.update(func() { a.toast, a.toastAt = m("space_invite_created"), time.Now() })
+						a.update(func() { a.notify(m("space_invite_created")) })
 					}
 					return err
 				}, "invites:"+d.ID)

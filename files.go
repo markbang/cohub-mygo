@@ -207,7 +207,7 @@ func (a *app) downloadFile(spaceID, p string) {
 			err = os.WriteFile(dest, b, 0o644)
 		}
 		if err != nil {
-			a.update(func() { a.toast, a.toastAt = err.Error(), time.Now() })
+			a.update(func() { a.toast, a.toastAt, a.toastOK = err.Error(), time.Now(), false })
 		}
 	}()
 }

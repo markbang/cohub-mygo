@@ -61,57 +61,60 @@ type app struct {
 	images        *imageCache
 	pages         pageData
 
-	route        route
-	back         []route
-	chip         string // the chats sidebar's Space filter, "" for all
-	spacesNav    int
-	chats        chatsFilter           // the inbox's source, "web" at first
-	chipSpaces   []string              // the chips, fixed once shown
-	chipChats    map[string][]*Session // a chip's chats by chip and filter
-	panelTab     int
-	theme        string // a built-in theme's name, or "system"
-	prefs        prefs
-	sidebarOpen  bool
-	attachments  []*attachment // the composer's files, before they are sent
-	voice        *voiceInput
-	toast        string // the last failed action, shown for a while
-	toastAt      time.Time
-	renaming     string // the chat whose title is being edited
-	renameText   string
-	shareOpen    bool
-	copiedAt     time.Time
-	labelTarget  *labelTarget
-	statsFor     string               // the chat whose statistics are open
-	editors      map[string]*fileEdit // open files by space:path
-	fsPending    *fsCreate
-	uploading    int
-	cron         *cronForm
-	cpTab        map[string]int // a save's tab: changes, files
-	copiedValue  string
-	forking      string // the turn a fork is being made from
-	spaceEdits   map[string]*spaceEdit
-	confirmBox   *confirmBox
-	windowWide   bool            // the window takes the main column's room
-	viewportOff  map[string]bool // windows the user took out of the prompt's context
-	inHeader     bool            // building a header: compact icon buttons grow to 40px
-	width        float32         // the window's width, as media queries see it
-	purchase     purchaseState
-	redeem       redeemState
-	subsPage     int
-	mediaFilter  string // the media panel's type: all, image, video, audio
-	compactPanel bool   // the side panel, over the chat in the compact shell
-	panelOpen    bool
-	userMenu     bool
-	palette      paletteState
-	draft        string
-	sending      bool
-	sendErr      string
-	groupsOpen   map[string]bool
-	compactNav   bool // the compact shell's drawer
-	newSpace     newSpaceForm
-	menus        map[string]bool
-	foldOpen     map[string]bool
-	modelChoices map[string]modelChoice
+	route                        route
+	back                         []route
+	chip                         string // the chats sidebar's Space filter, "" for all
+	spacesNav                    int
+	chats                        chatsFilter           // the inbox's source, "web" at first
+	chipSpaces                   []string              // the chips, fixed once shown
+	chipChats                    map[string][]*Session // a chip's chats by chip and filter
+	panelTab                     int
+	theme                        string // a built-in theme's name, or "system"
+	prefs                        prefs
+	sidebarOpen                  bool
+	attachments                  []*attachment // the composer's files, before they are sent
+	voice                        *voiceInput
+	toast                        string // the last failed action, shown for a while
+	toastAt                      time.Time
+	toastOK                      bool
+	renaming                     string // the chat whose title is being edited
+	renameText                   string
+	shareOpen                    bool
+	copiedAt                     time.Time
+	labelTarget                  *labelTarget
+	statsFor                     string               // the chat whose statistics are open
+	editors                      map[string]*fileEdit // open files by space:path
+	fsPending                    *fsCreate
+	uploading                    int
+	cron                         *cronForm
+	cpTab                        map[string]int // a save's tab: changes, files
+	copiedValue                  string
+	forking                      string // the turn a fork is being made from
+	spaceEdits                   map[string]*spaceEdit
+	editingProfile, profileDraft string
+	channelNew                   channelForm
+	confirmBox                   *confirmBox
+	windowWide                   bool            // the window takes the main column's room
+	viewportOff                  map[string]bool // windows the user took out of the prompt's context
+	inHeader                     bool            // building a header: compact icon buttons grow to 40px
+	width                        float32         // the window's width, as media queries see it
+	purchase                     purchaseState
+	redeem                       redeemState
+	subsPage                     int
+	mediaFilter                  string // the media panel's type: all, image, video, audio
+	compactPanel                 bool   // the side panel, over the chat in the compact shell
+	panelOpen                    bool
+	userMenu                     bool
+	palette                      paletteState
+	draft                        string
+	sending                      bool
+	sendErr                      string
+	groupsOpen                   map[string]bool
+	compactNav                   bool // the compact shell's drawer
+	newSpace                     newSpaceForm
+	menus                        map[string]bool
+	foldOpen                     map[string]bool
+	modelChoices                 map[string]modelChoice
 
 	sessionList ui.ListState
 	spaceList   ui.ListState
