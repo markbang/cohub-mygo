@@ -22,6 +22,7 @@ const (
 	routeSpaceCheckpoint                  // /spaces/:id/checkpoints/:cid (or new)
 	routeSpaceTask                        // /spaces/:id/tasks/:tid
 	routeSpaceCron                        // /spaces/:id/cronjobs/:cid (or new)
+	routeSpaceApp                         // /spaces/:id/apps/:appId
 	routeSettings                         // /settings/:section
 )
 
@@ -95,6 +96,8 @@ func parseRoute(p string) route {
 			r.kind, r.sub = routeSpaceTask, at(3)
 		case "cronjobs":
 			r.kind, r.sub = routeSpaceCron, at(3)
+		case "apps":
+			r.kind, r.sub = routeSpaceApp, at(3)
 		}
 		return r
 	case "settings":
@@ -145,6 +148,8 @@ func (r route) path() string {
 		return "/spaces/" + r.space + "/tasks/" + r.sub
 	case routeSpaceCron:
 		return "/spaces/" + r.space + "/cronjobs/" + r.sub
+	case routeSpaceApp:
+		return "/spaces/" + r.space + "/apps/" + r.sub
 	case routeSettings:
 		return "/settings/" + r.sub
 	}

@@ -433,9 +433,13 @@ func (a *app) show(r route) {
 			a.spawn(func() { a.loadTurns(id) })
 		}
 	}
-	if a.route.kind == routeSpaceCron {
-		// The side panel shows the scheduled prompts beside one.
+	switch a.route.kind {
+	case routeSpaceCron:
+		// The side panel shows the scheduled prompts beside one, the
+		// apps beside an app.
 		a.panelTab = 4
+	case routeSpaceApp:
+		a.panelTab = 3
 	}
 	if a.rt != nil {
 		a.rt.watch(a.currentSpace())

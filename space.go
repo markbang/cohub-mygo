@@ -75,12 +75,17 @@ type cronJob struct {
 }
 
 type appRec struct {
-	ID          string    `json:"id"`
-	Slug        string    `json:"slug"`
-	Status      string    `json:"status"`
-	Visibility  string    `json:"visibility"`
-	PublishedAt time.Time `json:"publishedAt"`
-	Meta        struct {
+	ID            string    `json:"id"`
+	Slug          string    `json:"slug"`
+	Status        string    `json:"status"`
+	Visibility    string    `json:"visibility"`
+	TargetType    string    `json:"targetType"`
+	TargetRef     string    `json:"targetRef"`
+	LatestVersion int       `json:"latestVersion"`
+	AppScopes     []string  `json:"appScopes"`
+	PublishedAt   time.Time `json:"publishedAt"`
+	UpdatedAt     time.Time `json:"updatedAt"`
+	Meta          struct {
 		Title string `json:"title"`
 	} `json:"meta"`
 }
@@ -126,7 +131,10 @@ func (a *app) spaceSections(c *ui.Context, spaceID string) {
 					ui.Text(c, ap.title()).FontSize(13).TextColor(p.textTertiary).SingleLine().Grow(1).MinWidth(0)
 					ui.Text(c, relTime(ap.PublishedAt, a.now())).FontSize(9.5).TextColor(p.placeholder.Alpha(0.7)).Shrink(0)
 				})
-				a.pressable(row, false)
+				on := a.route.kind == routeSpaceApp && a.route.sub == ap.ID
+				a.pressable(row, on)
+				appID := ap.ID
+				row.OnClick(func() { a.go_(route{kind: routeSpaceApp, space: spaceID, sub: appID}) })
 			}
 		}
 	}
@@ -282,31 +290,7 @@ func (a *app) panelContent(c *ui.Context, tab int) {
 		}
 	case 3:
 		if spaceID != "" {
-			apps, _, ok := loadJSON[struct {
-				Apps []*appRec `json:"apps"`
-			}](a, "apps:"+spaceID, "/api/apps/space/"+url.PathEscape(spaceID))
-			ui.Column(c.Key("apps")).Padding(8).Gap(2).Children(func() {
-				if !ok {
-					a.spinner(c, 14, p.textTertiary)
-					return
-				}
-				if apps == nil || len(apps.Apps) == 0 {
-					ui.Text(c, m("x_apps_empty")).FontSize(12).TextColor(p.textTertiary).Padding(8)
-					return
-				}
-				for _, ap := range apps.Apps {
-					row := ui.Row(c.Key(ap.ID)).Gap(10).AlignItems(ui.Center).Padding(8).Radius(6).Children(func() {
-						ui.Box(c).Size(32, 32).Radius(7).Background(p.hoverStrong).Center().Children(func() {
-							ui.Icon(c, icon("layout-template")).Size(15, 15).TextColor(p.textTertiary)
-						})
-						ui.Column(c).Grow(1).MinWidth(0).Children(func() {
-							ui.Text(c, ap.title()).FontSize(13).SingleLine()
-							ui.Text(c, ap.Visibility+" · "+relTime(ap.PublishedAt, a.now())).FontSize(11).TextColor(p.textTertiary)
-						})
-					})
-					a.pressable(row, false)
-				}
-			})
+			a.appsPanel(c, spaceID)
 			return
 		}
 	}
@@ -460,6 +444,8 @@ func (a *app) windowPane(c *ui.Context) {
 		if r.sub != "new" {
 			title = m("sidebar_saves")
 		}
+	case r.kind == routeSpaceApp:
+		title, iconName = m("x_apps"), "panels-top-left"
 	case r.kind == routeSpaceTask:
 		title, iconName = m("sidebar_task_run"), "activity"
 	case r.kind == routeSpaceCron:
@@ -513,6 +499,8 @@ func (a *app) windowPane(c *ui.Context) {
 				a.checkpointView(c, r.space, r.sub)
 			case r.kind == routeSpaceTask:
 				a.taskView(c, r.space, r.sub)
+			case r.kind == routeSpaceApp:
+				a.appView(c, r.space, r.sub)
 			case r.kind == routeSpaceCron:
 				a.cronView(c, r.space, r.sub)
 			}

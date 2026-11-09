@@ -421,6 +421,11 @@ func (a *app) sessionOutputs(c *ui.Context, spaceID, sessionID string) {
 
 // panelSection is SidePanelSection.svelte: a 32px folding title.
 func (a *app) panelSection(c *ui.Context, key, title, count string, body func()) {
+	a.panelSectionMeta(c, key, title, count, nil, body)
+}
+
+// panelSectionMeta is panelSection with actions at the title's end.
+func (a *app) panelSectionMeta(c *ui.Context, key, title, count string, meta func(), body func()) {
 	p := a.pal
 	k := "panel-section:" + key
 	collapsed := a.groupsOpen[k]
@@ -433,6 +438,10 @@ func (a *app) panelSection(c *ui.Context, key, title, count string, body func())
 			ui.Text(c, title).FontSize(11).FontWeight(500).TextColor(p.textTertiary).SingleLine()
 			if count != "" && count != "0" {
 				ui.Text(c, count).FontSize(11).TextColor(p.placeholder)
+			}
+			if meta != nil {
+				ui.Spacer(c)
+				meta()
 			}
 		})
 		if head.Hovered() {

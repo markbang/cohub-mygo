@@ -440,5 +440,14 @@
     "wait": 3000
    }
   ]
+ },
+ {
+  "name": "app-detail",
+  "path": "/spaces/{MEDIA_SPACE}/apps/{APP}",
+  "actions": [
+   {
+    "wait": 3000
+   }
+  ]
  }
 ]

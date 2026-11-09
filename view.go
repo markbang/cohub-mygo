@@ -54,7 +54,7 @@ func (a *app) view(c *ui.Context) {
 		bg := p.bgPrimary
 		switch a.route.kind {
 		case routeSession, routeSpaceSession, routeSpace, routeSpaceNewSession,
-			routeSpaceCheckpoint, routeSpaceTask, routeSpaceCron:
+			routeSpaceCheckpoint, routeSpaceTask, routeSpaceCron, routeSpaceApp:
 			bg = p.chatBg.Over(p.bgPrimary)
 		}
 		if !(a.windowWide && a.hasWindow()) {
@@ -101,7 +101,7 @@ func (a *app) toastView(c *ui.Context) {
 func (a *app) showsPanel() bool {
 	switch a.route.kind {
 	case routeSession, routeSpaceSession, routeSpace, routeSpaceNewSession,
-		routeSpaceCheckpoint, routeSpaceTask, routeSpaceCron:
+		routeSpaceCheckpoint, routeSpaceTask, routeSpaceCron, routeSpaceApp:
 		return true
 	}
 	return false
@@ -109,7 +109,7 @@ func (a *app) showsPanel() bool {
 
 func (a *app) hasWindow() bool {
 	switch a.route.kind {
-	case routeSpaceCheckpoint, routeSpaceTask, routeSpaceCron:
+	case routeSpaceCheckpoint, routeSpaceTask, routeSpaceCron, routeSpaceApp:
 		return true
 	}
 	return a.route.win != "" && a.route.area() == areaSpace
@@ -132,7 +132,7 @@ func (a *app) page(c *ui.Context) {
 		a.activityPage(c, a.route.space)
 	case routeSpaceWallet:
 		a.walletPage(c)
-	case routeSpaceCheckpoint, routeSpaceTask, routeSpaceCron:
+	case routeSpaceCheckpoint, routeSpaceTask, routeSpaceCron, routeSpaceApp:
 		a.spaceHome(c)
 	case routeSettings:
 		a.settingsPage(c)

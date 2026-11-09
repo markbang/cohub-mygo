@@ -427,7 +427,7 @@ func (a *app) openFile(spaceID, p string) {
 	switch {
 	case r.space != spaceID:
 		r = route{kind: routeSpace, space: spaceID}
-	case r.kind == routeSpaceCheckpoint || r.kind == routeSpaceTask || r.kind == routeSpaceCron:
+	case r.kind == routeSpaceCheckpoint || r.kind == routeSpaceTask || r.kind == routeSpaceCron || r.kind == routeSpaceApp:
 		r = route{kind: routeSpace, space: spaceID}
 	}
 	r.win = "file:" + p
@@ -438,7 +438,7 @@ func (a *app) openFile(spaceID, p string) {
 func (a *app) closeWindow() {
 	r := a.route
 	switch r.kind {
-	case routeSpaceCheckpoint, routeSpaceTask, routeSpaceCron:
+	case routeSpaceCheckpoint, routeSpaceTask, routeSpaceCron, routeSpaceApp:
 		r = route{kind: routeSpace, space: r.space}
 	}
 	r.win = ""

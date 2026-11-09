@@ -55,7 +55,7 @@ func TestRoutes(t *testing.T) {
 		"/sessions", "/sessions/new", "/sessions/abc", "/spaces", "/spaces/new", "/spaces/s1",
 		"/spaces/s1/sessions/abc", "/spaces/s1/sessions/new", "/spaces/s1/settings", "/spaces/s1/activity",
 		"/spaces/s1/wallet", "/spaces/s1?window=file%3Adocs%2Fa.md", "/spaces/s1/sessions/abc?window=file%3Aa.md", "/spaces/s1/checkpoints/new", "/spaces/s1/tasks/t1",
-		"/spaces/s1/cronjobs/c1", "/settings/general", "/settings/billing",
+		"/spaces/s1/cronjobs/c1", "/spaces/s1/apps/a1", "/settings/general", "/settings/billing",
 	} {
 		r := parseRoute(path)
 		if got := r.String(); got != path && !(path == "/spaces/s1/sessions/new" && got == "/spaces/s1/sessions/new") {

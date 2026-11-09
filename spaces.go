@@ -199,8 +199,8 @@ func (a *app) spaceHome(c *ui.Context) {
 			ui.Row(c).Gap(16).AlignItems(ui.Center).Children(func() {
 				a.avatarSeed(c, sp.avatar(), sp.Name, sp.ID, 48, 8)
 				ui.Column(c).Gap(2).MinWidth(0).Children(func() {
-					ui.Row(c).Gap(10).AlignItems(ui.Center).Children(func() {
-						ui.Text(c, sp.Name).FontSize(34).FontWeight(600).LetterSpacing(-0.5).SingleLine()
+					ui.Row(c).Gap(10).AlignItems(ui.Center).Wrap().Children(func() {
+						ui.Text(c, sp.Name).FontSize(34).FontWeight(600).LetterSpacing(-0.5).LineHeight(1.15).Shrink(1).MinWidth(0)
 						col := p.placeholder
 						if sp.SandboxStatus == "running" || sp.SandboxStatus == "ready" {
 							col = p.success
