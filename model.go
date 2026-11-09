@@ -74,6 +74,14 @@ type app struct {
 	sidebarOpen  bool
 	attachments  []*attachment // the composer's files, before they are sent
 	voice        *voiceInput
+	toast        string // the last failed action, shown for a while
+	toastAt      time.Time
+	renaming     string // the chat whose title is being edited
+	renameText   string
+	shareOpen    bool
+	copiedAt     time.Time
+	labelTarget  *labelTarget
+	statsFor     string  // the chat whose statistics are open
 	inHeader     bool    // building a header: compact icon buttons grow to 40px
 	width        float32 // the window's width, as media queries see it
 	purchase     purchaseState

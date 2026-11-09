@@ -101,6 +101,7 @@ type Session struct {
 	ActiveTurn        *ActiveTurn   `json:"activeTurn"`
 	Space             *sessionSpace `json:"space"`
 	UserProfile       *Profile      `json:"userProfile"`
+	ArchivedAt        *time.Time    `json:"archivedAt"`
 }
 
 func (s *Session) running() bool {

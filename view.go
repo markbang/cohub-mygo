@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/egoist/mygo/ui"
+	"time"
 )
 
 const (
@@ -39,6 +40,7 @@ func (a *app) view(c *ui.Context) {
 	if a.compact {
 		a.compactView(c)
 		a.paletteView(c)
+		a.toastView(c)
 		return
 	}
 	p := a.pal
@@ -65,6 +67,25 @@ func (a *app) view(c *ui.Context) {
 		}
 	})
 	a.paletteView(c)
+	a.toastView(c)
+}
+
+// toastView is .toast-surface: what went wrong, for five seconds.
+func (a *app) toastView(c *ui.Context) {
+	if a.toast == "" {
+		return
+	}
+	if time.Since(a.toastAt) > 5*time.Second {
+		a.toast = ""
+		return
+	}
+	c.After(time.Second)
+	p := a.pal
+	ui.Row(c.Key("toast")).Attach(ui.AnchorBottom, ui.AnchorBottom).Bottom(24).MaxWidth(480).Gap(8).AlignItems(ui.Center).
+		Padding(10, 14).Radius(10).Background(p.bgElevated).Border(1, p.borderSubtle).Shadow(0, 10, 30, 0, ui.RGBA(0, 0, 0, 0.15)).Children(func() {
+		ui.Icon(c, icon("circle-alert")).Size(14, 14).TextColor(p.errorC)
+		ui.Text(c, a.toast).FontSize(12).TextColor(p.text).MaxLines(3)
+	})
 }
 
 // showsPanel tells whether the route has the panel beside it: chats and

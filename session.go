@@ -44,22 +44,16 @@ func (a *app) sessionView(c *ui.Context) {
 			sp := a.avatarSeed(c, av, name, s.SpaceID, 20, 6)
 			sp.Cursor(ui.CursorPointer).OnClick(func() { a.openSpace(s.SpaceID) })
 		}
-		ui.Text(c, title).FontSize(13).SingleLine().Grow(1).MinWidth(0).TextColor(p.textSecond)
+		a.sessionTitle(c, s, title)
 		if a.compact {
-			a.iconButton(c.Key("share"), "share-2", m("referral_share"), false)
+			a.shareButton(c, s)
 			a.moreMenu(c, s)
 			if a.iconButton(c.Key("panel"), "panel-right-open", m("side_panel_show"), false).Clicked() {
 				a.compactPanel = true
 			}
 			return
 		}
-		share := ui.ButtonBase(c.Key("share")).Row().Gap(6).AlignItems(ui.Center).Height(28).Padding(0, 8).Radius(6).Label(m("referral_share")).FocusRing(false).Children(func() {
-			ui.Icon(c, icon("share-2")).Size(14, 14).TextColor(p.textTertiary)
-			ui.Text(c, "Share").FontSize(13).TextColor(p.textTertiary)
-		})
-		if share.Hovered() {
-			share.Background(p.hover)
-		}
+		a.shareButton(c, s)
 		a.moreMenu(c, s)
 		ic, lb := "panel-right-open", m("side_panel_show")
 		if a.panelOpen {
@@ -629,36 +623,6 @@ func (a *app) statusDot(c *ui.Context, col ui.Color, active bool) {
 		}
 		d.Opacity(0.45 + 1.1*ph)
 	}
-}
-
-// moreMenu is the header's ⋯: label, stats, quote and archive.
-func (a *app) moreMenu(c *ui.Context, s *Session) {
-	b := a.iconButton(c.Key("more"), "ellipsis", m("turnrail_more"), a.menus["more"])
-	if b.Clicked() {
-		a.menus["more"] = !a.menus["more"]
-	}
-	open := a.menus["more"]
-	a.menu(c, b, &open, []menuItem{
-		{icon: "tag", label: m("inline_label_as")},
-		{icon: "gauge", label: m("stats_menu")},
-		{icon: "text-quote", label: m("space_header_insert_reference")},
-		{icon: "archive", label: m("session_archive"), run: func() { a.archiveSession(s) }},
-	})
-	a.menus["more"] = open
-}
-
-func (a *app) archiveSession(s *Session) {
-	if s == nil || a.api == nil {
-		return
-	}
-	id := s.ID
-	a.spawn(func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-		defer cancel()
-		if a.api.do(ctx, "PUT", "/api/sessions/"+id+"/archive", nil, nil) == nil {
-			a.refresh()
-		}
-	})
 }
 
 // composer is the message box under a chat, as SessionComposer.svelte.

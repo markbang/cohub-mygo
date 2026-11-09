@@ -45,13 +45,13 @@
   "path": "/sessions/{SESSION}",
   "actions": [
    {
-    "css": "main button[aria-expanded=false]",
+    "css": "button[title='更多操作']",
     "wait": 800
    }
   ],
   "app": [
    {
-    "clickLabel": "更多"
+    "clickLabel": "更多操作"
    }
   ]
  },
@@ -336,5 +336,64 @@
  {
   "name": "panel-session-outputs",
   "path": "/spaces/{SPACE_MOBILE}/sessions/{FILES_SESSION}"
+ },
+ {
+  "name": "chat-share",
+  "path": "/spaces/{SPACE}/sessions/{SESSION}",
+  "actions": [
+   {
+    "css": "button[title='Share session']",
+    "wait": 1500
+   }
+  ],
+  "app": [
+   {
+    "clickLabel": "分享"
+   }
+  ]
+ },
+ {
+  "name": "chat-stats",
+  "path": "/spaces/{SPACE}/sessions/{SESSION}",
+  "actions": [
+   {
+    "css": "button[title='更多操作']",
+    "wait": 600
+   },
+   {
+    "click": "统计",
+    "wait": 2000
+   }
+  ],
+  "app": [
+   {
+    "clickLabel": "更多操作"
+   },
+   {
+    "click": "统计"
+   }
+  ]
+ },
+ {
+  "name": "chat-label",
+  "path": "/spaces/{SPACE}/sessions/{SESSION}",
+  "actions": [
+   {
+    "css": "button[title='更多操作']",
+    "wait": 600
+   },
+   {
+    "click": "标记为…",
+    "wait": 2000
+   }
+  ],
+  "app": [
+   {
+    "clickLabel": "更多操作"
+   },
+   {
+    "click": "标记为…"
+   }
+  ]
  }
 ]
