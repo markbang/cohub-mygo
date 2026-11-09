@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -27,6 +28,7 @@ type sessionTurns struct {
 	live      string
 	liveTurn  string
 	liveSteps []Block
+	patch     *patchState // the running turn's message, as patches build it
 	// steps are the loaded intermediate messages of turns, by turn ID.
 	steps    map[string][]*StepMessage
 	expanded map[string]bool
@@ -95,10 +97,11 @@ type app struct {
 	channelNew                   channelForm
 	walletForms                  map[string]*walletForm
 	confirmBox                   *confirmBox
-	windowWide                   bool            // the window takes the main column's room
-	viewportOff                  map[string]bool // windows the user took out of the prompt's context
-	inHeader                     bool            // building a header: compact icon buttons grow to 40px
-	width                        float32         // the window's width, as media queries see it
+	windowWide                   bool                // the window takes the main column's room
+	viewportOff                  map[string]bool     // windows the user took out of the prompt's context
+	looseSessions                map[string]*Session // chats opened that no list holds
+	inHeader                     bool                // building a header: compact icon buttons grow to 40px
+	width                        float32             // the window's width, as media queries see it
 	purchase                     purchaseState
 	redeem                       redeemState
 	subsPage                     int
@@ -151,6 +154,7 @@ func newApp() *app {
 		chipChats:     map[string][]*Session{},
 		editors:       map[string]*fileEdit{},
 		viewportOff:   map[string]bool{},
+		looseSessions: map[string]*Session{},
 		cpTab:         map[string]int{},
 		spaceEdits:    map[string]*spaceEdit{},
 		walletForms:   map[string]*walletForm{},
@@ -347,11 +351,21 @@ func (a *app) loadTurns(sessionID string) {
 		}
 		tl.err = ""
 		tl.turns, tl.hasMore = page.Turns, page.HasMore
-		tl.live, tl.liveSteps = "", nil
-		if snap != nil && snap.Snapshot != nil && snap.Snapshot.Current != nil {
-			tl.live = joinText(snap.Snapshot.Current.Content)
+		switch {
+		case snap == nil || snap.Snapshot == nil || snap.Snapshot.Current == nil:
+			tl.live, tl.liveSteps, tl.patch = "", nil, nil
+		case tl.patch != nil && tl.patch.turnID == snap.Snapshot.TurnID && snap.Snapshot.Seq < tl.patch.seq:
+			// Patches got further than the snapshot, which was read
+			// before them: keep what they built.
+		default:
+			ps := &patchState{turnID: snap.Snapshot.TurnID, seq: snap.Snapshot.Seq, blocks: snap.Snapshot.Current.Content}
+			if ap := snap.Snapshot.Current.AppendPath; ap != nil {
+				ps.appendPath = *ap
+			}
+			tl.patch = ps
+			tl.liveSteps = ps.content()
+			tl.live = joinText(tl.liveSteps)
 			tl.liveTurn = snap.Snapshot.TurnID
-			tl.liveSteps = snap.Snapshot.Current.Content
 		}
 		if s := a.session(sessionID); s != nil && len(page.Turns) > 0 {
 			if !page.Turns[len(page.Turns)-1].running() {
@@ -429,6 +443,7 @@ func (a *app) show(r route) {
 			a.markSeen(s)
 		}
 		a.timelineOf(id)
+		a.fetchSession(id)
 		if a.api != nil {
 			a.spawn(func() { a.loadTurns(id) })
 		}
@@ -506,7 +521,39 @@ func (a *app) session(id string) *Session {
 			}
 		}
 	}
+	for _, list := range a.chipChats {
+		for _, s := range list {
+			if s.ID == id {
+				return s
+			}
+		}
+	}
+	if s := a.looseSessions[id]; s != nil {
+		return s
+	}
 	return nil
+}
+
+// fetchSession loads a chat the lists do not hold, as one opened by a
+// link, so that its Space and title are known.
+func (a *app) fetchSession(id string) {
+	if a.api == nil || id == "" || a.session(id) != nil {
+		return
+	}
+	a.once("session-detail:"+id, func(ctx context.Context) {
+		var out struct {
+			Session *Session `json:"session"`
+		}
+		if a.api.do(ctx, "GET", "/api/sessions/"+url.PathEscape(id), nil, &out) != nil || out.Session == nil {
+			return
+		}
+		a.update(func() {
+			a.looseSessions[id] = out.Session
+			if a.rt != nil {
+				a.rt.watch(out.Session.SpaceID)
+			}
+		})
+	})
 }
 
 func (a *app) space(id string) *Space {

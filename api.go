@@ -355,8 +355,10 @@ type turnsPage struct {
 type streamSnapshot struct {
 	Snapshot *struct {
 		TurnID  string `json:"turnId"`
+		Seq     int    `json:"seq"`
 		Current *struct {
-			Content []Block `json:"content"`
+			Content    []map[string]any `json:"content"`
+			AppendPath *string          `json:"appendPath"`
 		} `json:"current"`
 		IntermediateMessages []json.RawMessage `json:"intermediateMessages"`
 	} `json:"snapshot"`

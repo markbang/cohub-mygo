@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -27,6 +28,8 @@ type realtime struct {
 	turnsFor   string
 	lastStatus string
 	seen       map[string]int // events by type, for diagnostics
+	patched    int            // patches applied, and patches that needed the snapshot
+	resynced   int
 }
 
 func gatewayURL(apiBase string) string {
@@ -154,7 +157,11 @@ func (rt *realtime) handle(env wsEnvelope) {
 		rt.a.update(func() { open = rt.a.route.sessionID(); close(done) })
 		<-done
 		if env.SessionID != "" && env.SessionID == open {
-			rt.dueTurns(open, env.Type)
+			if env.Type == "session.turn.patch" {
+				rt.applyPatch(open, env.Payload)
+			} else {
+				rt.dueTurns(open, env.Type)
+			}
 		}
 		if env.Type != "session.turn.patch" {
 			rt.dueLists()
@@ -255,4 +262,44 @@ func (rt *realtime) live() bool {
 	rt.mu.Lock()
 	defer rt.mu.Unlock()
 	return rt.connected
+}
+
+var debugPatch func(string)
+
+// applyPatch builds the running reply from a patch, or reloads the chat
+// when the patch does not follow what the window has.
+func (rt *realtime) applyPatch(sessionID string, payload json.RawMessage) {
+	var ev patchEvent
+	if json.Unmarshal(payload, &ev) != nil {
+		rt.dueTurns(sessionID, "session.turn.patch")
+		return
+	}
+	rt.a.update(func() {
+		tl := rt.a.timelineOf(sessionID)
+		if tl.patch == nil && ev.BaseSeq == 0 {
+			tl.patch = &patchState{}
+		}
+		if tl.patch == nil || !tl.patch.apply(ev) {
+			if debugPatch != nil {
+				st := -1
+				if tl.patch != nil {
+					st = tl.patch.seq
+				}
+				ap := ""
+				if tl.patch != nil {
+					ap = tl.patch.appendPath
+				}
+				debugPatch(fmt.Sprintf("reject seq=%d base=%d state=%d append=%q ops=%s", ev.Seq, ev.BaseSeq, st, ap, string(payload)[:min(400, len(payload))]))
+			}
+			rt.resynced++
+			go rt.dueTurns(sessionID, "session.turn.snapshot")
+			return
+		}
+		rt.patched++
+		tl.liveSteps = tl.patch.content()
+		tl.live = joinText(tl.liveSteps)
+		if ev.TurnID != "" {
+			tl.liveTurn = ev.TurnID
+		}
+	})
 }
