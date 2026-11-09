@@ -200,6 +200,7 @@ func newApp() *app {
 	a.pages.init()
 	a.md.Reveal = &markdown.Reveal{Unit: markdown.ByWord}
 	a.md.OnLink = func(u string) { a.openLink(u) }
+	a.md.Block = a.mdBlock
 	a.images.onLoad = func(fn func()) { a.update(fn) }
 	if dir, err := os.UserConfigDir(); err == nil {
 		a.seenPath = filepath.Join(dir, "cohub-mygo", "seen.json")
