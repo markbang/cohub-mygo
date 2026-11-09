@@ -23,6 +23,7 @@ var locale = "zh-CN"
 // extraMessages are the app's words the web's catalogs lack, as
 // zh-CN and en.
 var extraMessages = map[string][2]string{
+	"x_name":              {"名称", "Name"},
 	"x_sign_out_detail":   {"会同时退出 cohub 命令行的登录。", "This also signs the cohub CLI out."},
 	"x_login_hint":        {"Cohub 桌面版与 cohub 命令行共用账号。登录会在浏览器里确认。", "Cohub for desktop shares its account with the cohub CLI. You confirm the sign-in in your browser."},
 	"x_login_code":        {"在浏览器中确认这个代码", "Confirm this code in your browser"},

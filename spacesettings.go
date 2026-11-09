@@ -48,6 +48,10 @@ var spaceSettingsSections = []struct{ id, icon, label string }{
 // spaceSettings is /spaces/:id/settings: a header, the sections' nav and
 // the sections, as the web's Space settings page.
 func (a *app) spaceSettings(c *ui.Context) {
+	if a.route.sub == "commerce" {
+		a.commercePage(c)
+		return
+	}
 	p := a.pal
 	id := a.route.space
 	d, err, ok := loadJSON[spaceDetail](a, "space:"+id, sp(id))
@@ -66,6 +70,9 @@ func (a *app) spaceSettings(c *ui.Context) {
 			}
 			if it.icon == "wallet" && b.Clicked() {
 				a.go_(route{kind: routeSpaceWallet, space: id})
+			}
+			if it.icon == "package" && b.Clicked() {
+				a.go_(route{kind: routeSpaceSettings, space: a.route.space, sub: "commerce"})
 			}
 		}
 	})

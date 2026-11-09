@@ -80,6 +80,9 @@ func parseRoute(p string) route {
 			}
 		case "settings":
 			r.kind, r.sub = routeSpaceSettings, frag
+			if at(3) == "commerce" {
+				r.sub = "commerce"
+			}
 			if r.sub == "" {
 				r.sub = "profile"
 			}
@@ -147,6 +150,9 @@ func (r route) path() string {
 	case routeSpaceNewSession:
 		return "/spaces/" + r.space + "/sessions/new"
 	case routeSpaceSettings:
+		if r.sub == "commerce" {
+			return "/spaces/" + r.space + "/settings/commerce"
+		}
 		return "/spaces/" + r.space + "/settings"
 	case routeSpaceActivity:
 		return "/spaces/" + r.space + "/activity"

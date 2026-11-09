@@ -106,6 +106,7 @@ type app struct {
 	boardViews                   map[string]*boardView // each board's pan and zoom
 	login                        loginState
 	helpOpen                     bool
+	commerce                     *commerceForm
 	feedback                     feedbackForm
 	lastG                        time.Time
 	inHeader                     bool    // building a header: compact icon buttons grow to 40px

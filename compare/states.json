@@ -458,5 +458,14 @@
     "wait": 6000
    }
   ]
+ },
+ {
+  "name": "space-commerce",
+  "path": "/spaces/{SPACE}/settings/commerce",
+  "actions": [
+   {
+    "wait": 2500
+   }
+  ]
  }
 ]
