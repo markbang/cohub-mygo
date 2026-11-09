@@ -9,3 +9,4 @@ mygo_windows_*.syso
 /compare/side/
 /compare/vars.json
 /tools/webshot/node_modules
+/cohub-mygo

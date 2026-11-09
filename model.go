@@ -451,6 +451,9 @@ func (a *app) show(r route) {
 	if r.kind == routeNewSession {
 		a.palette.open(paletteSpaces)
 	}
+	if r.kind == routeSlug {
+		a.resolveSlug(r.sub)
+	}
 	if id := a.route.sessionID(); id != "" && id != prevSession {
 		a.timeline = ui.ListState{}
 		if s := a.session(id); s != nil {
@@ -984,5 +987,44 @@ func (a *app) setSpaceFlags(id string, flip func(*Space), patch map[string]any) 
 				a.status = m("x_error") + ": " + err.Error()
 			})
 		}
+	})
+}
+
+// resolveSlug opens a Space by its URL, /username/slug, accepting an
+// invitation first when the link carries one.
+func (a *app) resolveSlug(sub string) {
+	a.act(func(ctx context.Context) error {
+		var id string
+		if token, ok := strings.CutPrefix(sub, "invite/"); ok {
+			sub = "/join/" + token
+		}
+		head, token, invite := strings.Cut(sub, "/join/")
+		if invite {
+			var out struct {
+				SpaceID string `json:"spaceId"`
+			}
+			if err := a.api.do(ctx, "POST", "/api/invite/"+url.PathEscape(token)+"/accept", nil, &out); err != nil {
+				return err
+			}
+			id = out.SpaceID
+		}
+		if id == "" && head != "" {
+			user, slug, _ := strings.Cut(head, "/")
+			var sp Space
+			if err := a.api.do(ctx, "GET", "/api/spaces/by-slug/"+url.PathEscape(user)+"/"+url.PathEscape(slug), nil, &sp); err != nil {
+				return err
+			}
+			id = sp.ID
+		}
+		if id != "" {
+			a.update(func() {
+				a.route = route{kind: routeSpace, space: id}
+				a.show(a.route)
+			})
+			if invite {
+				a.refresh()
+			}
+		}
+		return nil
 	})
 }

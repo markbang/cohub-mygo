@@ -24,6 +24,7 @@ const (
 	routeSpaceCron                        // /spaces/:id/cronjobs/:cid (or new)
 	routeSpaceApp                         // /spaces/:id/apps/:appId
 	routeSettings                         // /settings/:section
+	routeSlug                             // /:username/:slug(/join/:token), a Space by its URL
 )
 
 // route is where the window is, in the web app's URL scheme, so that
@@ -100,12 +101,21 @@ func parseRoute(p string) route {
 			r.kind, r.sub = routeSpaceApp, at(3)
 		}
 		return r
+	case "invite":
+		return route{kind: routeSlug, sub: "invite/" + at(1)}
 	case "settings":
 		s := at(1)
 		if s == "" {
 			s = "general"
 		}
 		return route{kind: routeSettings, sub: s}
+	}
+	if at(0) != "" && at(1) != "" {
+		sub := at(0) + "/" + at(1)
+		if at(2) == "join" && at(3) != "" {
+			sub += "/join/" + at(3)
+		}
+		return route{kind: routeSlug, sub: sub}
 	}
 	return route{kind: routeSessions}
 }
@@ -152,6 +162,11 @@ func (r route) path() string {
 		return "/spaces/" + r.space + "/apps/" + r.sub
 	case routeSettings:
 		return "/settings/" + r.sub
+	case routeSlug:
+		if strings.HasPrefix(r.sub, "invite/") {
+			return "/" + r.sub
+		}
+		return "/" + r.sub
 	}
 	return "/sessions"
 }

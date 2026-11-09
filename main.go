@@ -5,6 +5,7 @@ package main
 
 import (
 	"log"
+	"net/url"
 	"os"
 	"time"
 
@@ -53,6 +54,27 @@ func main() {
 		if path := os.Getenv("COHUB_CAPTURE"); path != "" {
 			go capture(a.win, path)
 		}
+	})
+	// cohub:// links and cohub.live links handed to the app open their
+	// page, as the web's routes.
+	mygo.App.OnOpenURL(func(raw string) {
+		u, err := url.Parse(raw)
+		if err != nil {
+			return
+		}
+		path := u.Path
+		if u.Scheme == "cohub" && u.Host != "" {
+			path = "/" + u.Host + u.Path
+		}
+		if u.RawQuery != "" {
+			path += "?" + u.RawQuery
+		}
+		a.update(func() {
+			a.navigate(path)
+			if a.win != nil {
+				a.win.Focus()
+			}
+		})
 	})
 	if err := mygo.App.Run(); err != nil {
 		log.Fatal(err)
