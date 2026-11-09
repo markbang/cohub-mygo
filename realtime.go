@@ -151,6 +151,9 @@ func (rt *realtime) handle(env wsEnvelope) {
 			rt.rooms[r] = true
 		}
 		rt.mu.Unlock()
+	case env.Type == "session.turn.notify":
+		rt.a.turnNotified(env.Payload)
+		rt.dueLists()
 	case strings.HasPrefix(env.Type, "session."):
 		open := ""
 		done := make(chan struct{})

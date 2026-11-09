@@ -69,6 +69,7 @@ func (a *app) view(c *ui.Context) {
 			a.rightPanel(c)
 		}
 	})
+	a.noticesView(c)
 	a.paletteView(c)
 	a.confirmView(c)
 	a.toastView(c)

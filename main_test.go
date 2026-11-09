@@ -486,3 +486,18 @@ func TestPatchReducer(t *testing.T) {
 		t.Fatal("a duplicate asked for the snapshot")
 	}
 }
+
+func TestTurnNoticeStacks(t *testing.T) {
+	a := demoApp(t)
+	tt := ui.NewTester(a.view, 1440, 900)
+	other := a.sessions[1]
+	a.turnNotified(json.RawMessage(`{"spaceId":"` + other.SpaceID + `","sessionId":"` + other.ID + `","turnId":"t9","status":"completed","userPreview":"写个总结","durationMs":12300,"stepCount":3}`))
+	tt.Frame()
+	if len(a.notices) != 1 || !tt.HasText("写个总结") {
+		t.Fatalf("notices %d, texts %q", len(a.notices), tt.Texts())
+	}
+	if err := tt.Click(other.displayTitle()); err != nil {
+		t.Fatal(err)
+	}
+	snapshot(t, tt, "desktop-notice")
+}
