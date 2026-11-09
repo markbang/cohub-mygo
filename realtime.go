@@ -155,6 +155,9 @@ func (rt *realtime) handle(env wsEnvelope) {
 		rt.a.turnNotified(env.Payload)
 		rt.dueLists()
 	case strings.HasPrefix(env.Type, "session."):
+		if env.Type == "session.turn.created" {
+			rt.a.update(func() { rt.a.danmakuTurn(env.SpaceID, env.SessionID, env.Payload) })
+		}
 		open := ""
 		done := make(chan struct{})
 		rt.a.update(func() { open = rt.a.route.sessionID(); close(done) })

@@ -570,3 +570,34 @@ func TestAppPath(t *testing.T) {
 		}
 	}
 }
+
+func TestDanmaku(t *testing.T) {
+	a := demoApp(t)
+	a.me = &Me{UUID: "me"}
+	a.route = route{kind: routeSpace, space: a.spaces[0].ID}
+	tt := ui.NewTester(a.view, 1440, 900)
+	tt.Frame()
+	payload := []byte(`{"turn":{"id":"t1","sequence":3,"userUuid":"u2","userText":"大家好，看看这个","authorProfile":{"displayName":"Mila"}}}`)
+	a.danmakuTurn(a.spaces[0].ID, "s-other", payload)
+	a.danmakuTurn(a.spaces[0].ID, "s-other", payload)
+	if len(a.danmaku.items) != 1 {
+		t.Fatalf("%d items, want one", len(a.danmaku.items))
+	}
+	tt.Advance(2 * time.Second)
+	tt.Frame()
+	if dir := os.Getenv("SNAPSHOT_DIR"); dir != "" {
+		writePNG(t, tt, filepath.Join(dir, "desktop-danmaku.png"))
+	}
+	if err := tt.Click("大家好，看看这个"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	if a.route.kind != routeSpaceSession || a.route.session != "s-other" {
+		t.Fatalf("route %+v", a.route)
+	}
+	own := []byte(`{"turn":{"id":"t2","sequence":4,"userUuid":"me","userText":"mine"}}`)
+	a.danmakuTurn(a.spaces[0].ID, "s-other", own)
+	if len(a.danmaku.items) > 1 {
+		t.Fatal("own message floated")
+	}
+}

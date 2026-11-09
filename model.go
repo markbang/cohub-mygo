@@ -110,6 +110,9 @@ type app struct {
 	harnesses                    map[string]harnessState // the composer's harness by chat or Space
 	newLabelFor, newLabelName    string
 	compMenu                     composerMenu
+	danmakuWidth                 float32
+	danmakuFrame                 time.Time
+	danmaku                      danmakuState
 	forks                        map[string][]sessionFork
 	runtimeDiag                  bool
 	height                       float32

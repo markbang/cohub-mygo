@@ -13,7 +13,10 @@ type prefs struct {
 	Theme       string `json:"theme,omitempty"`
 	Lang        string `json:"lang,omitempty"`
 	CustomTheme *bool  `json:"customTheme,omitempty"`
+	Danmaku     *bool  `json:"danmaku,omitempty"` // live messages over the Space
 }
+
+func (p *prefs) danmaku() bool { return p.Danmaku == nil || *p.Danmaku }
 
 func (p *prefs) load() {
 	if b, err := os.ReadFile(p.path); err == nil {

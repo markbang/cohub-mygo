@@ -302,6 +302,7 @@ type Turn struct {
 	Status              string               `json:"status"`
 	UserContent         []Block              `json:"userContent"`
 	UserText            string               `json:"userText"`
+	UserUUID            string               `json:"userUuid"`
 	AssistantContent    []Block              `json:"assistantContent"`
 	Provider            string               `json:"provider"`
 	Model               string               `json:"model"`

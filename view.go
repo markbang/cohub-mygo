@@ -73,6 +73,9 @@ func (a *app) view(c *ui.Context) {
 		if !(a.windowWide && a.hasWindow()) {
 			ui.Column(c).Grow(1).MinWidth(0).Background(bg).Children(func() {
 				a.page(c)
+				if a.route.area() == areaSpace {
+					a.danmakuLayer(c)
+				}
 			})
 		}
 		if a.hasWindow() {
