@@ -477,7 +477,7 @@ func (a *app) sessionFileRow(c *ui.Context, spaceID string, f sessionFile) {
 		row.Background(p.hover)
 	}
 	if row.Clicked() {
-		a.go_(route{kind: routeSpaceFiles, space: spaceID, sub: f.Path})
+		a.openFile(spaceID, f.Path)
 	}
 }
 

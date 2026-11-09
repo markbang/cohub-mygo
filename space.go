@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/egoist/mygo/ui"
-	"github.com/egoist/mygo/ui/markdown"
 )
 
 type checkpointRec struct {
@@ -101,12 +100,13 @@ type fsEntry struct {
 }
 
 type fsFile struct {
-	Path     string `json:"path"`
-	Name     string `json:"name"`
-	Size     int64  `json:"size"`
-	MimeType string `json:"mimeType"`
-	Kind     string `json:"kind"`
-	Content  string `json:"content"`
+	Path     string  `json:"path"`
+	Name     string  `json:"name"`
+	Size     int64   `json:"size"`
+	MimeType string  `json:"mimeType"`
+	Kind     string  `json:"kind"`
+	Content  string  `json:"content"`
+	MtimeMs  float64 `json:"mtimeMs"`
 }
 
 func sp(id string) string { return "/api/spaces/" + url.PathEscape(id) }
@@ -315,20 +315,46 @@ func (a *app) panelContent(c *ui.Context) {
 
 // filesPanel is the panel's file tree, as SpaceFileSidebar.svelte.
 func (a *app) filesPanel(c *ui.Context, spaceID string) {
+	p := a.pal
+	edit := a.can(spaceID, "file.edit")
 	ui.Row(c.Key("files-head")).Height(36).Gap(2).AlignItems(ui.Center).Padding(0, 6, 0, 12).Children(func() {
-		ui.Text(c, m("x_files")).FontSize(12).FontWeight(600).Grow(1)
-		a.iconButton(c.Key("new"), "plus", m("files_new"), false)
-		a.iconButton(c.Key("upload"), "upload", m("common_upload"), false)
-		if a.iconButton(c.Key("refresh"), "refresh-cw", m("rules_refresh"), false).Clicked() {
-			for k := range a.loading {
-				if strings.HasPrefix(k, "tree:"+spaceID) {
-					delete(a.loading, k)
-				}
+		ui.Text(c, m("files_title")).FontSize(12).FontWeight(600).Grow(1)
+		if a.uploading > 0 {
+			a.spinner(c, 12, p.textTertiary)
+		}
+		if edit {
+			nb := a.iconButton(c.Key("new"), "plus", m("files_new"), a.menus["files-new"])
+			if nb.Clicked() {
+				a.menus["files-new"] = !a.menus["files-new"]
+			}
+			open := a.menus["files-new"]
+			a.menuWidth(c, nb, &open, 160, []menuItem{
+				{icon: "file-plus", label: m("files_new_file"), run: func() { a.fsPending = &fsCreate{space: spaceID, kind: "file"} }},
+				{icon: "folder-plus", label: m("files_new_folder"), run: func() { a.fsPending = &fsCreate{space: spaceID, kind: "dir"} }},
+			})
+			a.menus["files-new"] = open
+			if a.iconButton(c.Key("upload"), "upload", m("files_upload_files"), false).Clicked() {
+				a.uploadFiles(spaceID, "")
 			}
 		}
+		if a.iconButton(c.Key("refresh"), "refresh-cw", m("files_refresh"), false).Clicked() {
+			a.forgetPrefix("tree:" + spaceID)
+		}
 	})
-	ui.Scroll(c.Key("tree")).Grow(1).Children(func() {
-		ui.Column(c).Padding(0, 6, 12, 6).Children(func() { a.treeDir(c, spaceID, "", 0) })
+	tree := ui.Scroll(c.Key("tree")).Grow(1)
+	if edit {
+		if files := tree.DroppedFiles(); files != nil {
+			a.uploadPaths(spaceID, "", files)
+		}
+		if tree.FileDragOver() {
+			tree.Background(p.brandMuted)
+		}
+	}
+	tree.Children(func() {
+		ui.Column(c).Padding(0, 6, 12, 6).Children(func() {
+			a.fsPendingRow(c, spaceID, "", 0)
+			a.treeDir(c, spaceID, "", 0)
+		})
 	})
 }
 
@@ -360,7 +386,7 @@ func (a *app) treeDir(c *ui.Context, spaceID, dir string, depth int) {
 	for _, e := range entries {
 		isDir := e.Type == "dir"
 		open := a.groupsOpen["fs:"+spaceID+":"+e.Path]
-		on := a.route.kind == routeSpaceFiles && a.route.sub == e.Path
+		on := a.route.file() == e.Path
 		row := ui.Row(c.Key(e.Path)).Gap(6).AlignItems(ui.Center).Height(26).Padding(0, 6, 0, 6+float32(depth)*14).Radius(5).Children(func() {
 			if isDir {
 				name := "chevron-right"
@@ -379,9 +405,36 @@ func (a *app) treeDir(c *ui.Context, spaceID, dir string, depth int) {
 				a.groupsOpen["fs:"+spaceID+":"+e.Path] = !open
 				return
 			}
-			a.go_(route{kind: routeSpaceFiles, space: spaceID, sub: e.Path})
+			a.openFile(spaceID, e.Path)
 		})
+		entry := e
+		actions := a.fileActions(spaceID, entry.Path, isDir)
+		if isDir && a.can(spaceID, "file.edit") {
+			actions = append([]menuItem{
+				{icon: "file-plus", label: m("files_new_file"), run: func() { a.fsPending = &fsCreate{space: spaceID, dir: entry.Path, kind: "file"} }},
+				{icon: "folder-plus", label: m("files_new_folder"), run: func() { a.fsPending = &fsCreate{space: spaceID, dir: entry.Path, kind: "dir"} }},
+				{icon: "upload", label: m("files_upload_files"), run: func() { a.uploadFiles(spaceID, entry.Path) }, divider: true},
+			}, actions...)
+		}
+		row.PopoverMenu(func(mn *ui.Menu) {
+			for _, it := range actions {
+				item := mn.Item(it.label)
+				if it.danger {
+					item.Danger()
+				}
+				if item.Chosen() && it.run != nil {
+					it.run()
+				}
+				if it.divider {
+					mn.Separator()
+				}
+			}
+		})
+		if f := a.fsPending; f != nil && f.kind == "rename" && f.from == e.Path {
+			continue
+		}
 		if isDir && open {
+			a.fsPendingRow(c, spaceID, e.Path, depth+1)
 			a.treeDir(c, spaceID, e.Path, depth+1)
 		}
 	}
@@ -393,20 +446,26 @@ func (a *app) windowPane(c *ui.Context) {
 	p := a.pal
 	r := a.route
 	title, iconName := "", "file"
-	switch r.kind {
-	case routeSpaceFiles:
-		title = path.Base(r.sub)
-	case routeSpaceCheckpoint:
+	switch {
+	case r.file() != "":
+		title = path.Base(r.file())
+	case r.kind == routeSpaceCheckpoint:
 		title, iconName = m("sidebar_new_save"), "save"
 		if r.sub != "new" {
 			title = m("sidebar_saves")
 		}
-	case routeSpaceTask:
+	case r.kind == routeSpaceTask:
 		title, iconName = m("sidebar_task_run"), "activity"
-	case routeSpaceCron:
+	case r.kind == routeSpaceCron:
 		title, iconName = m("x_schedules"), "calendar-clock"
 	}
-	ui.Column(c.Key("pane")).Width(480).Shrink(0).Background(p.bgPrimary).BorderWidth(0, 0, 0, 1).BorderColor(p.borderSubtle).Children(func() {
+	pane := ui.Column(c.Key("pane"))
+	if a.windowWide {
+		pane.Grow(1)
+	} else {
+		pane.Width(480).Shrink(0)
+	}
+	pane.Background(p.bgPrimary).BorderWidth(0, 0, 0, 1).BorderColor(p.borderSubtle).Children(func() {
 		ui.Row(c).Height(headerHeight).Shrink(0).Gap(4).AlignItems(ui.Center).Padding(0, 8).BorderWidth(0, 0, 1, 0).BorderColor(p.borderSubtle).DragWindow().Children(func() {
 			a.iconButton(c.Key("pane-side"), "panel-left", m("resource_app_files"), false)
 			ui.Row(c.Key("tab")).Gap(6).AlignItems(ui.Center).Height(40).Padding(0, 8).BorderWidth(0, 0, 2, 0).BorderColor(p.brand).Children(func() {
@@ -416,54 +475,35 @@ func (a *app) windowPane(c *ui.Context) {
 					ui.Icon(c, icon("x")).Size(12, 12).TextColor(p.textTertiary)
 				})
 				if x.Clicked() {
-					a.go_(route{kind: routeSpace, space: r.space})
+					a.closeWindow()
 				}
 			})
 			ui.Spacer(c)
-			a.iconButton(c.Key("reload"), "refresh-cw", m("rules_refresh"), false)
-			a.iconButton(c.Key("popout"), "external-link", m("x_new_window"), false)
+			if f := r.file(); f != "" {
+				a.fileWindowActions(c, r.space, f)
+			} else {
+				a.iconButton(c.Key("reload"), "refresh-cw", m("rules_refresh"), false)
+			}
+			ic := "maximize-2"
+			if a.windowWide {
+				ic = "minimize-2"
+			}
+			if a.iconButton(c.Key("wide"), ic, m("x_maximize"), a.windowWide).Clicked() {
+				a.windowWide = !a.windowWide
+			}
 		})
 		ui.Column(c).Grow(1).MinHeight(0).Children(func() {
-			switch r.kind {
-			case routeSpaceFiles:
-				a.fileView(c, r.space, r.sub)
-			case routeSpaceCheckpoint:
+			switch {
+			case r.file() != "":
+				a.fileView(c, r.space, r.file())
+			case r.kind == routeSpaceCheckpoint:
 				a.checkpointView(c, r.space, r.sub)
-			case routeSpaceTask:
+			case r.kind == routeSpaceTask:
 				a.taskView(c, r.space, r.sub)
-			case routeSpaceCron:
+			case r.kind == routeSpaceCron:
 				a.cronView(c, r.space, r.sub)
 			}
 		})
-	})
-}
-
-func (a *app) fileView(c *ui.Context, spaceID, file string) {
-	p := a.pal
-	if file == "" {
-		ui.Column(c).Grow(1).Center().Children(func() {
-			ui.Text(c, m("x_select_file")).FontSize(12).TextColor(p.textTertiary)
-		})
-		return
-	}
-	f, err, ok := loadJSON[fsFile](a, "file:"+spaceID+":"+file, sp(spaceID)+"/fs/file?path="+url.QueryEscape(file))
-	if !ok || err != nil {
-		a.loadingBlock(c, err, 200)
-		return
-	}
-	ui.Row(c.Key("crumbs")).Height(32).Gap(4).AlignItems(ui.Center).Padding(0, 12).BorderWidth(0, 0, 1, 0).BorderColor(p.borderSubtle).Children(func() {
-		ui.Text(c, f.Path).FontSize(11).Font(fontMono).TextColor(p.textTertiary).SingleLine().Grow(1)
-		ui.Text(c, fmt.Sprintf("%s · %s", f.MimeType, byteSize(f.Size))).FontSize(10).TextColor(p.placeholder)
-	})
-	ui.Scroll(c.Key("file-" + file)).Grow(1).Children(func() {
-		switch {
-		case f.Kind != "text":
-			ui.Text(c, f.MimeType).FontSize(12).TextColor(p.textTertiary).Padding(24)
-		case strings.HasSuffix(strings.ToLower(f.Name), ".md"):
-			ui.Column(c).Padding(20, 24).Children(func() { markdown.View(c, f.Content, &a.md) })
-		default:
-			ui.Text(c, f.Content).FontSize(12).Font(fontMono).LineHeight(1.6).TextColor(p.textSecond).Padding(12, 16).Selectable()
-		}
 	})
 }
 

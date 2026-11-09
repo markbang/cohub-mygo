@@ -395,5 +395,23 @@
     "click": "标记为…"
    }
   ]
+ },
+ {
+  "name": "file-open",
+  "path": "/spaces/{HOME}?window=file%3AAGENTS.md",
+  "actions": [
+   {
+    "wait": 3000
+   }
+  ]
+ },
+ {
+  "name": "file-with-chat",
+  "path": "/spaces/{SPACE}/sessions/{SESSION}?window=file%3AAGENTS.md",
+  "actions": [
+   {
+    "wait": 3000
+   }
+  ]
  }
 ]

@@ -648,6 +648,7 @@ func (a *app) composer(c *ui.Context, running bool) {
 			card.Border(2, p.brand)
 		}
 		card.Children(func() {
+			a.viewportChips(c)
 			a.attachmentStrip(c)
 			in := ui.TextAreaBase(c.Key("draft"), &a.draft).Lines(2, 10).Placeholder(m("composer_placeholder")).Label(m("x_message")).PlaceholderColor(p.placeholder).
 				FontSize(14).LineHeight(1.55).Padding(0, 9)

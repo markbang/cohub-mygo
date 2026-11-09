@@ -54,13 +54,16 @@ func TestRoutes(t *testing.T) {
 	for _, path := range []string{
 		"/sessions", "/sessions/new", "/sessions/abc", "/spaces", "/spaces/new", "/spaces/s1",
 		"/spaces/s1/sessions/abc", "/spaces/s1/sessions/new", "/spaces/s1/settings", "/spaces/s1/activity",
-		"/spaces/s1/wallet", "/spaces/s1/files/docs/a.md", "/spaces/s1/checkpoints/new", "/spaces/s1/tasks/t1",
+		"/spaces/s1/wallet", "/spaces/s1?window=file%3Adocs%2Fa.md", "/spaces/s1/sessions/abc?window=file%3Aa.md", "/spaces/s1/checkpoints/new", "/spaces/s1/tasks/t1",
 		"/spaces/s1/cronjobs/c1", "/settings/general", "/settings/billing",
 	} {
 		r := parseRoute(path)
 		if got := r.String(); got != path && !(path == "/spaces/s1/sessions/new" && got == "/spaces/s1/sessions/new") {
 			t.Errorf("%s parses to %+v, which is %s", path, r, got)
 		}
+	}
+	if r := parseRoute("/spaces/s1/files/docs/a.md"); r.kind != routeSpace || r.file() != "docs/a.md" {
+		t.Errorf("files path %+v", r)
 	}
 	if r := parseRoute("/spaces/s1/settings#access"); r.sub != "access" {
 		t.Errorf("settings section %q", r.sub)

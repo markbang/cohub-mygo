@@ -19,7 +19,6 @@ const (
 	routeSpaceSettings                    // /spaces/:id/settings#section
 	routeSpaceActivity                    // /spaces/:id/activity
 	routeSpaceWallet                      // /spaces/:id/wallet
-	routeSpaceFiles                       // /spaces/:id/files/*path
 	routeSpaceCheckpoint                  // /spaces/:id/checkpoints/:cid (or new)
 	routeSpaceTask                        // /spaces/:id/tasks/:tid
 	routeSpaceCron                        // /spaces/:id/cronjobs/:cid (or new)
@@ -32,13 +31,18 @@ type route struct {
 	kind    routeKind
 	space   string
 	session string
-	sub     string // checkpoint, task or cron job ID, files path or settings section
+	sub     string // checkpoint, task or cron job ID, or settings section
+	win     string // the Space's window, ?window=file:path as the web's
 }
 
 func parseRoute(p string) route {
-	frag := ""
+	frag, win := "", ""
 	if u, err := url.Parse(p); err == nil {
 		p, frag = u.Path, u.Fragment
+		win = u.Query().Get("window")
+		if win == "" {
+			win = u.Query().Get("preview")
+		}
 	}
 	parts := strings.Split(strings.Trim(p, "/"), "/")
 	at := func(i int) string {
@@ -64,7 +68,7 @@ func parseRoute(p string) route {
 		case "new":
 			return route{kind: routeNewSpace}
 		}
-		r := route{kind: routeSpace, space: id}
+		r := route{kind: routeSpace, space: id, win: win}
 		switch at(2) {
 		case "sessions":
 			if at(3) == "" || at(3) == "new" {
@@ -82,7 +86,9 @@ func parseRoute(p string) route {
 		case "wallet":
 			r.kind = routeSpaceWallet
 		case "files":
-			r.kind, r.sub = routeSpaceFiles, strings.Join(parts[3:], "/")
+			if f := strings.Join(parts[3:], "/"); f != "" {
+				r.win = "file:" + f
+			}
 		case "checkpoints":
 			r.kind, r.sub = routeSpaceCheckpoint, at(3)
 		case "tasks":
@@ -102,6 +108,14 @@ func parseRoute(p string) route {
 }
 
 func (r route) String() string {
+	s := r.path()
+	if r.win != "" {
+		s += "?window=" + url.QueryEscape(r.win)
+	}
+	return s
+}
+
+func (r route) path() string {
 	switch r.kind {
 	case routeSessions:
 		return "/sessions"
@@ -125,8 +139,6 @@ func (r route) String() string {
 		return "/spaces/" + r.space + "/activity"
 	case routeSpaceWallet:
 		return "/spaces/" + r.space + "/wallet"
-	case routeSpaceFiles:
-		return "/spaces/" + r.space + "/files/" + r.sub
 	case routeSpaceCheckpoint:
 		return "/spaces/" + r.space + "/checkpoints/" + r.sub
 	case routeSpaceTask:
@@ -165,6 +177,14 @@ func (r route) area() area {
 func (r route) sessionID() string {
 	if r.kind == routeSession || r.kind == routeSpaceSession {
 		return r.session
+	}
+	return ""
+}
+
+// file is the path of the file the route's window shows, "" for none.
+func (r route) file() string {
+	if f, ok := strings.CutPrefix(r.win, "file:"); ok {
+		return f
 	}
 	return ""
 }

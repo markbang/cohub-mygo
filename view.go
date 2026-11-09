@@ -53,12 +53,14 @@ func (a *app) view(c *ui.Context) {
 		bg := p.bgPrimary
 		switch a.route.kind {
 		case routeSession, routeSpaceSession, routeSpace, routeSpaceNewSession,
-			routeSpaceFiles, routeSpaceCheckpoint, routeSpaceTask, routeSpaceCron:
+			routeSpaceCheckpoint, routeSpaceTask, routeSpaceCron:
 			bg = p.chatBg.Over(p.bgPrimary)
 		}
-		ui.Column(c).Grow(1).MinWidth(0).Background(bg).Children(func() {
-			a.page(c)
-		})
+		if !(a.windowWide && a.hasWindow()) {
+			ui.Column(c).Grow(1).MinWidth(0).Background(bg).Children(func() {
+				a.page(c)
+			})
+		}
 		if a.hasWindow() {
 			a.windowPane(c)
 		}
@@ -93,7 +95,7 @@ func (a *app) toastView(c *ui.Context) {
 func (a *app) showsPanel() bool {
 	switch a.route.kind {
 	case routeSession, routeSpaceSession, routeSpace, routeSpaceNewSession,
-		routeSpaceFiles, routeSpaceCheckpoint, routeSpaceTask, routeSpaceCron:
+		routeSpaceCheckpoint, routeSpaceTask, routeSpaceCron:
 		return true
 	}
 	return false
@@ -101,10 +103,10 @@ func (a *app) showsPanel() bool {
 
 func (a *app) hasWindow() bool {
 	switch a.route.kind {
-	case routeSpaceFiles, routeSpaceCheckpoint, routeSpaceTask, routeSpaceCron:
+	case routeSpaceCheckpoint, routeSpaceTask, routeSpaceCron:
 		return true
 	}
-	return false
+	return a.route.win != "" && a.route.area() == areaSpace
 }
 
 // page builds the main column of the route.
@@ -124,7 +126,7 @@ func (a *app) page(c *ui.Context) {
 		a.activityPage(c, a.route.space)
 	case routeSpaceWallet:
 		a.walletPage(c)
-	case routeSpaceFiles, routeSpaceCheckpoint, routeSpaceTask, routeSpaceCron:
+	case routeSpaceCheckpoint, routeSpaceTask, routeSpaceCron:
 		a.spaceHome(c)
 	case routeSettings:
 		a.settingsPage(c)

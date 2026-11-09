@@ -23,6 +23,9 @@ var locale = "zh-CN"
 // extraMessages are the app's words the web's catalogs lack, as
 // zh-CN and en.
 var extraMessages = map[string][2]string{
+	"x_source":            {"源码", "Source"},
+	"x_maximize":          {"最大化", "Maximize"},
+	"x_edit":              {"编辑", "Edit"},
 	"x_voice_no_recorder": {"没有找到录音程序：请安装 PipeWire、PulseAudio、ALSA、SoX 或 ffmpeg。", "No recorder found: install PipeWire, PulseAudio, ALSA, SoX or ffmpeg."},
 	"x_voice_unavailable": {"语音服务暂不可用", "Voice service unavailable"},
 	"x_ready":             {"就绪", "Ready"},

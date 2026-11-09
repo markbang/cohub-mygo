@@ -381,3 +381,46 @@ func promptContent(text string, ats []*attachment, urls map[string]string, sandb
 	}
 	return out
 }
+
+// viewport is the window the prompt carries as context, as the web's
+// viewport block: the open file, unless the user took it out.
+func (a *app) viewport() map[string]any {
+	f := a.route.file()
+	if f == "" || a.viewportOff[f] || !a.hasWindow() {
+		return nil
+	}
+	clean := strings.NewReplacer("\r", "_", "\n", "_", "`", "_").Replace(f)
+	return map[string]any{
+		"type":  "text",
+		"text":  "Viewport:\n- file: `" + clean + "`",
+		"_meta": map[string]any{"attachmentKind": "viewport", "viewports": []map[string]any{{"kind": "file", "path": f}}},
+	}
+}
+
+// viewportChips are ViewportContextBlocks: the window's file over the text.
+func (a *app) viewportChips(c *ui.Context) {
+	f := a.route.file()
+	if f == "" || a.viewportOff[f] || !a.hasWindow() {
+		return
+	}
+	p := a.pal
+	ui.Row(c.Key("viewport")).Padding(0, 6).Children(func() {
+		chip := ui.Row(c.Key(f)).Height(24).AlignItems(ui.Center).Radius(6).Border(1, p.borderSubtle.Alpha(0.7)).Background(p.bgContent.Alpha(0.55))
+		hover := chip.Hovered()
+		chip.Children(func() {
+			ui.Row(c).Gap(6).AlignItems(ui.Center).Padding(0, 8).Children(func() {
+				ui.Icon(c, icon("file")).Size(12, 12).TextColor(p.textTertiary)
+				ui.Text(c, filepath.Base(f)).FontSize(11).FontWeight(500).TextColor(p.textSecond).SingleLine().MaxWidth(240)
+			})
+			x := ui.ButtonBase(c.Key("x")).Size(24, 24).Center().Label(m("vctx_remove")).FocusRing(false).Children(func() {
+				ui.Icon(c, icon("x")).Size(12, 12).TextColor(p.textTertiary)
+			})
+			if !hover {
+				x.Opacity(0.45)
+			}
+			if x.Clicked() {
+				a.viewportOff[f] = true
+			}
+		})
+	})
+}

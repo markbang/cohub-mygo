@@ -81,9 +81,14 @@ type app struct {
 	shareOpen    bool
 	copiedAt     time.Time
 	labelTarget  *labelTarget
-	statsFor     string  // the chat whose statistics are open
-	inHeader     bool    // building a header: compact icon buttons grow to 40px
-	width        float32 // the window's width, as media queries see it
+	statsFor     string               // the chat whose statistics are open
+	editors      map[string]*fileEdit // open files by space:path
+	fsPending    *fsCreate
+	uploading    int
+	windowWide   bool            // the window takes the main column's room
+	viewportOff  map[string]bool // windows the user took out of the prompt's context
+	inHeader     bool            // building a header: compact icon buttons grow to 40px
+	width        float32         // the window's width, as media queries see it
 	purchase     purchaseState
 	redeem       redeemState
 	subsPage     int
@@ -125,7 +130,7 @@ func newApp() *app {
 		labelItems:    map[string][]LabelItem{},
 		loading:       map[string]bool{},
 		seen:          map[string]time.Time{},
-		groupsOpen:    map[string]bool{"labels": true, "chats": true, "all": true},
+		groupsOpen:    map[string]bool{"labels": true, "chats": true, "all": true, "saves": true},
 		menus:         map[string]bool{},
 		foldOpen:      map[string]bool{},
 		modelChoices:  map[string]modelChoice{},
@@ -134,6 +139,8 @@ func newApp() *app {
 		chats:         chatsFilter{source: "web"},
 		mediaFilter:   "all",
 		chipChats:     map[string][]*Session{},
+		editors:       map[string]*fileEdit{},
+		viewportOff:   map[string]bool{},
 		panelOpen:     true,
 		pal:           lightPalette(),
 		route:         route{kind: -1},
@@ -428,7 +435,12 @@ func (a *app) openSession(s *Session) {
 		return
 	}
 	if a.route.area() == areaSpace {
-		a.go_(route{kind: routeSpaceSession, space: s.SpaceID, session: s.ID})
+		r := route{kind: routeSpaceSession, space: s.SpaceID, session: s.ID}
+		if a.route.space == s.SpaceID {
+			// The window stays as the chat beside it changes.
+			r.win = a.route.win
+		}
+		a.go_(r)
 		return
 	}
 	a.go_(route{kind: routeSession, session: s.ID})
@@ -650,6 +662,7 @@ func (a *app) send() {
 		at.status, at.progress = "uploading", 0
 	}
 	model := a.composerModel()
+	viewport := a.viewport()
 	inSpace := a.route.area() == areaSpace
 	a.spawn(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
@@ -675,7 +688,11 @@ func (a *app) send() {
 		}
 		var id string
 		if err == nil {
-			id, err = a.api.prompt(ctx, spaceID, sessionID, promptContent(text, ats, urls, sandbox), model)
+			content := promptContent(text, ats, urls, sandbox)
+			if viewport != nil {
+				content = append(content, viewport)
+			}
+			id, err = a.api.prompt(ctx, spaceID, sessionID, content, model)
 		}
 		a.update(func() {
 			a.sending = false
