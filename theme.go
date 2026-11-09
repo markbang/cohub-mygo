@@ -1,7 +1,6 @@
 package main
 
 import (
-
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/markdown"
 )

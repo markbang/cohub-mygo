@@ -117,7 +117,7 @@ func (s *Session) displayTitle() string {
 	if t := strings.TrimSpace(s.Title); t != "" {
 		return t
 	}
-	return "新对话"
+	return m("x_untitled")
 }
 
 type Block struct {

@@ -21,4 +21,3 @@ func (a *app) stubPage(c *ui.Context, title string) {
 		ui.Text(c, title).FontSize(13).TextColor(p.textTertiary)
 	})
 }
-

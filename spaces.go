@@ -16,15 +16,15 @@ func (a *app) spacesView(c *ui.Context) {
 		}
 		if a.status != "" && a.me == nil {
 			a.spinner(c, 13, p.textTertiary)
-			ui.Text(c, "连接中…").FontSize(13).FontWeight(500).Grow(1)
+			ui.Text(c, m("sync_connecting")).FontSize(13).FontWeight(500).Grow(1)
 		} else if a.compact {
 			a.logo(c, 30)
 			ui.Text(c, "Space").FontSize(17).FontWeight(600).Grow(1).MarginStart(6)
 		} else {
 			ui.Spacer(c)
 		}
-		a.iconButton(c.Key("search"), "search", "搜索 Space", false).OnClick(func() { a.palette.open(paletteSpaces) })
-		add := ui.ButtonBase(c.Key("new-space")).Size(28, 28).Center().Radius(6).Label("新建 Space").FocusRing(false).Children(func() {
+		a.iconButton(c.Key("search"), "search", m("command_placeholder_space"), false).OnClick(func() { a.palette.open(paletteSpaces) })
+		add := ui.ButtonBase(c.Key("new-space")).Size(28, 28).Center().Radius(6).Label(m("spaces_new")).FocusRing(false).Children(func() {
 			ui.Icon(c, icon("plus")).Size(16, 16).TextColor(p.brand)
 		})
 		if add.Hovered() {
@@ -36,12 +36,12 @@ func (a *app) spacesView(c *ui.Context) {
 			ui.Row(c).Gap(4).Children(func() {
 				for i, it := range sidebarSpaceNav {
 					on := a.spacesNav == i
-					b := ui.ButtonBase(c.Key(it.label)).Height(28).Padding(0, 8).Radius(6).Center().FocusRing(false).Children(func() {
+					b := ui.ButtonBase(c.Key(it.icon)).Height(28).Padding(0, 8).Radius(6).Center().FocusRing(false).Children(func() {
 						col := p.textSecond
 						if on {
 							col = p.brand
 						}
-						ui.Text(c, it.label).FontSize(13).TextColor(col)
+						ui.Text(c, m(it.label)).FontSize(13).TextColor(col)
 					})
 					if on {
 						b.Background(p.brandMuted)
@@ -72,7 +72,7 @@ func (a *app) spacesView(c *ui.Context) {
 				ui.Text(c, sp.Name).FontSize(fs).SingleLine()
 				desc := sp.Description
 				if desc == "" {
-					desc = "暂无描述"
+					desc = m("spaces_row_no_description")
 				}
 				ui.Text(c, oneLine(desc)).FontSize(fs - 2).TextColor(p.textTertiary).SingleLine()
 			})
@@ -87,7 +87,7 @@ func (a *app) spacesView(c *ui.Context) {
 		row.OnClick(func() { a.openSpace(sp.ID) })
 	}).Grow(1).Padding(6, 6).Gap(0).Children(func() {
 		if len(list) == 0 && a.me != nil {
-			ui.Text(c, "没有 Space").FontSize(13).TextColor(p.textTertiary).Padding(20)
+			ui.Text(c, m("x_no_spaces")).FontSize(13).TextColor(p.textTertiary).Padding(20)
 		}
 	})
 }
@@ -106,9 +106,9 @@ func (a *app) spaceHome(c *ui.Context) {
 	})
 	a.header(c, func() {
 		a.headerLead(c)
-		ui.Text(c, "新建对话").FontSize(13).TextColor(p.textSecond).Grow(1)
+		ui.Text(c, m("sidebar_new_chat")).FontSize(13).TextColor(p.textSecond).Grow(1)
 		if !a.compact {
-			if a.iconButton(c.Key("panel"), "panel-right", "侧边面板", false).Clicked() {
+			if a.iconButton(c.Key("panel"), "panel-right", m("x_side_panel"), false).Clicked() {
 				a.panelOpen = !a.panelOpen
 			}
 		}
@@ -145,8 +145,7 @@ func (a *app) spaceHome(c *ui.Context) {
 				})
 			}
 			if u := a.usage7d[id]; u != nil && u.Totals.RequestCount > 0 {
-				ui.Text(c, fmt.Sprintf("最近 7 天，此 Space 使用了 %s 个 Token、%d 次 LLM 请求，合计 US$%.2f。",
-					compactCount(u.Totals.TotalTokens), u.Totals.RequestCount, u.Totals.CostTotal)).FontSize(14).LineHeight(1.7).TextColor(p.textSecond)
+				ui.Text(c, m("x_space_usage", "tokens", compactCount(u.Totals.TotalTokens), "requests", u.Totals.RequestCount, "cost", fmt.Sprintf("US$%.2f", u.Totals.CostTotal))).FontSize(14).LineHeight(1.7).TextColor(p.textSecond)
 			}
 		})
 	})

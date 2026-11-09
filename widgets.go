@@ -40,15 +40,24 @@ func dateTime(t, now time.Time) string {
 	return t.Format("2006.01.02")
 }
 
+// units are the duration units of the window's language.
+func units() (ms, s, mi, h string) {
+	if locale == "zh-CN" {
+		return "毫秒", "秒", "分", "时"
+	}
+	return "ms", "s", "m", "h"
+}
+
 func elapsed(since, now time.Time) string {
+	_, s, mi, h := units()
 	d := now.Sub(since)
 	switch {
 	case d < time.Minute:
-		return fmt.Sprintf("%d秒", int(d.Seconds()))
+		return fmt.Sprintf("%d%s", int(d.Seconds()), s)
 	case d < time.Hour:
-		return fmt.Sprintf("%d分", int(d.Minutes()))
+		return fmt.Sprintf("%d%s", int(d.Minutes()), mi)
 	}
-	return fmt.Sprintf("%d时%d分", int(d.Hours()), int(d.Minutes())%60)
+	return fmt.Sprintf("%d%s %d%s", int(d.Hours()), h, int(d.Minutes())%60, mi)
 }
 
 func kilo(n int64) string {
@@ -186,10 +195,10 @@ func (a *app) pill(c *ui.Context, label, sub string, lead func()) ui.Element {
 
 type menuItem struct {
 	icon, label, hint string
-	checked          bool
-	danger           bool
-	divider          bool // a line below the item
-	run              func()
+	checked           bool
+	danger            bool
+	divider           bool // a line below the item
+	run               func()
 }
 
 // menu is the web's .menu-surface below (or above) anchor: rows of an
@@ -249,30 +258,31 @@ func fmt_(a string, n int) string { return fmt.Sprint(a, n) }
 // clock is a message's time: the time today, the day and time before.
 func clock(t, now time.Time) string { return relTime(t, now) }
 
-// duration is formatDurationMs in Chinese.
+// duration is formatDurationMs.
 func duration(ms int64) string {
+	ums, us, umi, uh := units()
 	if ms < 1000 {
-		return fmt.Sprintf("%d毫秒", max(1, ms))
+		return fmt.Sprintf("%d%s", max(1, ms), ums)
 	}
 	if ms < 10_000 {
-		return fmt.Sprintf("%.1f秒", float64(ms)/1000)
+		return fmt.Sprintf("%.1f%s", float64(ms)/1000, us)
 	}
 	sec := (ms + 500) / 1000
 	if sec < 60 {
-		return fmt.Sprintf("%d秒", sec)
+		return fmt.Sprintf("%d%s", sec, us)
 	}
-	min, sec := sec/60, sec%60
-	if min < 60 {
+	mn, sec := sec/60, sec%60
+	if mn < 60 {
 		if sec > 0 {
-			return fmt.Sprintf("%d分 %d秒", min, sec)
+			return fmt.Sprintf("%d%s %d%s", mn, umi, sec, us)
 		}
-		return fmt.Sprintf("%d分", min)
+		return fmt.Sprintf("%d%s", mn, umi)
 	}
-	h, min := min/60, min%60
-	if min > 0 {
-		return fmt.Sprintf("%d时 %d分", h, min)
+	h, mn := mn/60, mn%60
+	if mn > 0 {
+		return fmt.Sprintf("%d%s %d%s", h, uh, mn, umi)
 	}
-	return fmt.Sprintf("%d时", h)
+	return fmt.Sprintf("%d%s", h, uh)
 }
 
 func (a *app) spinner(c *ui.Context, size float32, col ui.Color) ui.Element {

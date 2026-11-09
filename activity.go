@@ -159,13 +159,13 @@ func (a *app) activityPage(c *ui.Context, spaceID string) {
 			ui.Row(c).AlignItems(ui.End).Gap(16).Padding(0, 0, 20, 0).BorderWidth(0, 0, 1, 0).BorderColor(p.borderSubtle).Children(func() {
 				ui.Column(c).Grow(1).MinWidth(0).Gap(4).Children(func() {
 					ui.Text(c, "Cohub").FontSize(11).FontWeight(600).TextColor(p.brand)
-					title, sub := "活动", "活动"
+					title, sub := m("nav_activity"), m("nav_activity")
 					if spaceID == "" {
-						who := "您的账户"
+						who := m("activity_your_account")
 						if a.me != nil && a.me.Profile != nil && a.me.Profile.Username != "" {
 							who = "@" + a.me.Profile.Username
 						}
-						sub = who + " · " + map[bool]string{true: "去年", false: fmt.Sprintf("最近 %d 天", days)}[days == 365]
+						sub = who + " · " + map[bool]string{true: m("activity_last_year"), false: m("activity_last_days", "days", days)}[days == 365]
 					}
 					ui.Text(c, title).FontSize(20).FontWeight(600).SingleLine()
 					ui.Text(c, sub).FontSize(12).TextColor(p.textTertiary)
@@ -177,7 +177,7 @@ func (a *app) activityPage(c *ui.Context, spaceID string) {
 				a.activityBody(c, v, days, spaceID)
 			case error:
 				ui.Column(c).Padding(64, 0).AlignItems(ui.Center).Gap(8).Children(func() {
-					ui.Text(c, "活动数据不可用。").FontSize(13).TextColor(p.textSecond)
+					ui.Text(c, m("activity_unavailable")).FontSize(13).TextColor(p.textSecond)
 					ui.Text(c, v.Error()).FontSize(12).TextColor(p.errorC)
 				})
 			default:
@@ -223,9 +223,9 @@ func (a *app) activityBody(c *ui.Context, act *Activity, n int, spaceID string) 
 	ui.Row(c).Padding(24, 0).BorderWidth(0, 0, 1, 0).BorderColor(p.borderSubtle).Children(func() {
 		stats := []struct{ v, l string }{
 			{compactCount(act.Totals.TotalTokens), "Token"},
-			{compactCount(act.Totals.RequestCount), "请求数"},
-			{strconv.Itoa(active), "活跃天数"},
-			{formatCost(act.Totals.CostTotal), "费用"},
+			{compactCount(act.Totals.RequestCount), m("activity_requests")},
+			{strconv.Itoa(active), m("activity_active_days")},
+			{formatCost(act.Totals.CostTotal), m("activity_cost")},
 		}
 		if spaceID != "" {
 			stats = stats[:3]
@@ -249,13 +249,13 @@ func (a *app) activityBody(c *ui.Context, act *Activity, n int, spaceID string) 
 	gen, _ := a.pages.json[modeKey].(bool)
 	ui.Column(c).Padding(28, 0).Gap(16).BorderWidth(0, 0, 1, 0).BorderColor(p.borderSubtle).Children(func() {
 		ui.Row(c).AlignItems(ui.Center).Gap(12).Children(func() {
-			ui.Text(c, "每日活动").FontSize(13).FontWeight(500).Grow(1)
+			ui.Text(c, m("activity_daily_activity")).FontSize(13).FontWeight(500).Grow(1)
 			mode := 0
 			if gen {
 				mode = 1
 			}
 			ui.Row(c.Key("mode")).Padding(2).Radius(6).Background(p.bgSurface).Children(func() {
-				for i, l := range []string{"LLM", "生成"} {
+				for i, l := range []string{"LLM", m("activity_mode_generation")} {
 					on := i == mode
 					b := ui.ButtonBase(c.Key(l)).Height(22).Padding(0, 10).Radius(4).Center().FocusRing(false).Children(func() {
 						col := p.placeholder
@@ -273,11 +273,11 @@ func (a *app) activityBody(c *ui.Context, act *Activity, n int, spaceID string) 
 				}
 			})
 			ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
-				ui.Text(c, "较少").FontSize(10).TextColor(p.placeholder)
+				ui.Text(c, m("activity_less")).FontSize(10).TextColor(p.placeholder)
 				for lv := 0; lv <= 4; lv++ {
 					ui.Box(c.Key(lv)).Size(11, 11).Radius(2).Background(a.heatColor(lv, gen))
 				}
-				ui.Text(c, "较多").FontSize(10).TextColor(p.placeholder)
+				ui.Text(c, m("activity_more")).FontSize(10).TextColor(p.placeholder)
 			})
 		})
 		value := func(d activityDay) int64 {
@@ -328,8 +328,8 @@ func (a *app) activityBody(c *ui.Context, act *Activity, n int, spaceID string) 
 	if act.Contributors != nil {
 		ui.Column(c).Padding(28, 0).Gap(16).BorderWidth(0, 0, 1, 0).BorderColor(p.borderSubtle).Children(func() {
 			ui.Row(c).Children(func() {
-				ui.Text(c, "参与者").FontSize(13).FontWeight(500).Grow(1)
-				ui.Text(c, fmt.Sprintf("%d 位成员", act.Contributors.MemberCount)).FontSize(10).TextColor(p.placeholder)
+				ui.Text(c, m("activity_contributors")).FontSize(13).FontWeight(500).Grow(1)
+				ui.Text(c, m("activity_member_count", "count", act.Contributors.MemberCount)).FontSize(10).TextColor(p.placeholder)
 			})
 			ui.Row(c).Gap(8).Wrap().Children(func() {
 				for _, it := range act.Contributors.Items {
@@ -379,8 +379,8 @@ func (a *app) activityBody(c *ui.Context, act *Activity, n int, spaceID string) 
 		}
 		r := act.Rankings
 		showCost := spaceID == ""
-		unit := map[bool]string{true: "Token · 费用", false: "Token"}[showCost]
-		rank("LLM 模型", unit, func() {
+		unit := map[bool]string{true: m("activity_tokens_cost"), false: "Token"}[showCost]
+		rank(m("activity_llm_models"), unit, func() {
 			for i, m := range r.LLMModels {
 				v := compactCount(m.TotalTokens)
 				if showCost {
@@ -388,8 +388,8 @@ func (a *app) activityBody(c *ui.Context, act *Activity, n int, spaceID string) 
 				}
 				row(i, m.Model, m.Provider, v)
 			}
-		}, len(r.LLMModels) == 0, "此范围内没有 LLM 用量。")
-		rank("生成模型", map[bool]string{true: "调用 · 费用", false: "调用"}[showCost], func() {
+		}, len(r.LLMModels) == 0, m("activity_no_llm_usage"))
+		rank(m("activity_generation_models"), map[bool]string{true: m("activity_calls_cost"), false: m("activity_calls")}[showCost], func() {
 			for i, m := range r.GenerationModels {
 				v := compactCount(m.RequestCount)
 				if showCost {
@@ -397,14 +397,14 @@ func (a *app) activityBody(c *ui.Context, act *Activity, n int, spaceID string) 
 				}
 				row(i, m.Model, "", v)
 			}
-		}, len(r.GenerationModels) == 0, "此范围内没有生成用量。")
+		}, len(r.GenerationModels) == 0, m("activity_no_generation_usage"))
 		apps := r.Apps
 		sort.SliceStable(apps, func(i, j int) bool { return apps[i].ViewCount > apps[j].ViewCount })
-		rank("应用", "浏览量", func() {
+		rank(m("side_panel_tab_apps"), m("activity_views"), func() {
 			for i, m := range apps {
 				row(i, m.Title, m.SpaceName, compactCount(m.ViewCount))
 			}
-		}, len(apps) == 0, "此范围内没有 App 浏览。")
+		}, len(apps) == 0, m("activity_no_app_views"))
 	})
 }
 

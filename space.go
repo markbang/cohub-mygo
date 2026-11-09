@@ -266,7 +266,7 @@ func (a *app) panelContent(c *ui.Context) {
 		}
 	case 2:
 		ui.Row(c.Key("media-tabs")).Gap(2).Padding(8, 8, 0, 8).Children(func() {
-			for i, l := range []string{"全部", "图片", "视频", "音频"} {
+			for i, l := range []string{m("sidebar_all"), m("media_filter_image"), m("media_filter_video"), m("media_filter_audio")} {
 				b := ui.ButtonBase(c.Key(l)).Height(24).Padding(0, 6).Radius(5).Center().FocusRing(false).Children(func() {
 					col := p.textTertiary
 					if i == 0 {
@@ -331,9 +331,9 @@ func (a *app) panelContent(c *ui.Context) {
 func (a *app) filesPanel(c *ui.Context, spaceID string) {
 	ui.Row(c.Key("files-head")).Height(36).Gap(2).AlignItems(ui.Center).Padding(0, 6, 0, 12).Children(func() {
 		ui.Text(c, m("x_files")).FontSize(12).FontWeight(600).Grow(1)
-		a.iconButton(c.Key("new"), "plus", "新建", false)
-		a.iconButton(c.Key("upload"), "upload", "上传", false)
-		if a.iconButton(c.Key("refresh"), "refresh-cw", "刷新", false).Clicked() {
+		a.iconButton(c.Key("new"), "plus", m("files_new"), false)
+		a.iconButton(c.Key("upload"), "upload", m("common_upload"), false)
+		if a.iconButton(c.Key("refresh"), "refresh-cw", m("rules_refresh"), false).Clicked() {
 			for k := range a.loading {
 				if strings.HasPrefix(k, "tree:"+spaceID) {
 					delete(a.loading, k)
@@ -422,7 +422,7 @@ func (a *app) windowPane(c *ui.Context) {
 	}
 	ui.Column(c.Key("pane")).Width(480).Shrink(0).Background(p.bgPrimary).BorderWidth(0, 0, 0, 1).BorderColor(p.borderSubtle).Children(func() {
 		ui.Row(c).Height(headerHeight).Shrink(0).Gap(4).AlignItems(ui.Center).Padding(0, 8).BorderWidth(0, 0, 1, 0).BorderColor(p.borderSubtle).DragWindow().Children(func() {
-			a.iconButton(c.Key("pane-side"), "panel-left", "文件", false)
+			a.iconButton(c.Key("pane-side"), "panel-left", m("resource_app_files"), false)
 			ui.Row(c.Key("tab")).Gap(6).AlignItems(ui.Center).Height(40).Padding(0, 8).BorderWidth(0, 0, 2, 0).BorderColor(p.brand).Children(func() {
 				ui.Icon(c, icon(iconName)).Size(13, 13).TextColor(p.text)
 				ui.Text(c, title).FontSize(12).FontWeight(500).SingleLine().MaxWidth(200)
@@ -434,8 +434,8 @@ func (a *app) windowPane(c *ui.Context) {
 				}
 			})
 			ui.Spacer(c)
-			a.iconButton(c.Key("reload"), "refresh-cw", "刷新", false)
-			a.iconButton(c.Key("popout"), "external-link", "新窗口", false)
+			a.iconButton(c.Key("reload"), "refresh-cw", m("rules_refresh"), false)
+			a.iconButton(c.Key("popout"), "external-link", m("x_new_window"), false)
 		})
 		ui.Column(c).Grow(1).MinHeight(0).Children(func() {
 			switch r.kind {
@@ -469,7 +469,7 @@ func (a *app) fileView(c *ui.Context, spaceID, file string) {
 		ui.Text(c, f.Path).FontSize(11).Font(fontMono).TextColor(p.textTertiary).SingleLine().Grow(1)
 		ui.Text(c, fmt.Sprintf("%s · %s", f.MimeType, byteSize(f.Size))).FontSize(10).TextColor(p.placeholder)
 	})
-	ui.Scroll(c.Key("file-"+file)).Grow(1).Children(func() {
+	ui.Scroll(c.Key("file-" + file)).Grow(1).Children(func() {
 		switch {
 		case f.Kind != "text":
 			ui.Text(c, f.MimeType).FontSize(12).TextColor(p.textTertiary).Padding(24)
@@ -517,7 +517,7 @@ func (a *app) checkpointView(c *ui.Context, spaceID, id string) {
 					a.spinner(c, 16, p.textTertiary)
 					return
 				}
-				ui.Text(c, "存档").FontSize(11).TextColor(p.textTertiary)
+				ui.Text(c, m("sidebar_saves")).FontSize(11).TextColor(p.textTertiary)
 				ui.Text(c, cp.Description).FontSize(20).FontWeight(600)
 				ui.Text(c, cp.CreatedAt.Local().Format("2006-01-02 15:04")+" · "+cp.CommitHash[:min(12, len(cp.CommitHash))]).FontSize(12).Font(fontMono).TextColor(p.textTertiary)
 				return
@@ -604,11 +604,11 @@ func (a *app) taskView(c *ui.Context, spaceID, id string) {
 					ui.Text(c, v).FontSize(12).Font(fontMono).TextColor(p.textSecond).Grow(1)
 				})
 			}
-			kv("类型", taskTypeLabel(r.TaskType))
-			kv("状态", r.Status)
-			kv("创建", r.CreatedAt.Local().Format("2006-01-02 15:04:05"))
+			kv(m("cron_type"), taskTypeLabel(r.TaskType))
+			kv(m("channels_col_status"), r.Status)
+			kv(m("x_created"), r.CreatedAt.Local().Format("2006-01-02 15:04:05"))
 			if r.FinishedAt != nil {
-				kv("完成", r.FinishedAt.Local().Format("2006-01-02 15:04:05"))
+				kv(m("tool_status_done"), r.FinishedAt.Local().Format("2006-01-02 15:04:05"))
 			}
 			if r.Error != "" {
 				ui.Text(c, r.Error).FontSize(12).TextColor(p.errorC).Padding(8, 10).Radius(6).Background(p.errorC.Alpha(0.08))

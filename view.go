@@ -138,7 +138,7 @@ func (a *app) emptyView(c *ui.Context) {
 	p := a.pal
 	a.header(c, func() {
 		a.headerLead(c)
-		ui.Text(c, "对话").FontSize(13).Grow(1)
+		ui.Text(c, m("sidebar_chats")).FontSize(13).Grow(1)
 	})
 	ui.Column(c).Grow(1).Center().Gap(8).Children(func() {
 		if a.status != "" && a.me == nil {
@@ -146,7 +146,7 @@ func (a *app) emptyView(c *ui.Context) {
 			ui.Text(c, a.status).TextColor(p.textTertiary).FontSize(13)
 			return
 		}
-		ui.Text(c, "选择一个对话，或新建一个").TextColor(p.textTertiary).FontSize(13)
+		ui.Text(c, m("x_select_or_new")).TextColor(p.textTertiary).FontSize(13)
 	})
 }
 
@@ -154,7 +154,7 @@ func (a *app) emptyView(c *ui.Context) {
 func (a *app) rightPanel(c *ui.Context) {
 	p := a.pal
 	bar := c.TitleBar()
-	tabs := []struct{ icon, label string }{{"message-square", "本对话"}, {"copy", "文件"}, {"images", "媒体"}, {"layout-template", "应用"}}
+	tabs := []struct{ icon, label string }{{"message-square", m("side_panel_tab_session")}, {"copy", m("resource_app_files")}, {"images", m("side_panel_tab_media")}, {"layout-template", m("side_panel_tab_apps")}}
 	ui.Column(c).Width(panelWidth).Shrink(0).Background(p.bgPrimary).BorderWidth(0, 0, 0, 1).BorderColor(p.borderSubtle).Children(func() {
 		ui.Row(c).Height(headerHeight).Shrink(0).AlignItems(ui.Center).Padding(0, 8+bar.Right, 0, 8).Gap(2).DragWindow().Children(func() {
 			for i, t := range tabs {

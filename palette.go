@@ -36,9 +36,9 @@ func (s *paletteState) toggle(k paletteKind) {
 
 func (s *paletteState) tabs() []string {
 	if s.kind == paletteSpaces {
-		return []string{"最近", "全部", "我的", "已置顶", "已归档"}
+		return []string{m("spaces_section_recent"), m("sidebar_all"), m("command_mine"), m("command_pinned"), m("spaces_archived")}
 	}
-	return []string{"全部", "Space", "对话", "标签", "命令"}
+	return []string{m("sidebar_all"), "Space", m("sidebar_chats"), m("sidebar_labels"), m("command_lens_command")}
 }
 
 // paletteItem is a row of the palette.
@@ -123,9 +123,9 @@ func (a *app) paletteItems() []paletteItem {
 	}
 	if s.tab == 4 {
 		for _, cmd := range []paletteItem{
-			{key: "cmd-new-chat", command: true, title: "新建对话", sub: "⌘O", choose: a.newChat},
-			{key: "cmd-settings", command: true, title: "设置", sub: "⌘,", choose: func() { a.go_(route{kind: routeSettings, sub: "general"}) }},
-			{key: "cmd-sidebar", command: true, title: "切换侧栏", sub: "⌘B", choose: func() { a.sidebarOpen = !a.sidebarOpen }},
+			{key: "cmd-new-chat", command: true, title: m("sidebar_new_chat"), sub: "⌘O", choose: a.newChat},
+			{key: "cmd-settings", command: true, title: m("nav_settings"), sub: "⌘,", choose: func() { a.go_(route{kind: routeSettings, sub: "general"}) }},
+			{key: "cmd-sidebar", command: true, title: m("x_toggle_sidebar"), sub: "⌘B", choose: func() { a.sidebarOpen = !a.sidebarOpen }},
 		} {
 			if match(cmd.title) {
 				items = append(items, cmd)
@@ -161,11 +161,11 @@ func (a *app) paletteView(c *ui.Context) {
 			Shadow(0, 25, 50, -12, ui.RGBA(0, 0, 0, 0.25)).Clip()
 		ui.Row(c).Height(50).Shrink(0).Gap(10).AlignItems(ui.Center).Padding(0, 16).Background(p.popHead).BorderWidth(0, 0, 1, 0).BorderColor(p.borderSubtle).Children(func() {
 			ui.Icon(c, icon("search")).Size(16, 16).TextColor(p.textTertiary)
-			ph := "搜索 Space 和对话…"
+			ph := m("command_placeholder")
 			if s.kind == paletteSpaces {
-				ph = "搜索 Space…"
+				ph = m("command_placeholder_space")
 			}
-			in := ui.TextInputBase(c.Key("query"), &s.query).Placeholder(ph).PlaceholderColor(p.placeholder).FontSize(15).Grow(1).AutoFocus().Label("搜索")
+			in := ui.TextInputBase(c.Key("query"), &s.query).Placeholder(ph).PlaceholderColor(p.placeholder).FontSize(15).Grow(1).AutoFocus().Label(m("list_search"))
 			if in.Changed() {
 				s.sel = 0
 			}
@@ -211,7 +211,7 @@ func (a *app) paletteView(c *ui.Context) {
 			if s.kind == paletteSpaces {
 				m := ui.ButtonBase(c.Key("manage")).Row().Gap(4).AlignItems(ui.Center).Height(24).Padding(0, 6).Radius(5).FocusRing(false).Children(func() {
 					ui.Icon(c, icon("sliders-horizontal")).Size(12, 12).TextColor(p.textTertiary)
-					ui.Text(c, "管理 Space").FontSize(11).TextColor(p.textTertiary)
+					ui.Text(c, m("spaces_manage")).FontSize(11).TextColor(p.textTertiary)
 				})
 				if m.Clicked() {
 					s.shown = false
@@ -223,16 +223,16 @@ func (a *app) paletteView(c *ui.Context) {
 			a.paletteRow(c, items[i], i == s.sel, func() { choose(i) })
 		}).Grow(1).MinHeight(0).Padding(0, 10, 6, 10).Gap(0).Children(func() {
 			if len(items) == 0 {
-				ui.Text(c, "没有结果").FontSize(13).TextColor(p.textTertiary).Padding(24).Margin(0, ui.Auto)
+				ui.Text(c, m("x_no_results")).FontSize(13).TextColor(p.textTertiary).Padding(24).Margin(0, ui.Auto)
 			}
 		})
 		ui.Row(c).Height(32).Shrink(0).Gap(6).AlignItems(ui.Center).Padding(0, 12).BorderWidth(1, 0, 0, 0).BorderColor(p.borderSubtle).Children(func() {
-			hint := "对话、Space、标签和命令"
+			hint := m("command_type_default")
 			if s.kind == paletteSpaces {
 				hint = "Space"
 			}
-			ui.Text(c, hint+" · 输入以筛选").FontSize(10.5).Font(fontMono).TextColor(p.textTertiary).Grow(1)
-			ui.Text(c, "↑↓ C-n/p 导航  ↵ 打开  esc 关闭").FontSize(10.5).Font(fontMono).TextColor(p.textTertiary)
+			ui.Text(c, hint+m("x_type_to_filter")).FontSize(10.5).Font(fontMono).TextColor(p.textTertiary).Grow(1)
+			ui.Text(c, m("x_palette_keys")).FontSize(10.5).Font(fontMono).TextColor(p.textTertiary)
 		})
 	})
 }

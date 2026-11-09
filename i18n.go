@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 )
 
 // The web app's Paraglide messages (apps/web/messages), so the copy is
@@ -22,6 +23,32 @@ var locale = "zh-CN"
 // extraMessages are the app's words the web's catalogs lack, as
 // zh-CN and en.
 var extraMessages = map[string][2]string{
+	"x_created":        {"创建", "Created"},
+	"x_mine":           {"我的", "Mine"},
+	"x_no_spaces":      {"没有 Space", "No Spaces"},
+	"x_no_results":     {"没有结果", "No results"},
+	"x_no_chats":       {"还没有对话", "No chats yet"},
+	"x_choose_space":   {"先选择一个 Space", "Choose a Space first"},
+	"x_demo_no_send":   {"演示模式不能发送", "The demo cannot send"},
+	"x_voice":          {"语音输入", "Voice input"},
+	"x_side_panel":     {"侧边面板", "Side panel"},
+	"x_menu":           {"菜单", "Menu"},
+	"x_filter":         {"筛选", "Filter"},
+	"x_new_window":     {"新窗口", "New window"},
+	"x_error":          {"出错了", "Something went wrong"},
+	"x_loading_chats":  {"加载对话…", "Loading chats…"},
+	"x_toggle_sidebar": {"切换侧栏", "Toggle sidebar"},
+	"x_message":        {"消息", "Message"},
+	"x_untitled":       {"新对话", "New chat"},
+	"x_provider":       {"提供方", "Provider"},
+	"x_auto_destroy":   {"自动销毁", "Auto destroy"},
+	"x_spec":           {"规格", "Spec"},
+	"x_search_k":       {"搜索 (⌘K)", "Search (⌘K)"},
+	"x_new_chat_k":     {"新建对话 (⌘O)", "New chat (⌘O)"},
+	"x_running_dot":    {"运行中 · ", "Working · "},
+	"x_offline":        {"离线：", "Offline: "},
+	"x_type_to_filter": {" · 输入以筛选", " · type to filter"},
+	"x_palette_keys":   {"↑↓ C-n/p 导航  ↵ 打开  esc 关闭", "↑↓ C-n/p navigate  ↵ open  esc close"},
 	"x_apps":           {"应用", "Apps"},
 	"x_account":        {"账户", "Account"},
 	"x_to_latest":      {"回到最新", "Jump to latest"},
@@ -96,4 +123,20 @@ func m(key string, params ...any) string {
 		s = strings.ReplaceAll(s, "{"+fmt.Sprint(params[i])+"}", fmt.Sprint(params[i+1]))
 	}
 	return s
+}
+
+// plural picks key_one or key_many by n.
+func plural(key string, n int) string {
+	if n == 1 {
+		return m(key+"_one", "count", n)
+	}
+	return m(key+"_many", "count", n)
+}
+
+// longDate is a date and time as the web's billing and rules pages write them.
+func longDate(t time.Time) string {
+	if locale == "zh-CN" {
+		return t.Local().Format("2006年1月2日 15:04")
+	}
+	return t.Local().Format("Jan 2, 2006, 15:04")
 }

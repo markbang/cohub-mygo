@@ -469,7 +469,7 @@ func (a *app) rulesPage(c *ui.Context) {
 			}
 			v := m("rules_not_published_yet")
 			if !when.IsZero() {
-				v = when.Local().Format("2006年1月2日 15:04")
+				v = longDate(when)
 			}
 			card(m("rules_updated"), v)
 		})
@@ -561,7 +561,7 @@ func (a *app) channelsPage(c *ui.Context) {
 						switch state {
 						case "ready":
 						case "unbound":
-							label, col = "未绑定", p.textTertiary
+							label, col = m("channels_not_bound"), p.textTertiary
 						default:
 							label, col = state, p.warning
 						}

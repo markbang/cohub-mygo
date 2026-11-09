@@ -65,7 +65,7 @@ func usd(v float64) string {
 	return out
 }
 
-func zhDate(t time.Time) string { return t.Local().Format("2006年1月2日 15:04") }
+func zhDate(t time.Time) string { return longDate(t) }
 
 // billingPage is BillingSettings.svelte's balance tab: the plan, the
 // balance, and the balance by when it expires.

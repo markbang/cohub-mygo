@@ -348,3 +348,16 @@ func TestThemesMatchWeb(t *testing.T) {
 		t.Errorf("custom over dark: dark %v brand %v font %q", c.dark, c.brand, c.font)
 	}
 }
+
+func TestEnglish(t *testing.T) {
+	a := demoApp(t)
+	setLocale("en")
+	defer setLocale("zh-CN")
+	tt := ui.NewTester(a.view, 1440, 900)
+	for _, want := range []string{"Chats", "New chat"} {
+		if !tt.HasText(want) {
+			t.Errorf("missing %q in %q", want, tt.Texts())
+		}
+	}
+	snapshot(t, tt, "desktop-chat-en")
+}

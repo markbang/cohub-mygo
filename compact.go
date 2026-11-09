@@ -40,8 +40,8 @@ func (a *app) compactChats(c *ui.Context) {
 	ui.Column(c).Grow(1).MinHeight(0).Background(p.bgPrimary).Children(func() {
 		ui.Row(c).Height(52).Shrink(0).Gap(6).AlignItems(ui.Center).Padding(0, 8+bar.Right, 0, 14+bar.Left).DragWindow().Children(func() {
 			a.logo(c, 30)
-			ui.Text(c, "对话").FontSize(17).FontWeight(600).Grow(1).MarginStart(6)
-			for _, it := range []struct{ icon, label string }{{"search", "搜索"}, {"list-filter", "筛选"}} {
+			ui.Text(c, m("sidebar_chats")).FontSize(17).FontWeight(600).Grow(1).MarginStart(6)
+			for _, it := range []struct{ icon, label string }{{"search", m("list_search")}, {"list-filter", m("x_filter")}} {
 				b := ui.ButtonBase(c.Key(it.label)).Size(40, 40).Center().Radius(8).Label(it.label).FocusRing(false).Children(func() {
 					ui.Icon(c, icon(it.icon)).Size(20, 20).TextColor(p.textSecond)
 				})
@@ -52,7 +52,7 @@ func (a *app) compactChats(c *ui.Context) {
 					a.palette.open(paletteAll)
 				}
 			}
-			add := ui.ButtonBase(c.Key("new")).Size(40, 40).Center().Radius(8).Label("新建对话").FocusRing(false).Children(func() {
+			add := ui.ButtonBase(c.Key("new")).Size(40, 40).Center().Radius(8).Label(m("sidebar_new_chat")).FocusRing(false).Children(func() {
 				ui.Icon(c, icon("plus")).Size(22, 22).TextColor(p.brand)
 			})
 			if add.Clicked() {
@@ -61,7 +61,7 @@ func (a *app) compactChats(c *ui.Context) {
 		})
 		ui.ScrollHorizontal(c.Key("chips")).Shrink(0).Scrollbars(false).Padding(2, 12, 10, 12).BorderWidth(0, 0, 1, 0).BorderColor(p.borderSubtle).Children(func() {
 			ui.Row(c).Gap(4).Children(func() {
-				a.spaceChip(c, "", "全部", "")
+				a.spaceChip(c, "", m("sidebar_all"), "")
 				for _, sp := range a.chatSpaces() {
 					a.spaceChip(c, sp.ID, sp.Name, sp.avatar())
 				}
@@ -127,9 +127,9 @@ func (a *app) tabBar(c *ui.Context) {
 		on          bool
 		to          route
 	}{
-		{"message-square", "对话", ar == areaChats, route{kind: routeSessions}},
+		{"message-square", m("sidebar_chats"), ar == areaChats, route{kind: routeSessions}},
 		{"layers", "Space", ar == areaSpaces, route{kind: routeSpaces}},
-		{"user", "账户", ar == areaSettings, route{kind: routeSettings, sub: "general"}},
+		{"user", m("nav_tab_account"), ar == areaSettings, route{kind: routeSettings, sub: "general"}},
 	}
 	ui.Row(c).Height(56).Shrink(0).AlignItems(ui.Stretch).BorderWidth(1, 0, 0, 0).BorderColor(p.borderSubtle).Background(p.bgPrimary).Children(func() {
 		for _, t := range tabs {

@@ -35,13 +35,13 @@ func (a *app) sidebarTop(c *ui.Context) {
 	ui.Row(c).Height(headerHeight).Shrink(0).AlignItems(ui.Center).Gap(2).Padding(0, 8, 0, 12+bar.Left).DragWindow().Children(func() {
 		a.logo(c, 28)
 		ui.Spacer(c)
-		if a.iconButton(c.Key("rail-chats"), "message-square", "对话", ar == areaChats).Clicked() {
+		if a.iconButton(c.Key("rail-chats"), "message-square", m("sidebar_chats"), ar == areaChats).Clicked() {
 			a.go_(route{kind: routeSessions})
 		}
 		if a.iconButton(c.Key("rail-spaces"), "layers", "Space", ar == areaSpaces).Clicked() {
 			a.go_(route{kind: routeSpaces})
 		}
-		search := ui.ButtonBase(c.Key("search")).Row().Gap(4).AlignItems(ui.Center).Height(26).Padding(0, 8).Radius(6).Background(p.hover).Label("搜索 (⌘K)").FocusRing(false).Children(func() {
+		search := ui.ButtonBase(c.Key("search")).Row().Gap(4).AlignItems(ui.Center).Height(26).Padding(0, 8).Radius(6).Background(p.hover).Label(m("x_search_k")).FocusRing(false).Children(func() {
 			ui.Icon(c, icon("search")).Size(13, 13).TextColor(p.textTertiary)
 			ui.Text(c, "⌘K").FontSize(10).TextColor(p.textTertiary)
 		})
@@ -60,9 +60,9 @@ func (a *app) sidebarTop(c *ui.Context) {
 func (a *app) chatsSidebar(c *ui.Context) {
 	p := a.pal
 	ui.Row(c).Height(38).Shrink(0).AlignItems(ui.Center).Gap(2).Padding(4, 8, 0, 12).Children(func() {
-		ui.Text(c, "对话").FontSize(14).FontWeight(600).Grow(1)
-		a.iconButton(c.Key("filter"), "list-filter", "筛选", false)
-		add := ui.ButtonBase(c.Key("new-chat")).Size(28, 28).Center().Radius(6).Label("新建对话 (⌘O)").FocusRing(false).Children(func() {
+		ui.Text(c, m("sidebar_chats")).FontSize(14).FontWeight(600).Grow(1)
+		a.iconButton(c.Key("filter"), "list-filter", m("x_filter"), false)
+		add := ui.ButtonBase(c.Key("new-chat")).Size(28, 28).Center().Radius(6).Label(m("x_new_chat_k")).FocusRing(false).Children(func() {
 			ui.Icon(c, icon("plus")).Size(16, 16).TextColor(p.brand)
 		})
 		if add.Hovered() {
@@ -74,7 +74,7 @@ func (a *app) chatsSidebar(c *ui.Context) {
 	})
 	ui.ScrollHorizontal(c.Key("chips")).Shrink(0).Scrollbars(false).Padding(6, 6, 10, 6).Children(func() {
 		ui.Row(c).Gap(2).Children(func() {
-			a.spaceChip(c, "", "全部", "")
+			a.spaceChip(c, "", m("sidebar_all"), "")
 			for _, sp := range a.chatSpaces() {
 				a.spaceChip(c, sp.ID, sp.Name, sp.avatar())
 			}
@@ -89,11 +89,11 @@ func (a *app) chatsSidebar(c *ui.Context) {
 			if a.status != "" && a.me == nil {
 				ui.Row(c).Gap(6).Padding(16, 10).Children(func() {
 					a.spinner(c, 12, p.textTertiary)
-					ui.Text(c, "加载对话…").FontSize(12).TextColor(p.textTertiary)
+					ui.Text(c, m("x_loading_chats")).FontSize(12).TextColor(p.textTertiary)
 				})
 				return
 			}
-			ui.Text(c, "还没有对话").FontSize(12).TextColor(p.textTertiary).Padding(16, 10)
+			ui.Text(c, m("x_no_chats")).FontSize(12).TextColor(p.textTertiary).Padding(16, 10)
 		}
 	})
 }
@@ -166,7 +166,7 @@ func (a *app) runningPill(c *ui.Context, since time.Time) {
 		for i := 0; i < 3; i++ {
 			a.dot(c.Key(i), p.brand, 3).Opacity(0.55)
 		}
-		label := "运行中"
+		label := m("session_activity_running")
 		if !since.IsZero() {
 			label += " " + elapsed(since, a.now())
 			c.After(time.Second)
@@ -176,7 +176,7 @@ func (a *app) runningPill(c *ui.Context, since time.Time) {
 }
 
 var sidebarSpaceNav = []struct{ icon, label string }{
-	{"clock", "最近"}, {"layout-grid", "全部 Space"}, {"user", "我的"}, {"pin", "置顶"}, {"archive", "已归档"},
+	{"clock", "spaces_section_recent"}, {"layout-grid", "spaces_section_all"}, {"user", "x_mine"}, {"pin", "spaces_section_pinned"}, {"archive", "spaces_archived"},
 }
 
 // navRow is a row of the sidebars' navigation: an icon and a label, the
@@ -216,7 +216,7 @@ func (a *app) actionRow(c *ui.Context, iconName, label string, fn func()) {
 func (a *app) spacesNavSidebar(c *ui.Context) {
 	ui.Column(c).Grow(1).Padding(8, 6).Gap(2).BorderWidth(1, 0, 0, 0).BorderColor(a.pal.borderSubtle).Children(func() {
 		for i, it := range sidebarSpaceNav {
-			a.navRow(c, it.icon, it.label, a.spacesNav == i, 36, func() { a.spacesNav = i; a.spaceList = ui.ListState{} })
+			a.navRow(c, it.icon, m(it.label), a.spacesNav == i, 36, func() { a.spacesNav = i; a.spaceList = ui.ListState{} })
 		}
 	})
 }
@@ -291,7 +291,7 @@ func (a *app) labelsSection(c *ui.Context, spaceID string) {
 			a.update(func() { a.labels[spaceID] = labels })
 		}
 	})
-	if !a.sectionHead(c, "labels", "tag", "标签", func() {
+	if !a.sectionHead(c, "labels", "tag", m("sidebar_labels"), func() {
 		ui.Icon(c, icon("plus")).Size(12, 12).TextColor(p.placeholder)
 	}) {
 		return
@@ -303,7 +303,7 @@ func (a *app) labelsSection(c *ui.Context, spaceID string) {
 		}
 	}
 	if len(user) == 0 {
-		ui.Text(c, "暂无标签").FontSize(12).TextColor(p.textTertiary).Padding(6, 24)
+		ui.Text(c, m("sidebar_no_labels")).FontSize(12).TextColor(p.textTertiary).Padding(6, 24)
 		return
 	}
 	for _, l := range user {
@@ -316,7 +316,7 @@ func (a *app) labelsSection(c *ui.Context, spaceID string) {
 func (a *app) chatsSection(c *ui.Context, spaceID string) {
 	p := a.pal
 	ui.Box(c).Height(8)
-	if !a.sectionHead(c, "chats", "message-square", "对话", nil) {
+	if !a.sectionHead(c, "chats", "message-square", m("sidebar_chats"), nil) {
 		return
 	}
 	for _, l := range a.labels[spaceID] {
@@ -343,7 +343,7 @@ func (a *app) chatsSection(c *ui.Context, spaceID string) {
 			name = "chevron-right"
 		}
 		ui.Icon(c, icon(name)).Size(12, 12).TextColor(p.textTertiary)
-		ui.Text(c, "全部").FontSize(13).TextColor(p.textSecond)
+		ui.Text(c, m("sidebar_all")).FontSize(13).TextColor(p.textSecond)
 	})
 	a.pressable(head, false)
 	head.OnClick(func() { a.groupsOpen[key] = !open })
@@ -472,7 +472,7 @@ func sourceLabel(src string) string {
 	case "public_api":
 		return "API"
 	case "scheduled_task":
-		return "定时"
+		return m("side_panel_tab_scheduled")
 	case "space_hook":
 		return "Hook"
 	}
@@ -480,21 +480,21 @@ func sourceLabel(src string) string {
 }
 
 var settingsSections = []struct{ id, icon, label string }{
-	{"general", "settings", "常规设置"},
-	{"activity", "activity", "活动"},
-	{"referrals", "gift", "邀请奖励"},
-	{"billing", "credit-card", "账单"},
-	{"rules", "square-pen", "用户规则"},
-	{"channels", "network", "渠道"},
+	{"general", "settings", "nav_general"},
+	{"activity", "activity", "nav_activity"},
+	{"referrals", "gift", "nav_referrals"},
+	{"billing", "credit-card", "nav_billing"},
+	{"rules", "square-pen", "nav_user_rules"},
+	{"channels", "network", "nav_channels"},
 }
 
 // settingsNav is the account settings' sidebar.
 func (a *app) settingsNav(c *ui.Context) {
 	ui.Column(c).Grow(1).Padding(8, 6).Gap(2).BorderWidth(1, 0, 0, 0).BorderColor(a.pal.borderSubtle).Children(func() {
-		a.navRow(c, "arrow-left", "返回", false, 34, func() { a.goBackFromSettings() })
+		a.navRow(c, "arrow-left", m("nav_back"), false, 34, func() { a.goBackFromSettings() })
 		ui.Box(c).Height(10)
 		for _, s := range settingsSections {
-			a.navRow(c, s.icon, s.label, a.route.sub == s.id, 38, func() { a.go_(route{kind: routeSettings, sub: s.id}) })
+			a.navRow(c, s.icon, m(s.label), a.route.sub == s.id, 38, func() { a.go_(route{kind: routeSettings, sub: s.id}) })
 		}
 	})
 }

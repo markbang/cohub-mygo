@@ -88,7 +88,7 @@ func (a *app) spaceSettings(c *ui.Context) {
 				}
 			})
 		}
-		ui.Scroll(c.Key("main-"+a.route.sub)).Grow(1).Children(func() {
+		ui.Scroll(c.Key("main-" + a.route.sub)).Grow(1).Children(func() {
 			ui.Column(c).FillWidth().MaxWidth(720).Margin(0, ui.Auto).Padding(28, 24, 40, 24).Children(func() {
 				if !ok || d == nil {
 					a.loadingBlock(c, err, 200)
@@ -115,7 +115,7 @@ func (a *app) spaceSettings(c *ui.Context) {
 
 func (a *app) settingsHeading(c *ui.Context, title, desc string, action func()) {
 	p := a.pal
-	ui.Row(c.Key("h-"+title)).Gap(12).AlignItems(ui.Start).Children(func() {
+	ui.Row(c.Key("h-" + title)).Gap(12).AlignItems(ui.Start).Children(func() {
 		ui.Column(c).Grow(1).Gap(4).Children(func() {
 			ui.Text(c, title).FontSize(18).FontWeight(600).LetterSpacing(-0.2)
 			ui.Text(c, desc).FontSize(13).TextColor(p.textTertiary)
@@ -338,7 +338,7 @@ func (a *app) spaceSandbox(c *ui.Context, d *spaceDetail) {
 	a.settingsHeading(c, m("space_section_sandbox"), m("space_sandbox_desc"), nil)
 	ui.Box(c).Height(16)
 	sb := d.Meta.Config.Sandbox
-	a.settingsRow(c, "状态", "", func() {
+	a.settingsRow(c, m("channels_col_status"), "", func() {
 		ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
 			col := p.placeholder
 			if d.SandboxStatus == "running" || d.SandboxStatus == "ready" {
@@ -348,18 +348,18 @@ func (a *app) spaceSandbox(c *ui.Context, d *spaceDetail) {
 			ui.Text(c, d.SandboxStatus).FontSize(12).Font(fontMono)
 		})
 	})
-	a.settingsRow(c, "规格", "", func() { ui.Text(c, sb.Spec).FontSize(12).Font(fontMono) })
-	a.settingsRow(c, "提供方", "", func() { ui.Text(c, sb.Provider).FontSize(12).Font(fontMono) })
+	a.settingsRow(c, m("x_spec"), "", func() { ui.Text(c, sb.Spec).FontSize(12).Font(fontMono) })
+	a.settingsRow(c, m("x_provider"), "", func() { ui.Text(c, sb.Provider).FontSize(12).Font(fontMono) })
 	img := sb.Image
 	if img == "" {
 		img = "default"
 	}
-	a.settingsRow(c, "镜像", "", func() { ui.Text(c, img).FontSize(12).Font(fontMono) })
+	a.settingsRow(c, m("sandbox_image"), "", func() { ui.Text(c, img).FontSize(12).Font(fontMono) })
 	ttl := "—"
 	if sb.AutoDestroy.TTLSeconds > 0 {
 		ttl = fmt.Sprintf("%s · %dh", sb.AutoDestroy.Mode, sb.AutoDestroy.TTLSeconds/3600)
 	}
-	a.settingsRow(c, "自动销毁", "", func() { ui.Text(c, ttl).FontSize(12).Font(fontMono) })
+	a.settingsRow(c, m("x_auto_destroy"), "", func() { ui.Text(c, ttl).FontSize(12).Font(fontMono) })
 }
 
 type walletSummary struct {

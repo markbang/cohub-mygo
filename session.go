@@ -26,7 +26,7 @@ func (a *app) sessionView(c *ui.Context) {
 	tl := a.timelineOf(id)
 	a.header(c, func() {
 		a.headerLead(c)
-		title := "对话"
+		title := m("sidebar_chats")
 		if s != nil {
 			title = s.displayTitle()
 			if a.route.area() == areaChats && !a.compact {
@@ -41,11 +41,11 @@ func (a *app) sessionView(c *ui.Context) {
 		}
 		ui.Text(c, title).FontSize(13).SingleLine().Grow(1).MinWidth(0).TextColor(p.textSecond)
 		if a.compact {
-			a.iconButton(c.Key("share"), "share-2", "分享", false)
+			a.iconButton(c.Key("share"), "share-2", m("referral_share"), false)
 			a.moreMenu(c, s)
 			return
 		}
-		share := ui.ButtonBase(c.Key("share")).Row().Gap(6).AlignItems(ui.Center).Height(28).Padding(0, 8).Radius(6).Label("分享").FocusRing(false).Children(func() {
+		share := ui.ButtonBase(c.Key("share")).Row().Gap(6).AlignItems(ui.Center).Height(28).Padding(0, 8).Radius(6).Label(m("referral_share")).FocusRing(false).Children(func() {
 			ui.Icon(c, icon("share-2")).Size(14, 14).TextColor(p.textTertiary)
 			ui.Text(c, "Share").FontSize(13).TextColor(p.textTertiary)
 		})
@@ -53,7 +53,7 @@ func (a *app) sessionView(c *ui.Context) {
 			share.Background(p.hover)
 		}
 		a.moreMenu(c, s)
-		if a.iconButton(c.Key("panel"), "panel-right", "侧边面板", false).Clicked() {
+		if a.iconButton(c.Key("panel"), "panel-right", m("x_side_panel"), false).Clicked() {
 			a.panelOpen = !a.panelOpen
 		}
 	})
@@ -78,7 +78,7 @@ func (a *app) sessionView(c *ui.Context) {
 			case tl.err != "":
 				ui.Text(c, tl.err).FontSize(12).TextColor(p.errorC).Margin(ui.Auto)
 			case len(turns) == 0:
-				ui.Text(c, "还没有消息").FontSize(13).TextColor(p.textTertiary).Margin(ui.Auto)
+				ui.Text(c, m("x_no_messages")).FontSize(13).TextColor(p.textTertiary).Margin(ui.Auto)
 			}
 		})
 		if !a.compact && len(turns) > 0 {
@@ -134,7 +134,7 @@ func (a *app) turnRail(c *ui.Context, turns []*Turn) {
 			}
 			mark := ui.ButtonBase(c.Key(t.ID)).Absolute().TopPercent(top).Right(2).Size(24, h+4).Center().
 				Label(fmt.Sprintf("Turn %d", t.Sequence)).FocusRing(false).Children(func() {
-				ui.Box(c).Size(w, h).Radius(w / 2).Background(col).Border(1, p.chatBg.Over(p.bgPrimary).Alpha(0.9))
+				ui.Box(c).Size(w, h).Radius(w/2).Background(col).Border(1, p.chatBg.Over(p.bgPrimary).Alpha(0.9))
 			})
 			idx := i
 			if mark.Clicked() {
@@ -148,7 +148,7 @@ func (a *app) turnRail(c *ui.Context, turns []*Turn) {
 // closed, the drawer's in the compact shell.
 func (a *app) headerLead(c *ui.Context) {
 	if a.compact {
-		if a.iconButton(c.Key("menu"), "menu", "菜单", false).Clicked() {
+		if a.iconButton(c.Key("menu"), "menu", m("x_menu"), false).Clicked() {
 			a.compactNav = true
 		}
 		return
@@ -200,7 +200,7 @@ func (a *app) turnView(c *ui.Context, sessionID string, t *Turn, tl *sessionTurn
 	}
 	if t.ErrorMessage != "" {
 		ui.Column(c.Key("error")).Gap(4).Padding(8, 12).Radius(8).Border(1, p.errorC.Alpha(0.3)).Background(p.errorC.Alpha(0.08)).Children(func() {
-			ui.Text(c, "出错了").FontSize(12).FontWeight(500).TextColor(p.errorC)
+			ui.Text(c, m("x_error")).FontSize(12).FontWeight(500).TextColor(p.errorC)
 			ui.Text(c, t.ErrorMessage).FontSize(12).TextColor(p.errorC)
 		})
 	}
@@ -223,7 +223,7 @@ func (a *app) metaRow(c *ui.Context, fn func(), at time.Time) {
 
 func (a *app) metaCopy(c *ui.Context, text string) {
 	p := a.pal
-	b := ui.ButtonBase(c.Key("copy")).Size(22, 22).Center().Radius(4).Label("复制").FocusRing(false).Children(func() {
+	b := ui.ButtonBase(c.Key("copy")).Size(22, 22).Center().Radius(4).Label(m("copy")).FocusRing(false).Children(func() {
 		ui.Icon(c, icon("copy")).Size(14, 14).TextColor(p.metaText())
 	})
 	if b.Hovered() {
@@ -244,7 +244,7 @@ func (a *app) thinking(c *ui.Context, key, text string, streaming bool) {
 			ui.Text(c, text).FontSize(13).LineHeight(1.375).TextColor(p.disabled).Selectable()
 			if !streaming {
 				b := ui.ButtonBase(c.Key("collapse")).FocusRing(false).AlignSelf(ui.Start).Children(func() {
-					ui.Text(c, "收起").FontSize(11).TextColor(p.placeholder)
+					ui.Text(c, m("common_collapse")).FontSize(11).TextColor(p.placeholder)
 				})
 				if b.Clicked() {
 					a.foldOpen[key] = false
@@ -317,10 +317,10 @@ func (a *app) processView(c *ui.Context, sessionID string, t *Turn, tl *sessionT
 	if steps > 0 || !running {
 		parts := []string{}
 		if steps > 0 {
-			parts = append(parts, fmt.Sprintf("%d 步", steps))
+			parts = append(parts, plural("process_steps", steps))
 		}
 		if tools > 0 {
-			parts = append(parts, fmt.Sprintf("%d 个工具", tools))
+			parts = append(parts, plural("process_tools", tools))
 		}
 		if sum != nil {
 			if u := usageLabel(sum.Usage); u != "" {
@@ -337,7 +337,7 @@ func (a *app) processView(c *ui.Context, sessionID string, t *Turn, tl *sessionT
 		_, loading := tl.steps[t.ID]
 		loading = open && !loading
 		if open {
-			label = "收起"
+			label = m("common_collapse")
 		}
 		head := ui.ButtonBase(c.Key("process")).Row().Gap(8).AlignItems(ui.Center).Justify(ui.Start).Padding(8, msgInset).Radius(6).FocusRing(false).Children(func() {
 			switch {
@@ -369,7 +369,7 @@ func (a *app) processView(c *ui.Context, sessionID string, t *Turn, tl *sessionT
 		if len(live) == 0 {
 			ui.Row(c.Key("working")).Gap(8).AlignItems(ui.Center).Padding(4, msgInset).Children(func() {
 				a.statusDot(c, p.brand, true)
-				ui.Text(c, "运行中 · "+elapsed(t.StartedAt, a.now())).FontSize(13).TextColor(p.textTertiary)
+				ui.Text(c, m("x_running_dot")+elapsed(t.StartedAt, a.now())).FontSize(13).TextColor(p.textTertiary)
 				c.After(time.Second)
 			})
 			return
@@ -455,9 +455,9 @@ func toolBlocks(msgs ...*StepMessage) []Block {
 func (a *app) stepRun(c *ui.Context, t *Turn, msgs []*StepMessage) {
 	tools := toolBlocks(msgs...)
 	open := a.foldOpen[msgs[0].ID]
-	parts := []string{fmt.Sprintf("%d 步", len(msgs))}
+	parts := []string{plural("process_steps", len(msgs))}
 	if len(tools) > 0 {
-		parts = append(parts, fmt.Sprintf("%d 个工具", len(tools)))
+		parts = append(parts, plural("process_tools", len(tools)))
 	}
 	var names []string
 	counts := map[string]int{}
@@ -490,7 +490,7 @@ func (a *app) stepRunBody(c *ui.Context, msgs []*StepMessage, tools []Block, par
 		ui.Text(c, strings.Join(parts, " · ")).FontSize(13).TextColor(p.textTertiary).Shrink(0)
 		ui.Text(c, strings.Join(names, " · ")).FontSize(13).Font(fontMono).TextColor(p.placeholder).SingleLine().Grow(1).MinWidth(0)
 		if failed > 0 {
-			ui.Text(c, fmt.Sprintf("%d 个失败", failed)).FontSize(11).TextColor(p.errorC)
+			ui.Text(c, m("tool_failed_count", "count", failed)).FontSize(11).TextColor(p.errorC)
 		}
 		name := "chevron-right"
 		if open {
@@ -575,12 +575,12 @@ func (a *app) toolRow(c *ui.Context, b Block, live bool) {
 		summary = "$ " + summary
 	}
 	ui.Row(c).Gap(8).AlignItems(ui.Center).MinHeight(28).Padding(4, msgInset).Radius(6).Children(func() {
-		col, label := p.success.Alpha(0.75), "完成"
+		col, label := p.success.Alpha(0.75), m("tool_status_done")
 		switch status {
 		case "running", "pending":
-			col, label = p.brand, "运行中"
+			col, label = p.brand, m("session_activity_running")
 		case "error", "failed":
-			col, label = p.errorC, "失败"
+			col, label = p.errorC, m("tool_status_failed")
 		}
 		a.statusDot(c, col, status == "running")
 		ui.Text(c, b.Name).FontSize(13).Font(fontMono).TextColor(p.textSecond).Shrink(0).MinWidth(56)
@@ -621,16 +621,16 @@ func (a *app) statusDot(c *ui.Context, col ui.Color, active bool) {
 
 // moreMenu is the header's ⋯: label, stats, quote and archive.
 func (a *app) moreMenu(c *ui.Context, s *Session) {
-	b := a.iconButton(c.Key("more"), "ellipsis", "更多", a.menus["more"])
+	b := a.iconButton(c.Key("more"), "ellipsis", m("turnrail_more"), a.menus["more"])
 	if b.Clicked() {
 		a.menus["more"] = !a.menus["more"]
 	}
 	open := a.menus["more"]
 	a.menu(c, b, &open, []menuItem{
-		{icon: "tag", label: "标记为…"},
-		{icon: "gauge", label: "统计"},
-		{icon: "text-quote", label: "插入引用"},
-		{icon: "archive", label: "归档对话", run: func() { a.archiveSession(s) }},
+		{icon: "tag", label: m("inline_label_as")},
+		{icon: "gauge", label: m("stats_menu")},
+		{icon: "text-quote", label: m("space_header_insert_reference")},
+		{icon: "archive", label: m("session_archive"), run: func() { a.archiveSession(s) }},
 	})
 	a.menus["more"] = open
 }
@@ -663,7 +663,7 @@ func (a *app) composer(c *ui.Context, running bool) {
 		card := ui.Column(c.Key("composer")).FillWidth().MaxWidth(832).Margin(0, ui.Auto).Radius(16).
 			Background(p.bgInput).Border(1, p.brandBorder).Padding(14, 12, 12, 12).Gap(12)
 		card.Children(func() {
-			in := ui.TextAreaBase(c.Key("draft"), &a.draft).Lines(2, 10).Placeholder("发送消息…").Label("消息").PlaceholderColor(p.placeholder).
+			in := ui.TextAreaBase(c.Key("draft"), &a.draft).Lines(2, 10).Placeholder(m("composer_placeholder")).Label(m("x_message")).PlaceholderColor(p.placeholder).
 				FontSize(14).LineHeight(1.55).Padding(0, 9)
 			if !a.compact {
 				in.AutoFocus()
@@ -678,13 +678,13 @@ func (a *app) composer(c *ui.Context, running bool) {
 				return false
 			})
 			ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
-				a.iconButton(c.Key("attach"), "plus", "添加附件", false)
+				a.iconButton(c.Key("attach"), "plus", m("feedback_add_files"), false)
 				if h := a.composerHarness(); h != "" && h != "cohub" {
 					a.pill(c.Key("harness"), harnessName(h), "", func() { a.harnessIcon(c, h, 14) })
 				}
 				a.modelPicker(c)
 				ui.Spacer(c)
-				a.iconButton(c.Key("mic"), "mic", "语音输入", false)
+				a.iconButton(c.Key("mic"), "mic", m("x_voice"), false)
 				empty := strings.TrimSpace(a.draft) == ""
 				send := ui.ButtonBase(c.Key("send")).Size(36, 36).Radius(18).Center().FocusRing(false).Children(func() {
 					switch {
@@ -698,11 +698,11 @@ func (a *app) composer(c *ui.Context, running bool) {
 				})
 				switch {
 				case running:
-					send.Background(p.text).Label("停止")
+					send.Background(p.text).Label(m("board_session_stop"))
 				case empty || a.sending:
-					send.Background(p.hover).Label("发送")
+					send.Background(p.hover).Label(m("feedback_send"))
 				default:
-					send.Background(p.text).Label("发送")
+					send.Background(p.text).Label(m("feedback_send"))
 				}
 				if send.Clicked() {
 					if running {
@@ -976,7 +976,7 @@ func usageLabel(u *Usage) string {
 	if in > 0 {
 		s := "↑" + kilo(in)
 		if u.CacheRead > 0 {
-			s += " (缓存 " + kilo(u.CacheRead) + ")"
+			s += " (" + m("chat_cached", "count", kilo(u.CacheRead)) + ")"
 		}
 		parts = append(parts, s)
 	}

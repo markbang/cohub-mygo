@@ -195,7 +195,7 @@ func (a *app) start() {
 		return
 	}
 	a.api = cl
-	a.status = "连接中…"
+	a.status = m("sync_connecting")
 	a.spawn(a.refresh)
 	a.spawn(a.loadCustomTheme)
 	if !a.sync {
@@ -224,7 +224,7 @@ func (a *app) refresh() {
 	a.update(func() {
 		for _, err := range errs {
 			if err != nil {
-				a.status = "离线：" + err.Error()
+				a.status = m("x_offline") + err.Error()
 				return
 			}
 		}
@@ -554,11 +554,11 @@ func (a *app) send() {
 	sessionID := a.route.sessionID()
 	spaceID := a.currentSpace()
 	if spaceID == "" {
-		a.sendErr = "先选择一个 Space"
+		a.sendErr = m("x_choose_space")
 		return
 	}
 	if a.api == nil {
-		a.sendErr = "演示模式不能发送"
+		a.sendErr = m("x_demo_no_send")
 		return
 	}
 	a.sending, a.sendErr = true, ""
