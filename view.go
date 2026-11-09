@@ -92,8 +92,10 @@ func (a *app) page(c *ui.Context) {
 		a.sessionView(c)
 	case routeSpace, routeSpaceNewSession:
 		a.spaceHome(c)
-	case routeSpaces, routeNewSpace:
+	case routeSpaces:
 		a.spacesView(c)
+	case routeNewSpace:
+		a.newSpacePage(c)
 	case routeSpaceSettings:
 		a.spaceSettings(c)
 	case routeSpaceActivity:

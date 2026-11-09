@@ -76,6 +76,7 @@ type app struct {
 	sendErr      string
 	groupsOpen   map[string]bool
 	compactNav   bool // the compact shell's drawer
+	newSpace     newSpaceForm
 	menus        map[string]bool
 	foldOpen     map[string]bool
 	modelChoices map[string]modelChoice
