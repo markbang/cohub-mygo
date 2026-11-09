@@ -93,6 +93,7 @@ type app struct {
 	spaceEdits                   map[string]*spaceEdit
 	editingProfile, profileDraft string
 	channelNew                   channelForm
+	walletForms                  map[string]*walletForm
 	confirmBox                   *confirmBox
 	windowWide                   bool            // the window takes the main column's room
 	viewportOff                  map[string]bool // windows the user took out of the prompt's context
@@ -152,6 +153,7 @@ func newApp() *app {
 		viewportOff:   map[string]bool{},
 		cpTab:         map[string]int{},
 		spaceEdits:    map[string]*spaceEdit{},
+		walletForms:   map[string]*walletForm{},
 		panelOpen:     true,
 		pal:           lightPalette(),
 		route:         route{kind: -1},
