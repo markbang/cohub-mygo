@@ -160,8 +160,17 @@ func (rt *realtime) handle(env wsEnvelope) {
 			rt.dueLists()
 		}
 	case strings.HasPrefix(env.Type, "space."):
-		if env.Type == "space.list.changed" || env.Type == "space.updated" {
+		switch env.Type {
+		case "space.list.changed", "space.updated":
 			rt.dueLists()
+		case "space.session.approvals.changed":
+			rt.a.update(func() { rt.a.forget("approvals:" + env.SessionID) })
+		case "space.fs.changed":
+			rt.a.update(func() { rt.a.forgetPrefix("tree:"+env.SpaceID, "file:"+env.SpaceID) })
+		case "space.cronjobs.changed", "space.cronjob.updated":
+			rt.a.update(func() { rt.a.forget("crons:" + env.SpaceID) })
+		case "space.labels.changed", "label.assignments.updated":
+			rt.a.update(func() { rt.a.forgetPrefix("labels:"+env.SpaceID, "res-labels:"+env.SpaceID) })
 		}
 	}
 }

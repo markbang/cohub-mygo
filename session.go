@@ -101,6 +101,9 @@ func (a *app) sessionView(c *ui.Context) {
 			}
 		}
 	})
+	if s != nil {
+		a.approvals(c, s, tl)
+	}
 	a.composer(c, s != nil && s.running() || lastRunning(tl))
 }
 

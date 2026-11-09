@@ -294,6 +294,9 @@ func (a *app) poll() {
 		live := a.rt.live()
 		if sessionID != "" && running && (!live || i%3 == 0) {
 			a.loadTurns(sessionID)
+			if i%3 == 0 {
+				a.update(func() { a.forget("approvals:" + sessionID) })
+			}
 		}
 		if i%8 == 0 && (!live || i%16 == 0) {
 			a.refresh()
