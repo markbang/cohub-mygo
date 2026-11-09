@@ -116,6 +116,9 @@ func parseRoute(p string) route {
 		if s == "" {
 			s = "general"
 		}
+		if s == "channels" && at(2) == "new" {
+			s = "channels/new"
+		}
 		return route{kind: routeSettings, sub: s}
 	}
 	if at(0) != "" && at(1) != "" {

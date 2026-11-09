@@ -650,7 +650,7 @@ func (a *app) settingsNav(c *ui.Context) {
 		a.navRow(c, "arrow-left", m("nav_back"), false, 34, func() { a.goBackFromSettings() })
 		ui.Box(c).Height(10)
 		for _, s := range settingsSections {
-			a.navRow(c, s.icon, m(s.label), a.route.sub == s.id, 38, func() { a.go_(route{kind: routeSettings, sub: s.id}) })
+			a.navRow(c, s.icon, m(s.label), a.route.sub == s.id || strings.HasPrefix(a.route.sub, s.id+"/"), 38, func() { a.go_(route{kind: routeSettings, sub: s.id}) })
 		}
 	})
 }

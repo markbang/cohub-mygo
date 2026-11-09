@@ -46,8 +46,10 @@ type palette struct {
 	brandFg      ui.Color
 	brand900     ui.Color
 	brandBg      ui.Color // a chosen option's background
-	userBubble   ui.Color
-	selection    ui.Color
+
+	providerDiscord, providerFeishu, providerWechat ui.Color
+	userBubble                                      ui.Color
+	selection                                       ui.Color
 
 	success ui.Color
 	errorC  ui.Color

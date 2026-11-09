@@ -23,6 +23,8 @@ func (a *app) settingsPage(c *ui.Context) {
 		a.rulesPage(c)
 	case "channels":
 		a.channelsPage(c)
+	case "channels/new":
+		a.channelNewPage(c)
 	default:
 		a.generalSettings(c)
 	}
@@ -538,10 +540,10 @@ func (a *app) channelsPage(c *ui.Context) {
 				ui.Text(c, m("channels_description")).FontSize(13).TextColor(p.textTertiary)
 			})
 			if a.button(c, "plus", m("channels_add"), true).Clicked() {
-				a.channelNew = channelForm{open: true}
+				a.channelNew = channelForm{}
+				a.go_(route{kind: routeSettings, sub: "channels/new"})
 			}
 		})
-		a.channelDialog(c)
 		if list == nil || !ok {
 			a.loadingBlock(c, err, 160)
 			return
@@ -607,13 +609,20 @@ func (a *app) channelsPage(c *ui.Context) {
 						}
 					}, func() {
 						id := ch.ID
+						bound := ch.BoundSpace != nil
+						col := p.textSecond
+						if bound {
+							col = p.placeholder.Alpha(0.6)
+						}
 						del := ui.ButtonBase(c.Key("del")).Size(24, 24).Center().Radius(5).Label(m("channels_delete_title")).FocusRing(false).Children(func() {
-							ui.Icon(c, icon("trash-2")).Size(14, 14).TextColor(p.textSecond)
+							ui.Icon(c, icon("trash-2")).Size(14, 14).TextColor(col)
 						})
-						if del.Hovered() {
+						if bound {
+							del.Disabled(true)
+						} else if del.Hovered() {
 							del.Background(p.errorC.Alpha(0.08))
 						}
-						if del.Clicked() {
+						if del.Clicked() && !bound {
 							a.deleteChannel(id)
 						}
 					})
@@ -626,13 +635,13 @@ func (a *app) channelsPage(c *ui.Context) {
 func providerColor(provider string, p *palette) ui.Color {
 	switch provider {
 	case "qq":
-		return ui.RGB(18, 183, 245)
+		return p.brand
 	case "feishu":
-		return ui.RGB(51, 112, 255)
+		return p.providerFeishu
 	case "wechat":
-		return ui.RGB(7, 193, 96)
+		return p.providerWechat
 	case "discord":
-		return ui.RGB(88, 101, 242)
+		return p.providerDiscord
 	}
 	return p.textTertiary
 }

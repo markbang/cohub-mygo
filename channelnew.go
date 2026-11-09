@@ -26,11 +26,11 @@ type channelForm struct {
 	wechatNeedCode, wechatPolling bool
 }
 
-var channelProviders = []struct{ id, name, desc string }{
-	{"discord", "Discord", "channel_new_discord_desc"},
-	{"feishu", "Feishu", "channel_new_feishu_desc"},
-	{"wechat", "WeChat", "channel_new_wechat_desc"},
-	{"qq", "QQ", "channel_new_qq_desc"},
+var channelProviders = []struct{ id, name, desc, icon string }{
+	{"discord", "Discord", "channel_new_discord_desc", "message-square"},
+	{"feishu", "Feishu / Lark", "channel_new_feishu_desc", "webhook"},
+	{"wechat", "WeChat", "channel_new_wechat_desc", "message-circle"},
+	{"qq", "QQ Bot", "channel_new_qq_desc", "message-circle"},
 }
 
 func (a *app) deleteChannel(id string) {
@@ -41,28 +41,57 @@ func (a *app) deleteChannel(id string) {
 	})
 }
 
-// channelDialog is the new channel's form.
-func (a *app) channelDialog(c *ui.Context) {
+// channelNewPage is /settings/channels/new: the platform, then its form.
+func (a *app) channelNewPage(c *ui.Context) {
 	f := &a.channelNew
-	if !f.open {
-		return
-	}
 	p := a.pal
-	a.dialog(c, &f.open, m("channel_new_header"), 480, func() {
-		ui.Column(c.Key("new-channel")).Padding(16).Gap(14).Children(func() {
+	ui.Row(c.Key("channel-new-bar")).Height(40).Shrink(0).Gap(12).Padding(0, 16).AlignItems(ui.Center).BorderWidth(0, 0, 1, 0).BorderColor(p.borderSubtle).Background(p.bgPrimary).DragWindow().Children(func() {
+		back := ui.ButtonBase(c.Key("back")).Size(20, 20).Center().Label(m("nav_back")).FocusRing(false).Children(func() {
+			ui.Icon(c, icon("arrow-left")).Size(16, 16).TextColor(p.textTertiary)
+		})
+		if back.Clicked() {
+			*f = channelForm{}
+			a.go_(route{kind: routeSettings, sub: "channels"})
+		}
+		ui.Box(c).Size(1, 16).Background(p.borderSubtle)
+		ui.Text(c, m("channel_new_header")).FontSize(11).FontWeight(500).TextColor(p.textSecond)
+	})
+	ui.Scroll(c.Key("channel-new")).Grow(1).Children(func() {
+		ui.Column(c).FillWidth().MaxWidth(672).Margin(0, ui.Auto).Padding(16).Children(func() {
+			a.channelForm(c, f)
+		})
+	})
+}
+
+// channelDone leaves the form for the channels.
+func (a *app) channelDone() {
+	a.channelNew = channelForm{}
+	if a.route.kind == routeSettings && a.route.sub == "channels/new" {
+		a.go_(route{kind: routeSettings, sub: "channels"})
+	}
+}
+
+func (a *app) channelForm(c *ui.Context, f *channelForm) {
+	p := a.pal
+	{
+		ui.Column(c.Key("new-channel")).Gap(14).Children(func() {
 			if f.provider == "" {
-				ui.Text(c, m("channel_new_select_hint")).FontSize(12).TextColor(p.textTertiary)
+				ui.Column(c).Gap(4).Children(func() {
+					ui.Text(c, strings.ToUpper(m("channel_new_select_platform"))).FontSize(10).FontWeight(500).LetterSpacing(0.8).TextColor(p.placeholder)
+					ui.Text(c, m("channel_new_select_hint")).FontSize(13).TextColor(p.textTertiary)
+				})
 				for _, pr := range channelProviders {
 					pr := pr
-					card := ui.ButtonBase(c.Key(pr.id)).Row().Gap(12).AlignItems(ui.Center).Padding(12).Radius(8).Border(1, p.borderSubtle).FocusRing(false).Children(func() {
-						ui.Box(c).Size(32, 32).Radius(8).Center().Background(providerColor(pr.id, p).Alpha(0.12)).Children(func() {
-							a.dot(c, providerColor(pr.id, p), 10)
+					col := providerColor(pr.id, p)
+					card := ui.ButtonBase(c.Key(pr.id)).Row().Gap(12).AlignItems(ui.Start).Padding(16).Radius(6).Border(1, p.borderSubtle).Background(p.bgSurface).FocusRing(false).Children(func() {
+						ui.Box(c).Size(40, 40).Radius(7).Center().Background(col.Alpha(0.1)).Border(1, col.Alpha(0.25)).Children(func() {
+							ui.Icon(c, icon(pr.icon)).Size(20, 20).TextColor(col)
 						})
 						ui.Column(c).Grow(1).Gap(2).Children(func() {
-							ui.Text(c, pr.name).FontSize(13).FontWeight(500)
-							ui.Text(c, m(pr.desc)).FontSize(11).LineHeight(1.5).TextColor(p.textTertiary)
+							ui.Text(c, pr.name).FontSize(14).FontWeight(500)
+							ui.Text(c, m(pr.desc)).FontSize(12).LineHeight(1.5).TextColor(p.textTertiary)
 						})
-						ui.Icon(c, icon("chevron-right")).Size(14, 14).TextColor(p.placeholder)
+						ui.Icon(c, icon("chevron-right")).Size(16, 16).TextColor(p.placeholder).Margin(4, 0, 0, 0)
 					})
 					if card.Hovered() {
 						card.Background(p.hover)
@@ -135,7 +164,7 @@ func (a *app) channelDialog(c *ui.Context) {
 			ui.Row(c.Key("foot")).Gap(8).Children(func() {
 				ui.Spacer(c)
 				if a.button(c, "", m("channel_new_cancel"), false).Clicked() {
-					*f = channelForm{}
+					a.channelDone()
 				}
 				label := m("channel_new_save")
 				if f.saving {
@@ -146,9 +175,6 @@ func (a *app) channelDialog(c *ui.Context) {
 				}
 			})
 		})
-	})
-	if !f.open {
-		*f = channelForm{}
 	}
 }
 
@@ -172,7 +198,7 @@ func (a *app) createChannel(f *channelForm) {
 				f.err = err.Error()
 				return
 			}
-			*f = channelForm{}
+			a.channelDone()
 		})
 		return nil
 	}, "channels")
@@ -277,7 +303,7 @@ func (a *app) pollWeChat(f *channelForm) {
 			case err != nil:
 				f.err = err.Error()
 			case out.Connected:
-				*f = channelForm{}
+				a.channelDone()
 				a.forget("channels")
 			case out.Expired:
 				f.wechatMsg = m("channel_new_scan_expired")
