@@ -532,6 +532,10 @@ func byteSize(n int64) string {
 
 // checkpointView is the new save's form, or a save's record.
 func (a *app) checkpointView(c *ui.Context, spaceID, id string) {
+	if id != "new" {
+		a.checkpointDetail(c, spaceID, id)
+		return
+	}
 	p := a.pal
 	name, _ := a.spaceName(spaceID)
 	ui.Row(c.Key("back")).Height(36).Gap(4).AlignItems(ui.Center).Padding(0, 12).BorderWidth(0, 0, 1, 0).BorderColor(p.borderSubtle).Children(func() {
@@ -540,27 +544,6 @@ func (a *app) checkpointView(c *ui.Context, spaceID, id string) {
 	})
 	ui.Scroll(c.Key("cp")).Grow(1).Children(func() {
 		ui.Column(c).Padding(24, 20).Gap(6).Children(func() {
-			if id != "new" {
-				saves, _, _ := loadJSON[struct {
-					Checkpoints []*checkpointRec `json:"checkpoints"`
-				}](a, "saves:"+spaceID, sp(spaceID)+"/checkpoints?limit=20")
-				var cp *checkpointRec
-				if saves != nil {
-					for _, x := range saves.Checkpoints {
-						if x.ID == id {
-							cp = x
-						}
-					}
-				}
-				if cp == nil {
-					a.spinner(c, 16, p.textTertiary)
-					return
-				}
-				ui.Text(c, m("sidebar_saves")).FontSize(11).TextColor(p.textTertiary)
-				ui.Text(c, cp.Description).FontSize(20).FontWeight(600)
-				ui.Text(c, cp.CreatedAt.Local().Format("2006-01-02 15:04")+" · "+cp.CommitHash[:min(12, len(cp.CommitHash))]).FontSize(12).Font(fontMono).TextColor(p.textTertiary)
-				return
-			}
 			ui.Text(c, m("sidebar_new_save")).FontSize(11).TextColor(p.textTertiary)
 			ui.Text(c, m("cp_save_workspace")).FontSize(20).FontWeight(600)
 			ui.Text(c, m("cp_create_save_of")+" "+name+".").FontSize(13).TextColor(p.textSecond)
@@ -572,11 +555,38 @@ func (a *app) checkpointView(c *ui.Context, spaceID, id string) {
 			ui.TextArea(c.Key("desc"), &desc).Lines(3, 6).Placeholder(m("cp_what_changed_ph")).FontSize(13)
 			a.pages.json["cp-desc:"+spaceID] = desc
 			ui.Text(c, m("cp_desc_fallback_hint")).FontSize(11).TextColor(p.textTertiary).Margin(6, 0, 16, 0)
-			ui.Row(c).Gap(6).AlignItems(ui.Center).Padding(12, 0).BorderWidth(1, 0, 0, 0).BorderColor(p.borderSubtle).Children(func() {
-				ui.Icon(c, icon("chevron-right")).Size(12, 12).TextColor(p.textTertiary)
+			review := a.groupsOpen["cp-review:"+spaceID]
+			rv := ui.Row(c.Key("review")).Gap(6).AlignItems(ui.Center).Padding(12, 0).BorderWidth(1, 0, 0, 0).BorderColor(p.borderSubtle).Cursor(ui.CursorPointer).Children(func() {
+				ch := "chevron-right"
+				if review {
+					ch = "chevron-down"
+				}
+				ui.Icon(c, icon(ch)).Size(12, 12).TextColor(p.textTertiary)
 				ui.Text(c, m("cp_review_changes")).FontSize(12).TextColor(p.textSecond)
 				ui.Text(c, m("cp_workspace_as_is")).FontSize(11).TextColor(p.textTertiary)
 			})
+			if rv.Clicked() {
+				a.groupsOpen["cp-review:"+spaceID] = !review
+			}
+			if review {
+				sum, err, ok := loadJSON[diffSummary](a, "ws-diff:"+spaceID, sp(spaceID)+"/fs/diff")
+				switch {
+				case !ok:
+					a.spinner(c, 12, p.textTertiary)
+				case err != nil:
+					ui.Text(c, err.Error()).FontSize(11).TextColor(p.errorC)
+				case len(sum.Files) == 0:
+					ui.Text(c, m("cp_no_changes_since_save")).FontSize(12).TextColor(p.textTertiary)
+				default:
+					for _, f := range sum.Files {
+						ui.Row(c.Key("chg-"+f.Path)).Gap(8).Children(func() {
+							ui.Text(c, f.Status).FontSize(10).FontWeight(600).Font(fontMono).TextColor(p.warning).Width(12)
+							ui.Text(c, f.Path).FontSize(12).Font(fontMono).TextColor(p.textSecond).SingleLine().Grow(1)
+							ui.Text(c, fmt.Sprintf("+%d −%d", f.Additions, f.Deletions)).FontSize(11).Font(fontMono).TextColor(p.textTertiary)
+						})
+					}
+				}
+			}
 			save := ui.ButtonBase(c.Key("save")).Row().Gap(6).Height(36).Radius(6).Background(p.brand).Center().FocusRing(false).Margin(12, 0, 0, 0).Children(func() {
 				ui.Icon(c, icon("save")).Size(14, 14).TextColor(p.brandFg)
 				ui.Text(c, m("common_save")).FontSize(13).FontWeight(500).TextColor(p.brandFg)

@@ -431,5 +431,14 @@
     "wait": 2000
    }
   ]
+ },
+ {
+  "name": "checkpoint-detail",
+  "path": "/spaces/{HOME}/checkpoints/{CHECKPOINT}",
+  "actions": [
+   {
+    "wait": 3000
+   }
+  ]
  }
 ]

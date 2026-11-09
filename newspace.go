@@ -11,7 +11,8 @@ import (
 type newSpaceForm struct {
 	name, slug, desc string
 	source           int // 0 blank, 1 git, 2 save
-	gitURL           string
+	gitURL, gitRef   string
+	checkpoint       string // the save a Space starts from
 	creating         bool
 	err              string
 }
@@ -81,9 +82,19 @@ func (a *app) newSpacePage(c *ui.Context) {
 							}
 						}
 					})
-					if f.source == 1 {
+					if f.checkpoint != "" && f.source == 0 {
+						f.source = 2
+					}
+					switch f.source {
+					case 1:
 						ui.Box(c).Height(8)
-						input("git", &f.gitURL, "https://github.com/owner/repo", true)
+						input("git", &f.gitURL, "https://github.com/org/repo.git", true)
+						ui.Box(c).Height(6)
+						input("git-ref", &f.gitRef, "Optional ref (branch / tag / commit)", true)
+					case 2:
+						ui.Box(c).Height(8)
+						input("save", &f.checkpoint, "Save UUID", true)
+						ui.Text(c, "Create an independent Space from this Save.").FontSize(11).TextColor(p.placeholder).Margin(6, 0, 0, 0)
 					}
 				})
 			})
@@ -173,7 +184,13 @@ func (a *app) createSpace() {
 	}
 	switch f.source {
 	case 1:
-		in["bootstrapSource"] = map[string]any{"type": "git", "url": strings.TrimSpace(f.gitURL)}
+		src := map[string]any{"type": "git_repo", "repoUrl": strings.TrimSpace(f.gitURL), "ref": nil}
+		if r := strings.TrimSpace(f.gitRef); r != "" {
+			src["ref"] = r
+		}
+		in["bootstrapSource"] = src
+	case 2:
+		in["bootstrapSource"] = map[string]any{"type": "checkpoint", "checkpointId": strings.TrimSpace(f.checkpoint)}
 	default:
 		in["bootstrapSource"] = map[string]any{"type": "blank"}
 	}

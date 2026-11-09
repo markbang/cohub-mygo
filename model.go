@@ -86,6 +86,8 @@ type app struct {
 	fsPending    *fsCreate
 	uploading    int
 	cron         *cronForm
+	cpTab        map[string]int // a save's tab: changes, files
+	copiedValue  string
 	confirmBox   *confirmBox
 	windowWide   bool            // the window takes the main column's room
 	viewportOff  map[string]bool // windows the user took out of the prompt's context
@@ -143,6 +145,7 @@ func newApp() *app {
 		chipChats:     map[string][]*Session{},
 		editors:       map[string]*fileEdit{},
 		viewportOff:   map[string]bool{},
+		cpTab:         map[string]int{},
 		panelOpen:     true,
 		pal:           lightPalette(),
 		route:         route{kind: -1},
