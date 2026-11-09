@@ -72,7 +72,11 @@ type app struct {
 	theme        string // a built-in theme's name, or "system"
 	prefs        prefs
 	sidebarOpen  bool
-	inHeader     bool // building a header: compact icon buttons grow to 40px
+	inHeader     bool    // building a header: compact icon buttons grow to 40px
+	width        float32 // the window's width, as media queries see it
+	purchase     purchaseState
+	redeem       redeemState
+	subsPage     int
 	compactPanel bool // the side panel, over the chat in the compact shell
 	panelOpen    bool
 	userMenu     bool

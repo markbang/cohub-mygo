@@ -299,5 +299,23 @@
     "clickLabel": "对话来源：Web App"
    }
   ]
+ },
+ {
+  "name": "settings-billing-plans",
+  "path": "/settings/billing?tab=plans",
+  "app": [
+   {
+    "click": "方案"
+   }
+  ]
+ },
+ {
+  "name": "settings-billing-redeem",
+  "path": "/settings/billing?tab=redeem",
+  "app": [
+   {
+    "click": "兑换"
+   }
+  ]
  }
 ]

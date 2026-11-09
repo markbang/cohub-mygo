@@ -76,7 +76,7 @@ func (a *app) billingPage(c *ui.Context) {
 	tab, _ := a.pages.json["billing-tab"].(int)
 	a.settingsScroll(c, 1024, func() {
 		a.settingsTitle(c, m("page_title_billing"), m("billing_description"), nil)
-		ui.Row(c.Key("cards")).Gap(12).Padding(20, 0).Children(func() {
+		ui.Row(c.Key("cards")).Gap(12).Padding(20, 0).AlignItems(ui.Stretch).Children(func() {
 			ui.Column(c.Key("plan")).Grow(2).Basis(0).Gap(6).Padding(12).Radius(6).Border(1, p.borderSubtle).Children(func() {
 				ui.Text(c, m("billing_subscription")).FontSize(11).LetterSpacing(0.6).TextColor(p.textTertiary)
 				name, line := m("billing_no_subscription"), ""
@@ -133,8 +133,12 @@ func (a *app) billingPage(c *ui.Context) {
 				}
 			}
 		})
-		if tab != 0 {
-			ui.Text(c.Key("todo"), m("billing_no_plans")).FontSize(12).TextColor(p.textTertiary).Padding(20, 0)
+		switch tab {
+		case 1:
+			a.plansTab(c)
+			return
+		case 2:
+			a.redeemTab(c)
 			return
 		}
 		ui.Text(c.Key("h"), m("billing_balance_heading")).FontSize(13).FontWeight(500).Margin(20, 0, 12, 0)

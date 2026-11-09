@@ -24,6 +24,7 @@ func (a *app) view(c *ui.Context) {
 	c.OnShortcut(ui.Cmd, ui.KeyBracketLeft, func() { a.goBack() })
 
 	w, _ := c.Size()
+	a.width = w
 	if a.route.kind < 0 {
 		a.compact = w < compactWidth
 		a.navigate("/sessions")
