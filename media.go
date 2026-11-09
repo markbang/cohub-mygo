@@ -526,6 +526,10 @@ func (a *app) scheduledPanel(c *ui.Context, spaceID string) {
 			if b.Hovered() {
 				b.Background(p.hover)
 			}
+			if b.Clicked() {
+				a.cron = nil
+				a.go_(route{kind: routeSpaceCron, space: spaceID, sub: "new"})
+			}
 		}
 	})
 	ui.Scroll(c.Key("sched")).Grow(1).MinHeight(0).Children(func() {

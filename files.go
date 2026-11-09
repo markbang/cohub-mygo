@@ -251,36 +251,24 @@ func (a *app) fileActions(spaceID, p string, dir bool) []menuItem {
 }
 
 func (a *app) deleteNode(spaceID, p string, dir bool) {
-	if a.win == nil {
-		return
-	}
-	go func() {
-		res, err := mygo.Dialog.Message(mygo.MessageOptions{
-			Parent: a.win, Type: mygo.MessageWarning, Message: m("file_delete") + " " + path.Base(p) + "?",
-			Detail: p, Buttons: []string{m("common_cancel"), m("common_delete")}, DestructiveButtons: []int{1},
-		})
-		if err != nil || res.Button != 1 {
-			return
+	a.confirm(m("file_delete")+" "+path.Base(p)+"?", p, m("common_delete"), func() {
+		q := url.Values{"path": {p}}
+		if dir {
+			q.Set("recursive", "true")
 		}
-		a.update(func() {
-			q := url.Values{"path": {p}}
-			if dir {
-				q.Set("recursive", "true")
+		a.act(func(ctx context.Context) error {
+			err := a.api.do(ctx, "DELETE", sp(spaceID)+"/fs/node?"+q.Encode(), nil, nil)
+			if err == nil {
+				a.update(func() {
+					a.forgetPrefix("tree:"+spaceID, "file:"+spaceID+":"+p)
+					if a.route.file() == p {
+						a.closeWindow()
+					}
+				})
 			}
-			a.act(func(ctx context.Context) error {
-				err := a.api.do(ctx, "DELETE", sp(spaceID)+"/fs/node?"+q.Encode(), nil, nil)
-				if err == nil {
-					a.update(func() {
-						a.forgetPrefix("tree:"+spaceID, "file:"+spaceID+":"+p)
-						if a.route.file() == p {
-							a.closeWindow()
-						}
-					})
-				}
-				return err
-			})
+			return err
 		})
-	}()
+	})
 }
 
 // fsPendingRow is the tree's text box for a new file or folder, or a

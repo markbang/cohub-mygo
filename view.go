@@ -40,6 +40,7 @@ func (a *app) view(c *ui.Context) {
 	if a.compact {
 		a.compactView(c)
 		a.paletteView(c)
+		a.confirmView(c)
 		a.toastView(c)
 		return
 	}
@@ -69,6 +70,7 @@ func (a *app) view(c *ui.Context) {
 		}
 	})
 	a.paletteView(c)
+	a.confirmView(c)
 	a.toastView(c)
 }
 
@@ -195,15 +197,18 @@ func (a *app) rightPanel(c *ui.Context) {
 	if a.can(a.currentSpace(), "cronjob.view") {
 		tabs = append(tabs, struct{ icon, label string }{"clock", m("side_panel_tab_scheduled")})
 	}
-	if a.panelTab >= len(tabs) {
-		a.panelTab = 0
+	// A tab the Space does not offer (yet: its access may be loading)
+	// shows the chat's outputs, and comes back once it does.
+	tab := a.panelTab
+	if tab >= len(tabs) {
+		tab = 0
 	}
 	// The tab bar drops its icons once the tabs overflow it.
 	icons := len(tabs) <= 4
 	// The panel shows the page's content color through; the file tree
 	// lays its own primary background over the whole panel.
 	bg := p.bgContent
-	if a.panelTab == 1 {
+	if tab == 1 {
 		bg = p.bgPrimary
 	}
 	col := ui.Column(c).Shrink(0).Background(bg).BorderWidth(0, 0, 0, 1).BorderColor(p.borderSubtle)
@@ -218,7 +223,7 @@ func (a *app) rightPanel(c *ui.Context) {
 				if i == 1 {
 					ui.Box(c).Width(1).Height(14).Background(p.borderSubtle).Margin(0, 4)
 				}
-				on := a.panelTab == i
+				on := tab == i
 				// .tab-key: 28px, 11px medium, the chosen one on a raised pill.
 				b := ui.ButtonBase(c.Key(t.label)).Row().Gap(6).AlignItems(ui.Center).Height(28).Padding(0, 8).Radius(5).Label(t.label).FocusRing(false)
 				hover := b.Hovered()
@@ -249,6 +254,6 @@ func (a *app) rightPanel(c *ui.Context) {
 				}
 			}
 		})
-		ui.Column(c).Grow(1).MinHeight(0).Children(func() { a.panelContent(c) })
+		ui.Column(c).Grow(1).MinHeight(0).Children(func() { a.panelContent(c, tab) })
 	})
 }

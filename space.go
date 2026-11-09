@@ -165,7 +165,13 @@ func (a *app) spaceSections(c *ui.Context, spaceID string) {
 	}](a, "crons:"+spaceID, "/api/cron-jobs?spaceId="+url.QueryEscape(spaceID))
 	ui.Box(c.Key("gap-cron")).Height(12)
 	if a.sectionHead(c, "cron", "calendar-clock", m("x_schedules"), func() {
-		ui.Icon(c, icon("plus")).Size(12, 12).TextColor(p.placeholder)
+		add := ui.ButtonBase(c.Key("new-cron")).Size(18, 18).Center().Radius(4).Label(m("cron_new_scheduled")).FocusRing(false).Children(func() {
+			ui.Icon(c, icon("plus")).Size(12, 12).TextColor(p.placeholder)
+		})
+		if add.Clicked() {
+			a.cron = nil
+			a.go_(route{kind: routeSpaceCron, space: spaceID, sub: "new"})
+		}
 	}) {
 		switch {
 		case crons == nil:
@@ -255,10 +261,10 @@ func taskTypeLabel(t string) string {
 
 // panelContent is the right panel's tab: the chat's output, the Space's
 // files, its media or its apps.
-func (a *app) panelContent(c *ui.Context) {
+func (a *app) panelContent(c *ui.Context, tab int) {
 	p := a.pal
 	spaceID := a.currentSpace()
-	switch a.panelTab {
+	switch tab {
 	case 1:
 		if spaceID != "" {
 			a.filesPanel(c, spaceID)
@@ -458,6 +464,13 @@ func (a *app) windowPane(c *ui.Context) {
 		title, iconName = m("sidebar_task_run"), "activity"
 	case r.kind == routeSpaceCron:
 		title, iconName = m("x_schedules"), "calendar-clock"
+		if r.sub == "new" {
+			title = m("cron_new_scheduled")
+		} else if j, _, _ := loadJSON[struct {
+			Job *cronRecord `json:"job"`
+		}](a, "cron:"+r.sub, "/api/cron-jobs/"+url.PathEscape(r.sub)); j != nil && j.Job != nil {
+			title = j.Job.Title
+		}
 	}
 	pane := ui.Column(c.Key("pane"))
 	if a.windowWide {
@@ -641,32 +654,6 @@ func (a *app) taskView(c *ui.Context, spaceID, id string) {
 			}
 			if t := joinText(r.Payload.Data.Content); t != "" {
 				ui.Text(c, t).FontSize(12).Font(fontMono).LineHeight(1.6).Padding(10, 12).Radius(6).Background(p.bgSurface).Selectable()
-			}
-		})
-	})
-}
-
-func (a *app) cronView(c *ui.Context, spaceID, id string) {
-	p := a.pal
-	out, err, ok := loadJSON[struct {
-		Job map[string]any `json:"job"`
-	}](a, "cron:"+id, "/api/cron-jobs/"+url.PathEscape(id))
-	if !ok || err != nil {
-		a.loadingBlock(c, err, 200)
-		return
-	}
-	ui.Scroll(c.Key("cron")).Grow(1).Children(func() {
-		ui.Column(c).Padding(20).Gap(8).Children(func() {
-			keys := make([]string, 0, len(out.Job))
-			for k := range out.Job {
-				keys = append(keys, k)
-			}
-			sort.Strings(keys)
-			for _, k := range keys {
-				ui.Row(c.Key(k)).Gap(12).Children(func() {
-					ui.Text(c, k).FontSize(12).TextColor(p.textTertiary).Width(120)
-					ui.Text(c, fmt.Sprint(out.Job[k])).FontSize(12).Font(fontMono).TextColor(p.textSecond).Grow(1)
-				})
 			}
 		})
 	})

@@ -85,6 +85,8 @@ type app struct {
 	editors      map[string]*fileEdit // open files by space:path
 	fsPending    *fsCreate
 	uploading    int
+	cron         *cronForm
+	confirmBox   *confirmBox
 	windowWide   bool            // the window takes the main column's room
 	viewportOff  map[string]bool // windows the user took out of the prompt's context
 	inHeader     bool            // building a header: compact icon buttons grow to 40px
@@ -419,6 +421,10 @@ func (a *app) show(r route) {
 		if a.api != nil {
 			a.spawn(func() { a.loadTurns(id) })
 		}
+	}
+	if a.route.kind == routeSpaceCron {
+		// The side panel shows the scheduled prompts beside one.
+		a.panelTab = 4
 	}
 	if a.rt != nil {
 		a.rt.watch(a.currentSpace())

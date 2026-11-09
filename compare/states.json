@@ -413,5 +413,23 @@
     "wait": 3000
    }
   ]
+ },
+ {
+  "name": "cron-detail",
+  "path": "/spaces/{SPACE}/cronjobs/{CRON}",
+  "actions": [
+   {
+    "wait": 3000
+   }
+  ]
+ },
+ {
+  "name": "cron-new",
+  "path": "/spaces/{SPACE}/cronjobs/new",
+  "actions": [
+   {
+    "wait": 2000
+   }
+  ]
  }
 ]
