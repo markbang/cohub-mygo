@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -472,7 +473,7 @@ func (a *app) chatsSection(c *ui.Context, spaceID string) {
 	if !ok {
 		limit = 20
 	}
-	for i, s := range list {
+	for i, r := range forkTree(list, a.forks[spaceID]) {
 		if i >= limit {
 			more := ui.ButtonBase(c.Key("more")).Height(28).Radius(6).Center().FocusRing(false).Children(func() {
 				ui.Text(c, m("sidebar_show_more")).FontSize(12).TextColor(p.textTertiary)
@@ -485,16 +486,26 @@ func (a *app) chatsSection(c *ui.Context, spaceID string) {
 			}
 			break
 		}
-		a.spaceSessionRow(c, s, 0)
+		a.spaceSessionTreeRow(c, r)
 	}
 }
 
 func (a *app) spaceSessionRow(c *ui.Context, s *Session, indent float32) {
+	a.spaceSessionTreeRow(c, treeRow{s: s})
+}
+
+func (a *app) spaceSessionTreeRow(c *ui.Context, tr treeRow) {
 	p := a.pal
+	s := tr.s
 	on := s.ID == a.route.sessionID()
+	indent := float32(0)
+	if tr.depth > 0 {
+		indent = float32(11+(tr.depth-1)*12+7) - 6
+	}
 	row := ui.Column(c.Key(s.ID)).Gap(2).Justify(ui.Center).MinHeight(30).Padding(5, 6, 5, 6+indent).Radius(6).Children(func() {
+		a.treeGuides(c, tr)
 		ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
-			t := ui.Text(c, s.displayTitle()).FontSize(13).TextColor(p.textTertiary).SingleLine().Grow(1).MinWidth(0)
+			t := ui.Text(c, tr.title()).FontSize(13).TextColor(p.textTertiary).SingleLine().Grow(1).MinWidth(0)
 			if on {
 				t.TextColor(p.text).FontWeight(500)
 			}
@@ -593,19 +604,35 @@ func (a *app) labelName(l *Label) string {
 }
 
 func sourceLabel(src string) string {
-	switch src {
-	case "cli":
-		return "CLI"
-	case "web", "":
+	k := sourceKey(src)
+	if k == "web" {
 		return ""
-	case "public_api":
-		return "API"
-	case "scheduled_task":
-		return m("side_panel_tab_scheduled")
-	case "space_hook":
-		return "Hook"
 	}
-	return strings.ToUpper(src[:1]) + src[1:]
+	return sourceName(k)
+}
+
+// sourceKey is a chat's source as the inbox sorts them, as the server's
+// resolveSessionSourceKey: "channel:feishu" is Feishu's, an unknown one
+// "other".
+func sourceKey(src string) string {
+	raw := strings.ToLower(strings.TrimSpace(src))
+	raw = regexp.MustCompile(`[\s-]+`).ReplaceAllString(raw, "_")
+	switch raw {
+	case "", "web_app":
+		return "web"
+	}
+	known := func(k string) bool { return k == "other" || sourceName(k) != "" }
+	if known(raw) {
+		return raw
+	}
+	ch := strings.Split(raw, ":")[0]
+	if mm := regexp.MustCompile(`^channel[:_](.+)$`).FindStringSubmatch(raw); mm != nil {
+		ch = mm[1]
+	}
+	if ch != raw && known(ch) {
+		return ch
+	}
+	return "other"
 }
 
 var settingsSections = []struct{ id, icon, label string }{

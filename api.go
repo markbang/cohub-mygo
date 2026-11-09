@@ -559,11 +559,13 @@ func sourceName(source string) string {
 	}[source]
 }
 
-func (cl *client) spaceSessions(ctx context.Context, spaceID string) ([]*Session, error) {
+func (cl *client) spaceSessions(ctx context.Context, spaceID string) ([]*Session, []sessionFork, error) {
 	var page struct {
-		Sessions []*Session `json:"sessions"`
+		Sessions []*Session    `json:"sessions"`
+		Forks    []sessionFork `json:"forks"`
 	}
-	return page.Sessions, cl.do(ctx, "GET", "/api/spaces/"+url.PathEscape(spaceID)+"/sessions?limit=60", nil, &page)
+	err := cl.do(ctx, "GET", "/api/spaces/"+url.PathEscape(spaceID)+"/sessions?limit=60&includeForks=1", nil, &page)
+	return page.Sessions, page.Forks, err
 }
 
 // turns returns the latest turns of a session, oldest first.

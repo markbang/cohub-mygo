@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -47,6 +48,7 @@ func (a *app) sessionView(c *ui.Context) {
 		}
 		a.sessionTitle(c, s, title)
 		if s != nil && !a.compact {
+			a.runtimeStatus(c, s.SpaceID)
 			a.presenceStack(c, s.SpaceID)
 		}
 		if a.compact {
@@ -948,25 +950,45 @@ func contains(list []string, s string) bool {
 
 // harnessIcon is HarnessIcon: Pi's mark, or a spark for the others.
 func (a *app) harnessIcon(c *ui.Context, h string, size float32) {
-	col := a.pal.textTertiary
-	if h == "pi" {
-		ui.Box(c).Size(size, size).Shrink(0).Draw(func(pt *ui.Painter, r ui.Rect) {
-			u := r.W / 8
-			for _, sq := range [][2]float32{{1, 1}, {2, 1}, {3, 1}, {4, 1}, {5, 1}, {6, 1}, {2, 2}, {2, 3}, {2, 4}, {2, 5}, {2, 6}, {5, 2}, {5, 3}, {5, 4}, {5, 5}, {6, 6}, {1, 6}} {
-				pt.Fill(ui.Rect{X: r.X + sq[0]*u, Y: r.Y + sq[1]*u, W: u, H: u}, col, 0)
-			}
-		})
+	// The web's marks: Pi's and Cursor's follow the text's color.
+	if h == "claude-code" {
+		h = "claude"
+	}
+	if _, ok := icons["harness-"+h]; !ok {
+		ui.Icon(c, icon("monitor")).Size(size, size).TextColor(a.pal.textTertiary)
 		return
 	}
-	ui.Icon(c, icon("sparkles")).Size(size, size).TextColor(col)
+	if h == "pi" || h == "cursor" {
+		ui.Icon(c, icon("harness-"+h)).Size(size, size).Shrink(0).TextColor(a.pal.textSecond)
+		return
+	}
+	ui.Image(c, colorIcon("harness-"+h, size)).Size(size, size).Shrink(0).Radius(3)
+}
+
+// colorIcon is an SVG of its own colors, drawn at 3x for sharpness.
+var colorIcons = map[string]*ui.Bitmap{}
+
+func colorIcon(name string, size float32) *ui.Bitmap {
+	k := name + "@" + strconv.Itoa(int(size))
+	if b, ok := colorIcons[k]; ok {
+		return b
+	}
+	px := int(size * 3)
+	b := ui.NewBitmap(icon(name).Image(px, px, nil))
+	colorIcons[k] = b
+	return b
 }
 
 func harnessName(h string) string {
 	switch h {
 	case "pi":
 		return "Pi"
-	case "claude-code":
+	case "claude-code", "claude":
 		return "Claude Code"
+	case "workbuddy":
+		return "WorkBuddy"
+	case "cohub":
+		return "Cohub"
 	case "codex":
 		return "Codex"
 	}

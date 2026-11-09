@@ -110,6 +110,9 @@ type app struct {
 	harnesses                    map[string]harnessState // the composer's harness by chat or Space
 	newLabelFor, newLabelName    string
 	compMenu                     composerMenu
+	forks                        map[string][]sessionFork
+	runtimeDiag                  bool
+	height                       float32
 	draftCaret                   int
 	inviteBusy                   bool
 	inviteErr                    string
@@ -153,6 +156,7 @@ func newApp() *app {
 	a := &app{
 		now:            time.Now,
 		spaceSessions:  map[string][]*Session{},
+		forks:          map[string][]sessionFork{},
 		timelines:      map[string]*sessionTurns{},
 		usage7d:        map[string]*SpaceUsage{},
 		labels:         map[string][]*Label{},
@@ -416,13 +420,14 @@ func (a *app) loadSpaceSessions(spaceID string) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	list, err := a.api.spaceSessions(ctx, spaceID)
+	list, forks, err := a.api.spaceSessions(ctx, spaceID)
 	if err != nil {
 		return
 	}
 	a.update(func() {
 		sort.SliceStable(list, func(i, j int) bool { return list[i].when().After(list[j].when()) })
 		a.spaceSessions[spaceID] = list
+		a.forks[spaceID] = forks
 	})
 }
 

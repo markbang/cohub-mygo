@@ -516,5 +516,15 @@
     "wait": 2500
    }
   ]
+ },
+ {
+  "name": "runtime-status",
+  "path": "/spaces/{LOCAL}",
+  "actions": [
+   {
+    "click": "本地",
+    "wait": 1500
+   }
+  ]
  }
 ]

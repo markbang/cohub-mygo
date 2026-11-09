@@ -27,8 +27,8 @@ func (a *app) view(c *ui.Context) {
 	c.OnShortcut(ui.Ctrl|ui.Alt, ui.KeyRight, func() { a.panelOpen = !a.panelOpen })
 	a.pageKeys(c)
 
-	w, _ := c.Size()
-	a.width = w
+	w, h := c.Size()
+	a.width, a.height = w, h
 	if a.route.kind < 0 {
 		a.compact = w < compactWidth
 		a.navigate("/sessions")

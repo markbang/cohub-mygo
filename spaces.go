@@ -240,6 +240,9 @@ func (a *app) spaceHome(c *ui.Context) {
 	a.header(c, func() {
 		a.headerLead(c)
 		ui.Text(c, m("sidebar_new_chat")).FontSize(13).TextColor(p.textSecond).Grow(1)
+		if !a.compact {
+			a.runtimeStatus(c, id)
+		}
 		a.presenceStack(c, id)
 		if !a.compact {
 			ic, lb := "panel-right-open", m("side_panel_show")
