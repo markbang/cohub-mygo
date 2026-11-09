@@ -236,7 +236,7 @@ func TestCompare(t *testing.T) {
 				w, h = s.Size[0], s.Size[1]
 			}
 			a.route, a.back = route{kind: -1}, nil
-			a.palette, a.menus, a.userMenu, a.compactNav = paletteState{}, map[string]bool{}, false, false
+			a.palette, a.menus, a.userMenu, a.compactNav, a.panelTab = paletteState{}, map[string]bool{}, false, false, 0
 			a.theme = "light"
 			if s.Dark {
 				a.theme = "dark"

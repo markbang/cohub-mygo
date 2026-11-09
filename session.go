@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -90,11 +91,6 @@ func (a *app) headerLead(c *ui.Context) {
 			a.compactNav = true
 		}
 		return
-	}
-	if !a.sidebarOpen {
-		if a.iconButton(c.Key("open-sidebar"), "panel-left", "展开侧栏 (⌘B)", false).Clicked() {
-			a.sidebarOpen = true
-		}
 	}
 }
 
@@ -699,70 +695,143 @@ func (a *app) composerModel() modelChoice {
 	return modelChoice{}
 }
 
-// modelPicker is the composer's model chip and its menu of models and
-// thinking levels.
+// modelPicker is the composer's model chip, which opens the model
+// selector, as ModelSelector.svelte.
 func (a *app) modelPicker(c *ui.Context) {
 	p := a.pal
-	m := a.composerModel()
-	label := m.id
+	cur := a.composerModel()
+	label := cur.id
 	if label == "" {
-		label = "默认模型"
+		label = m("model_default")
 	}
-	b := a.pill(c.Key("model"), label, levelName(m.level, ""), nil)
+	b := a.pill(c.Key("model"), label, levelName(cur.level, ""), nil).Label(m("model_choose"))
 	if b.Clicked() {
-		a.menus["model"] = !a.menus["model"]
+		a.menus["model"] = true
+		a.pages.json["model-query"] = ""
 	}
 	open := a.menus["model"]
-	ui.Popover(c, b, &open, func() {
-		ui.Column(c).Gap(1).Width(280).MaxHeight(420).Children(func() {
-			ui.Text(c, "模型").FontSize(11).TextColor(p.textTertiary).Padding(4, 8)
-			ui.Scroll(c).Grow(1).MaxHeight(300).Children(func() {
-				ui.Column(c).Gap(1).Children(func() {
-					for _, mod := range a.models {
-						row := ui.Row(c.Key(mod.ID)).Gap(8).AlignItems(ui.Center).Height(30).Padding(0, 8).Radius(5).Children(func() {
-							ui.Text(c, mod.ID).FontSize(13).Grow(1).SingleLine()
-							if mod.ID == m.id {
-								ui.Icon(c, icon("check")).Size(14, 14).TextColor(p.brand)
-							}
-						})
-						a.pressable(row, false)
-						row.OnClick(func() {
-							lv := m.level
-							if !contains(mod.levels(), lv) {
-								lv = ""
-							}
-							a.chooseModel(modelChoice{provider: mod.Provider, id: mod.ID, level: lv})
-						})
+	a.dialog(c, &open, m("model_selector_title"), 540, func() {
+		ui.Row(c.Key("tabs")).Padding(8, 12).BorderWidth(0, 0, 1, 0).BorderColor(p.borderSubtle.Alpha(0.7)).Children(func() {
+			ui.Row(c).Padding(2).Radius(6).Background(p.hover.Alpha(0.7)).Children(func() {
+				for i, l := range []string{m("model_selector_tab_chat"), m("model_selector_tab_generation")} {
+					t := ui.Box(c.Key(l)).Padding(6, 12).Radius(4).Children(func() {
+						col := p.textTertiary
+						if i == 0 {
+							col = p.text
+						}
+						ui.Text(c, l).FontSize(12).FontWeight(500).TextColor(col)
+					})
+					if i == 0 {
+						t.Background(p.bgSurface).Shadow(0, 1, 2, 0, ui.RGBA(0, 0, 0, 0.06))
 					}
-				})
+				}
 			})
-			if mod := a.model(m.id); mod != nil && len(mod.levels()) > 0 {
-				ui.Divider(c).Margin(4, 0)
-				ui.Text(c, "思考强度").FontSize(11).TextColor(p.textTertiary).Padding(4, 8)
-				ui.Row(c).Gap(4).Wrap().Padding(0, 6, 4, 6).Children(func() {
-					for _, lv := range mod.levels() {
-						on := lv == m.level
-						chip := ui.ButtonBase(c.Key(lv)).Height(24).Padding(0, 8).Radius(6).Center().Border(1, p.borderSubtle).FocusRing(false).Children(func() {
-							col := p.textSecond
-							if on {
-								col = p.brand
-							}
-							ui.Text(c, levelName(lv, "")).FontSize(12).TextColor(col)
-						})
-						if on {
-							chip.Background(p.brandMuted).BorderColor(p.brandBorder)
-						}
-						if chip.Clicked() {
-							mm := m
-							mm.level = lv
-							a.chooseModel(mm)
-						}
+		})
+		q, _ := a.pages.json["model-query"].(string)
+		ui.Row(c.Key("search")).Padding(8, 12).BorderWidth(0, 0, 1, 0).BorderColor(p.borderSubtle.Alpha(0.7)).Children(func() {
+			ui.TextInputBase(c.Key("q"), &q).Placeholder(m("model_selector_search_placeholder")).PlaceholderColor(p.placeholder).
+				FontSize(13).Padding(8, 12).Radius(6).Background(p.bgInput).Border(1, p.borderSubtle).Grow(1).AutoFocus()
+		})
+		a.pages.json["model-query"] = q
+		ui.Scroll(c.Key("models")).Grow(1).MinHeight(0).Children(func() {
+			ui.Column(c).Padding(4, 0).Children(func() {
+				n := 0
+				models := append([]*Model(nil), a.models...)
+				sort.SliceStable(models, func(i, j int) bool { return models[i].ID == cur.id && models[j].ID != cur.id })
+				for _, mod := range models {
+					if q != "" && !strings.Contains(strings.ToLower(mod.ID), strings.ToLower(q)) {
+						continue
 					}
-				})
-			}
+					n++
+					on := mod.ID == cur.id
+					row := ui.Row(c.Key(mod.ID)).Gap(12).AlignItems(ui.Start).Padding(8, 16).Children(func() {
+						if on {
+							ui.Box(c).Absolute().Left(0).Top(14).Size(2, 16).Radius(1).Background(p.brand)
+						}
+						ui.Column(c).Grow(1).MinWidth(0).Gap(2).Children(func() {
+							ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
+								ui.Text(c, mod.ID).FontSize(13).FontWeight(500).SingleLine()
+								if mod.vision() {
+									ui.Icon(c, icon("image")).Size(14, 14).TextColor(p.textTertiary)
+								}
+								a.dot(c, p.success, 6)
+							})
+							if cost := mod.costLabel(); cost != "" {
+								ui.Text(c, cost).FontSize(11).TextColor(p.textTertiary.Alpha(0.75)).SingleLine()
+							}
+						})
+						ui.Column(c).AlignItems(ui.End).Gap(2).Shrink(0).Children(func() {
+							ui.Text(c, mod.Provider).FontSize(11).TextColor(p.textTertiary.Alpha(0.7))
+							if lv := mod.levels(); len(lv) > 1 {
+								level := mod.Model.DefaultLevel
+								if level == "" {
+									level = "high"
+								}
+								if on && cur.level != "" {
+									level = cur.level
+								}
+								if !contains(lv, level) {
+									level = lv[len(lv)-1]
+								}
+								ui.Row(c).Gap(3).AlignItems(ui.Center).Padding(1, 4).Children(func() {
+									ui.Icon(c, icon("brain")).Size(11, 11).TextColor(p.textTertiary)
+									ui.Text(c, levelName(level, "")).FontSize(10).TextColor(p.textTertiary)
+									ui.Icon(c, icon("chevron-down")).Size(10, 10).TextColor(p.textTertiary)
+								})
+							}
+						})
+					})
+					switch {
+					case on:
+						row.Background(p.hover)
+					case row.Hovered():
+						row.Background(p.hover)
+					}
+					row.Cursor(ui.CursorPointer).OnClick(func() {
+						lv := cur.level
+						if !contains(mod.levels(), lv) {
+							lv = ""
+						}
+						a.chooseModel(modelChoice{provider: mod.Provider, id: mod.ID, level: lv})
+						a.menus["model"] = false
+					})
+				}
+				if n == 0 {
+					ui.Text(c, m("model_selector_no_matching")).FontSize(13).TextColor(p.textTertiary).Padding(32).Margin(0, ui.Auto)
+				}
+			})
 		})
 	})
-	a.menus["model"] = open
+	if a.menus["model"] {
+		a.menus["model"] = open
+	}
+}
+
+// dialog is Dialog.svelte: a panel over the dimmed window, with a small
+// uppercase title and a close button.
+func (a *app) dialog(c *ui.Context, open *bool, title string, maxWidth float32, fn func()) {
+	p := a.pal
+	ui.DialogBase(c, open, func(backdrop, panel ui.Element) {
+		backdrop.Background(ui.RGBA(0, 0, 0, 0.5)).Padding(16)
+		_, h := c.Size()
+		panel.FillWidth().MaxWidth(maxWidth).MaxHeight(min(h*0.85, 720)).Radius(12).Background(p.bgPrimary).Border(1, p.borderSubtle).
+			Shadow(0, 25, 50, -12, ui.RGBA(0, 0, 0, 0.25)).Clip()
+		if title != "" {
+			ui.Row(c.Key("dialog-head")).Height(36).Shrink(0).AlignItems(ui.Center).Padding(0, 6, 0, 12).BorderWidth(0, 0, 1, 0).BorderColor(p.borderSubtle).Children(func() {
+				ui.Text(c, strings.ToUpper(title)).FontSize(10).FontWeight(500).LetterSpacing(0.8).TextColor(p.textTertiary).Grow(1)
+				x := ui.ButtonBase(c.Key("close")).Size(24, 24).Center().Radius(5).Label(m("common_close")).FocusRing(false).Children(func() {
+					ui.Icon(c, icon("x")).Size(14, 14).TextColor(p.textTertiary)
+				})
+				if x.Hovered() {
+					x.Background(p.hover)
+				}
+				if x.Clicked() {
+					*open = false
+				}
+			})
+		}
+		fn()
+	})
 }
 
 func (a *app) chooseModel(m modelChoice) {

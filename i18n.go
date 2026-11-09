@@ -23,6 +23,8 @@ var locale = "zh-CN"
 // zh-CN and en.
 var extraMessages = map[string][2]string{
 	"x_apps":           {"应用", "Apps"},
+	"x_account":        {"账户", "Account"},
+	"x_not_signed_in":  {"未登录", "Signed out"},
 	"x_schedules":      {"定时任务", "Scheduled"},
 	"x_no_schedules":   {"暂无定时任务", "No scheduled prompts"},
 	"x_files":          {"文件", "Files"},

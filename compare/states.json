@@ -48,6 +48,11 @@
     "css": "main button[aria-expanded=false]",
     "wait": 800
    }
+  ],
+  "app": [
+   {
+    "clickLabel": "更多"
+   }
   ]
  },
  {
@@ -212,6 +217,64 @@
   "actions": [
    {
     "wait": 1500
+   }
+  ]
+ },
+ {
+  "name": "menu-model",
+  "path": "/sessions/{SESSION}",
+  "actions": [
+   {
+    "css": "form button:has-text('claude-opus-5-5')",
+    "wait": 1200
+   }
+  ],
+  "app": [
+   {
+    "clickLabel": "选择模型"
+   }
+  ]
+ },
+ {
+  "name": "menu-account",
+  "path": "/sessions/{SESSION}",
+  "actions": [
+   {
+    "css": "button[data-user-menu]",
+    "wait": 1000
+   }
+  ],
+  "app": [
+   {
+    "clickLabel": "账户"
+   }
+  ]
+ },
+ {
+  "name": "sidebar-collapsed",
+  "path": "/sessions/{SESSION}",
+  "actions": [
+   {
+    "css": "button[aria-label='收起侧栏']",
+    "wait": 1000
+   }
+  ],
+  "app": [
+   {
+    "clickLabel": "收起侧栏"
+   }
+  ]
+ },
+ {
+  "name": "new-space",
+  "path": "/spaces/new"
+ },
+ {
+  "name": "spaces-pinned",
+  "path": "/spaces",
+  "actions": [
+   {
+    "click": "置顶"
    }
   ]
  }

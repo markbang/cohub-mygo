@@ -17,7 +17,7 @@ const (
 func (a *app) view(c *ui.Context) {
 	a.applyTheme(c)
 
-	c.OnShortcut(ui.Cmd, ui.KeyB, func() { a.sidebarOpen = !a.sidebarOpen })
+	c.OnShortcut(ui.Ctrl|ui.Alt, ui.KeyLeft, func() { a.sidebarOpen = !a.sidebarOpen })
 	c.OnShortcut(ui.Cmd, ui.KeyO, func() { a.newChat() })
 	c.OnShortcut(ui.Cmd, ui.KeyK, func() { a.palette.toggle(paletteAll) })
 	c.OnShortcut(ui.Cmd, ui.KeyComma, func() { a.go_(route{kind: routeSettings, sub: "general"}) })
@@ -44,6 +44,8 @@ func (a *app) view(c *ui.Context) {
 	ui.Row(c).Fill().AlignItems(ui.Stretch).Children(func() {
 		if a.sidebarOpen {
 			a.sidebar(c)
+		} else {
+			a.collapsedRail(c)
 		}
 		bg := p.bgPrimary
 		switch a.route.kind {

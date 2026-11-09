@@ -176,7 +176,48 @@ type Model struct {
 		Reasoning        bool               `json:"reasoning"`
 		ContextWindow    int64              `json:"contextWindow"`
 		ThinkingLevelMap map[string]*string `json:"thinkingLevelMap"`
+		Input            []string           `json:"input"`
+		DefaultLevel     string             `json:"defaultThinkingLevel"`
+		Cost             struct {
+			Input, Output, CacheRead, CacheWrite float64
+		} `json:"cost"`
 	} `json:"model"`
+}
+
+// costLabel is formatModelCost: "US$4/M 输入 · US$20/M 输出 · …".
+func (m_ *Model) costLabel() string {
+	c := m_.Model.Cost
+	var parts []string
+	for _, x := range []struct {
+		v   float64
+		key string
+	}{{c.Input, "model_cost_input"}, {c.Output, "model_cost_output"}, {c.CacheRead, "model_cost_cache_read"}, {c.CacheWrite, "model_cost_cache_write"}} {
+		if x.v == 0 {
+			continue
+		}
+		var s string
+		switch {
+		case x.v < 0.01:
+			s = fmt.Sprintf("US$%.4f", x.v)
+		case x.v < 1:
+			s = fmt.Sprintf("US$%.2f", x.v)
+		case x.v == float64(int64(x.v)):
+			s = fmt.Sprintf("US$%d", int64(x.v))
+		default:
+			s = fmt.Sprintf("US$%.2f", x.v)
+		}
+		parts = append(parts, s+"/M "+m(x.key))
+	}
+	return strings.Join(parts, " · ")
+}
+
+func (m_ *Model) vision() bool {
+	for _, in := range m_.Model.Input {
+		if in == "image" {
+			return true
+		}
+	}
+	return false
 }
 
 // levels returns the thinking levels the model takes, in order.

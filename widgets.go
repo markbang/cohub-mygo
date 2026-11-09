@@ -186,49 +186,65 @@ func (a *app) pill(c *ui.Context, label, sub string, lead func()) ui.Element {
 
 type menuItem struct {
 	icon, label, hint string
-	checked           bool
-	danger            bool
-	run               func()
+	checked          bool
+	danger           bool
+	divider          bool // a line below the item
+	run              func()
 }
 
-// menu is a popover of rows below anchor, as the web's dropdown menus.
+// menu is the web's .menu-surface below (or above) anchor: rows of an
+// icon and a label.
 func (a *app) menu(c *ui.Context, anchor ui.Element, open *bool, items []menuItem) {
+	a.menuWidth(c, anchor, open, 0, items)
+}
+
+func (a *app) menuWidth(c *ui.Context, anchor ui.Element, open *bool, width float32, items []menuItem) {
 	p := a.pal
-	ui.Popover(c, anchor, open, func() {
-		ui.Column(c).Gap(1).MinWidth(168).Children(func() {
-			for _, it := range items {
-				if it.label == "" {
-					ui.Divider(c).Margin(3, 0)
-					continue
-				}
-				row := ui.Row(c.Key(it.label)).Gap(8).AlignItems(ui.Center).Height(30).Padding(0, 8).Radius(5).Children(func() {
-					col := p.textSecond
-					if it.danger {
-						col = p.errorC
-					}
-					if it.icon != "" {
-						ui.Icon(c, icon(it.icon)).Size(14, 14).TextColor(col)
-					}
-					ui.Text(c, it.label).FontSize(13).TextColor(col).Grow(1)
-					if it.hint != "" {
-						ui.Text(c, it.hint).FontSize(11).TextColor(p.placeholder)
-					}
-					if it.checked {
-						ui.Icon(c, icon("check")).Size(14, 14).TextColor(p.brand)
-					}
-				})
-				a.pressable(row, false)
-				run := it.run
-				row.OnClick(func() {
-					*open = false
-					if run != nil {
-						run()
-					}
-				})
+	ui.PopoverBase(c, anchor, open, func(panel ui.Element) {
+		panel.MinWidth(180).Padding(4, 0).Radius(8).Background(p.bgElevated).Border(1, p.borderSubtle).
+			Shadow(0, 10, 24, 0, ui.RGBA(0, 0, 0, 0.12)).Margin(4, 0, 4, 0)
+		if width > 0 {
+			panel.Width(width)
+		}
+		for _, it := range items {
+			if it.label == "" {
+				ui.Box(c.Key(fmt_("div", len(it.hint)))).Height(1).Background(p.borderSubtle).Margin(4, 0)
+				continue
 			}
-		})
+			row := ui.Row(c.Key(it.label)).Gap(8).AlignItems(ui.Center).Height(30).Padding(0, 10).Children(func() {
+				col := p.textTertiary
+				if it.danger {
+					col = p.errorC
+				}
+				if it.icon != "" {
+					ui.Icon(c, icon(it.icon)).Size(14, 14).TextColor(col)
+				}
+				ui.Text(c, it.label).FontSize(12).TextColor(col).Grow(1).SingleLine()
+				if it.hint != "" {
+					ui.Text(c, it.hint).FontSize(11).Font(fontMono).TextColor(p.textSecond)
+				}
+				if it.checked {
+					ui.Icon(c, icon("check")).Size(14, 14).TextColor(p.brand)
+				}
+			})
+			if it.divider {
+				row.BorderWidth(0, 0, 1, 0).BorderColor(p.borderSubtle)
+			}
+			if row.Hovered() {
+				row.Background(p.hover)
+			}
+			run := it.run
+			row.Cursor(ui.CursorPointer).OnClick(func() {
+				*open = false
+				if run != nil {
+					run()
+				}
+			})
+		}
 	})
 }
+
+func fmt_(a string, n int) string { return fmt.Sprint(a, n) }
 
 // clock is a message's time: the time today, the day and time before.
 func clock(t, now time.Time) string { return relTime(t, now) }

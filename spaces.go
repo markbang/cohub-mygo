@@ -11,7 +11,9 @@ import (
 func (a *app) spacesView(c *ui.Context) {
 	p := a.pal
 	a.header(c, func() {
-		a.headerLead(c)
+		if !a.compact {
+			a.headerLead(c)
+		}
 		if a.status != "" && a.me == nil {
 			a.spinner(c, 13, p.textTertiary)
 			ui.Text(c, "连接中…").FontSize(13).FontWeight(500).Grow(1)

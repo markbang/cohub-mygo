@@ -51,7 +51,7 @@ func (a *app) sidebarTop(c *ui.Context) {
 		if search.Clicked() {
 			a.palette.open(paletteAll)
 		}
-		if a.iconButton(c.Key("collapse"), "panel-left", "收起侧栏 (⌘B)", false).Clicked() {
+		if a.iconButton(c.Key("collapse"), "panel-left", m("sidebar_collapse"), false).Clicked() {
 			a.sidebarOpen = false
 		}
 	})
@@ -471,22 +471,26 @@ func (a *app) goBackFromSettings() {
 	a.show(route{kind: routeSessions})
 }
 
-// accountRow is the signed-in user, whose menu holds the settings and
-// the appearance.
+// accountRow is the signed-in user, whose menu holds the plan, the
+// settings and signing out, as the sidebar's user menu.
 func (a *app) accountRow(c *ui.Context) {
 	p := a.pal
-	name, av := "未登录", ""
+	name, av := m("x_not_signed_in"), ""
 	if a.me != nil && a.me.Profile != nil {
 		name, av = a.me.Profile.name(), a.me.Profile.AvatarURL
 	}
-	ui.Row(c).Height(46).Shrink(0).Gap(6).AlignItems(ui.Center).Padding(0, 6).BorderWidth(1, 0, 0, 0).BorderColor(p.borderSubtle).Children(func() {
-		who := ui.ButtonBase(c.Key("account")).Row().Gap(8).AlignItems(ui.Center).Grow(1).Height(34).Padding(0, 6).Radius(6).Label("账户").FocusRing(false).Children(func() {
+	ui.Row(c).Shrink(0).Gap(4).AlignItems(ui.Center).Padding(6).BorderWidth(1, 0, 0, 0).BorderColor(p.borderSubtle).Children(func() {
+		who := ui.ButtonBase(c.Key("account")).Row().Gap(8).AlignItems(ui.Center).Justify(ui.Start).Grow(1).MinWidth(0).Padding(6).Radius(5).Label(m("x_account")).FocusRing(false).Children(func() {
 			a.avatar(c, av, name, 22, 11)
-			ui.Text(c, name).FontSize(13).SingleLine().Grow(1)
-			ui.Icon(c, icon("chevron-down")).Size(13, 13).TextColor(p.textTertiary)
+			ui.Text(c, name).FontSize(12).TextColor(p.textSecond).SingleLine().Grow(1)
+			chev := "chevron-down"
+			if a.userMenu {
+				chev = "chevron-up"
+			}
+			ui.Icon(c, icon(chev)).Size(12, 12).TextColor(p.textTertiary)
 		})
 		switch {
-		case a.route.area() == areaSettings || a.userMenu:
+		case a.route.area() == areaSettings:
 			who.Background(p.active)
 		case who.Hovered():
 			who.Background(p.hover)
@@ -494,15 +498,77 @@ func (a *app) accountRow(c *ui.Context) {
 		if who.Clicked() {
 			a.userMenu = !a.userMenu
 		}
-		items := []menuItem{
-			{icon: "settings", label: "设置", run: func() { a.go_(route{kind: routeSettings, sub: "general"}) }},
-			{icon: "credit-card", label: "账单", run: func() { a.go_(route{kind: routeSettings, sub: "billing"}) }},
-			{},
-			{icon: "sun", label: "浅色", checked: a.theme == "light", run: func() { a.setTheme("light") }},
-			{icon: "moon", label: "深色", checked: a.theme == "dark", run: func() { a.setTheme("dark") }},
-			{icon: "monitor", label: "跟随系统", checked: a.theme == "system", run: func() { a.setTheme("system") }},
+		plan, bal := m("sidebar_free_plan"), ""
+		if subs, _, _ := loadJSON[billingSubscriptions](a, "subscriptions", "/api/billing/subscriptions"); subs != nil {
+			for _, s := range subs.Subscriptions.Items {
+				if s.Status == "active" {
+					plan = s.ProductName
+					break
+				}
+			}
 		}
-		a.menu(c, who, &a.userMenu, items)
-		a.iconButton(c.Key("help"), "circle-help", "帮助", false)
+		if cr, _, _ := loadJSON[billingCredits](a, "credits", "/api/billing/credits"); cr != nil {
+			bal = usd(cr.NetUSD)
+		}
+		items := []menuItem{
+			{icon: "credit-card", label: plan, hint: bal, divider: true, run: func() { a.go_(route{kind: routeSettings, sub: "billing"}) }},
+			{icon: "gift", label: m("nav_referrals"), run: func() { a.go_(route{kind: routeSettings, sub: "referrals"}) }},
+		}
+		if a.route.area() == areaSettings {
+			items = append(items, menuItem{icon: "folder-kanban", label: m("nav_spaces"), run: a.goBackFromSettings})
+		} else {
+			items = append(items, menuItem{icon: "settings", label: m("nav_settings"), run: func() { a.go_(route{kind: routeSettings, sub: "general"}) }})
+		}
+		items = append(items,
+			menuItem{icon: "chart-column", label: m("sidebar_trending")},
+			menuItem{icon: "message-square-text", label: m("sidebar_feedback")},
+			menuItem{icon: "log-out", label: m("sidebar_sign_out")},
+		)
+		a.menuWidth(c, who, &a.userMenu, sidebarWidth-12, items)
+		a.iconButton(c.Key("help"), "circle-help", m("sidebar_help"), false)
+	})
+}
+
+// collapsedRail is the sidebar folded to 52 DIPs: the mark, expanding,
+// search and the areas, and the account at the bottom.
+func (a *app) collapsedRail(c *ui.Context) {
+	p := a.pal
+	bar := c.TitleBar()
+	ar := a.route.area()
+	ui.Column(c.Key("rail")).Width(52).Shrink(0).AlignItems(ui.Center).Gap(4).Padding(4+bar.Height, 8, 8, 8).Background(p.sidebarBg).
+		BorderWidth(0, 1, 0, 0).BorderColor(p.borderSubtle.Alpha(0.7)).DragWindow().Children(func() {
+		home := ui.ButtonBase(c.Key("home")).Size(32, 32).Radius(7).Background(p.brand).Center().Label(m("sidebar_home")).FocusRing(false).Children(func() {
+			ui.Text(c, "C").FontSize(11).FontWeight(700).TextColor(p.brandFg)
+		})
+		if home.Clicked() {
+			a.go_(route{kind: routeSessions})
+		}
+		rail := func(name, label string, on bool, fn func()) {
+			b := ui.ButtonBase(c.Key(label)).Size(32, 32).Radius(6).Center().Label(label).Tooltip(label).FocusRing(false).Children(func() {
+				col := p.textTertiary
+				if on {
+					col = p.text
+				}
+				ui.Icon(c, icon(name)).Size(16, 16).TextColor(col)
+			})
+			switch {
+			case on:
+				b.Background(p.active)
+			case b.Hovered():
+				b.Background(p.hover)
+			}
+			if b.Clicked() {
+				fn()
+			}
+		}
+		rail("panel-left", m("sidebar_expand"), false, func() { a.sidebarOpen = true })
+		rail("search", m("sidebar_search_everywhere"), false, func() { a.palette.open(paletteAll) })
+		ui.Box(c).Height(8)
+		rail("message-square", m("sidebar_chats"), ar == areaChats, func() { a.go_(route{kind: routeSessions}) })
+		rail("layers", m("nav_spaces"), ar == areaSpaces || ar == areaSpace, func() { a.go_(route{kind: routeSpaces}) })
+		ui.Spacer(c)
+		if a.me != nil && a.me.Profile != nil {
+			a.avatar(c, a.me.Profile.AvatarURL, a.me.Profile.name(), 26, 13)
+		}
 	})
 }
