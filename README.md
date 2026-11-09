@@ -41,12 +41,20 @@ go tool mygo build             # 打包 dmg / 安装器 / AppImage
 | 新建 Space | `newspace.go` |
 | 窄窗口：列表页头、chips、大号会话行、底部 tab 栏、全屏会话页、侧面板浮层、抽屉 | `compact.go` |
 | 实时：订阅 `wss://gateway.cohub.live/ws` 的 `space:<id>`，收到事件后重新拉取 | `realtime.go` |
+| 附件、语音输入、"/" 提示词和技能、"@" 提及 Space | `attach.go`、`voice.go`、`composermenus.go` |
+| 对话操作：重命名、分享、统计、标签、fork 树、审批、存档点 | `sessionactions.go`、`forktree.go`、`approvals.go`、`checkpoint.go` |
+| 文件：编辑保存、新建 / 重命名 / 删除 / 上传、Board、打开方式（App 的 fileHandlers 和 `.cohub/apps.json`） | `files.go`、`board.go`、`openwith.go` |
+| 发布 App（文件、目录、端口）、App 面板与详情、已安装 App | `publish.go`、`apps.go` |
+| 端口和 display 窗口、本地 Runtime 状态、desktop 命令 | `ports.go`、`display.go`、`runtimestatus.go`、`desktop.go` |
+| Space 商务、钱包、Space 设置编辑、邀请页 | `commerce.go`、`wallet.go`、`spacesettings_edit.go`、`invite.go` |
+| 在线成员和弹幕、通知、Markdown 表格（web 样式） | `presence.go`、`danmaku.go`、`notify.go`、`mdtable.go` |
+| 新建渠道（Discord / 飞书 / 微信扫码 / QQ） | `channelnew.go` |
 
-付款仍在 web 完成：方案页的「订阅 / 充值余额」会在浏览器打开 `cohub.live/settings/billing?tab=plans`。
+付款、已发布 App、App 窗口（包括用 App 打开文件）和端口页面都在浏览器打开，因为客户端没有 WebView。
 
 ## 和 web 对比
 
-`compare/states.json` 列出约 40 个界面状态（路径、web 端操作、app 端操作）。
+`compare/states.json` 列出 58 个界面状态（路径、web 端操作、app 端操作）。
 
 ```sh
 node tools/webshot/shot.mjs [正则]                      # Playwright 截 web（compare/web/）
@@ -59,7 +67,7 @@ tools/crop.sh 名字 x y w h                              # 裁出同一区域�
 ## 还没做
 
 - 实时事件只触发重新拉取，没有逐字增量合并；没有本地首屏缓存；未读状态只存在本地。
-- 附件上传、语音输入、Board、标签的「标记为…」、Space 设置里的编辑保存、钱包充值。
+- display 窗口轮询截图，不走 WebRTC。
 - 只在 Linux（Xvfb + llvmpipe）上跑过真实窗口，没有在 macOS / Windows 的 GPU 上测过帧率和内存。
 
 ## 测试
