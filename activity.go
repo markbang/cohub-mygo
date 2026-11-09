@@ -153,25 +153,14 @@ func (a *app) activityPage(c *ui.Context, spaceID string) {
 			a.pages.json[load] = &act
 		})
 	})
-	if spaceID == "" {
-		a.settingsHeaderless(c)
-	} else {
-		a.header(c, func() {
-			a.headerLead(c)
-			ui.Spacer(c)
-		})
-	}
+	a.settingsHeaderless(c)
 	ui.Scroll(c.Key("activity")).Grow(1).Children(func() {
 		ui.Column(c).FillWidth().MaxWidth(1024).Padding(28, 32).Children(func() {
 			ui.Row(c).AlignItems(ui.End).Gap(16).Padding(0, 0, 20, 0).BorderWidth(0, 0, 1, 0).BorderColor(p.borderSubtle).Children(func() {
 				ui.Column(c).Grow(1).MinWidth(0).Gap(4).Children(func() {
 					ui.Text(c, "Cohub").FontSize(11).FontWeight(600).TextColor(p.brand)
 					title, sub := "活动", "活动"
-					if spaceID != "" {
-						if name, _ := a.spaceName(spaceID); name != "" {
-							title = name
-						}
-					} else {
+					if spaceID == "" {
 						who := "您的账户"
 						if a.me != nil && a.me.Profile != nil && a.me.Profile.Username != "" {
 							who = "@" + a.me.Profile.Username
@@ -237,6 +226,9 @@ func (a *app) activityBody(c *ui.Context, act *Activity, n int, spaceID string) 
 			{compactCount(act.Totals.RequestCount), "请求数"},
 			{strconv.Itoa(active), "活跃天数"},
 			{formatCost(act.Totals.CostTotal), "费用"},
+		}
+		if spaceID != "" {
+			stats = stats[:3]
 		}
 		for i, s := range stats {
 			col := ui.Column(c.Key(i)).Grow(1).Basis(0).Gap(4).Padding(0, 20)
@@ -386,14 +378,24 @@ func (a *app) activityBody(c *ui.Context, act *Activity, n int, spaceID string) 
 			})
 		}
 		r := act.Rankings
-		rank("LLM 模型", "Token · 费用", func() {
+		showCost := spaceID == ""
+		unit := map[bool]string{true: "Token · 费用", false: "Token"}[showCost]
+		rank("LLM 模型", unit, func() {
 			for i, m := range r.LLMModels {
-				row(i, m.Model, m.Provider, compactCount(m.TotalTokens)+" · "+formatCost(m.CostTotal))
+				v := compactCount(m.TotalTokens)
+				if showCost {
+					v += " · " + formatCost(m.CostTotal)
+				}
+				row(i, m.Model, m.Provider, v)
 			}
 		}, len(r.LLMModels) == 0, "此范围内没有 LLM 用量。")
-		rank("生成模型", "调用 · 费用", func() {
+		rank("生成模型", map[bool]string{true: "调用 · 费用", false: "调用"}[showCost], func() {
 			for i, m := range r.GenerationModels {
-				row(i, m.Model, "", compactCount(m.RequestCount)+" · "+formatCost(m.CostTotal))
+				v := compactCount(m.RequestCount)
+				if showCost {
+					v += " · " + formatCost(m.CostTotal)
+				}
+				row(i, m.Model, "", v)
 			}
 		}, len(r.GenerationModels) == 0, "此范围内没有生成用量。")
 		apps := r.Apps

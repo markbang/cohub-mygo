@@ -47,12 +47,16 @@ func (a *app) view(c *ui.Context) {
 		}
 		bg := p.bgPrimary
 		switch a.route.kind {
-		case routeSession, routeSpaceSession, routeSpace, routeSpaceNewSession:
+		case routeSession, routeSpaceSession, routeSpace, routeSpaceNewSession,
+			routeSpaceFiles, routeSpaceCheckpoint, routeSpaceTask, routeSpaceCron:
 			bg = p.chatBg.Over(p.bgPrimary)
 		}
 		ui.Column(c).Grow(1).MinWidth(0).Background(bg).Children(func() {
 			a.page(c)
 		})
+		if a.hasWindow() {
+			a.windowPane(c)
+		}
 		if a.panelOpen && a.showsPanel() && w >= 1100 {
 			a.rightPanel(c)
 		}
@@ -64,7 +68,16 @@ func (a *app) view(c *ui.Context) {
 // a Space's new chat.
 func (a *app) showsPanel() bool {
 	switch a.route.kind {
-	case routeSession, routeSpaceSession, routeSpace, routeSpaceNewSession:
+	case routeSession, routeSpaceSession, routeSpace, routeSpaceNewSession,
+		routeSpaceFiles, routeSpaceCheckpoint, routeSpaceTask, routeSpaceCron:
+		return true
+	}
+	return false
+}
+
+func (a *app) hasWindow() bool {
+	switch a.route.kind {
+	case routeSpaceFiles, routeSpaceCheckpoint, routeSpaceTask, routeSpaceCron:
 		return true
 	}
 	return false
@@ -85,14 +98,8 @@ func (a *app) page(c *ui.Context) {
 		a.activityPage(c, a.route.space)
 	case routeSpaceWallet:
 		a.walletPage(c)
-	case routeSpaceFiles:
-		a.filesPage(c)
-	case routeSpaceCheckpoint:
-		a.checkpointPage(c)
-	case routeSpaceTask:
-		a.taskPage(c)
-	case routeSpaceCron:
-		a.cronPage(c)
+	case routeSpaceFiles, routeSpaceCheckpoint, routeSpaceTask, routeSpaceCron:
+		a.spaceHome(c)
 	case routeSettings:
 		a.settingsPage(c)
 	default:

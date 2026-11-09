@@ -236,15 +236,15 @@ func (a *app) spaceSidebar(c *ui.Context) {
 				nb.Background(p.brand.Alpha(0.15))
 			}
 			nb.OnClick(func() { a.go_(route{kind: routeSpace, space: spaceID}) })
-			r := a.route
-			a.navRow(c, "settings", "设置", r.kind == routeSpaceSettings, 33, func() { a.go_(route{kind: routeSpaceSettings, space: spaceID, sub: "profile"}) })
-			a.navRow(c, "activity", "活动", r.kind == routeSpaceActivity, 33, func() { a.go_(route{kind: routeSpaceActivity, space: spaceID}) })
-			a.navRow(c, "save", "新建存档", r.kind == routeSpaceCheckpoint && r.sub == "new", 33, func() {
+			a.navRow(c, "settings", m("nav_settings"), false, 33, func() { a.go_(route{kind: routeSpaceSettings, space: spaceID, sub: "profile"}) })
+			a.navRow(c, "activity", m("nav_activity"), false, 33, func() { a.go_(route{kind: routeSpaceActivity, space: spaceID}) })
+			a.navRow(c, "save", m("sidebar_new_save"), false, 33, func() {
 				a.go_(route{kind: routeSpaceCheckpoint, space: spaceID, sub: "new"})
 			})
 			ui.Box(c).Height(14)
 			a.labelsSection(c, spaceID)
 			a.chatsSection(c, spaceID)
+			a.spaceSections(c, spaceID)
 		})
 	})
 }
