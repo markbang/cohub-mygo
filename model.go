@@ -88,6 +88,7 @@ type app struct {
 	cron         *cronForm
 	cpTab        map[string]int // a save's tab: changes, files
 	copiedValue  string
+	forking      string // the turn a fork is being made from
 	confirmBox   *confirmBox
 	windowWide   bool            // the window takes the main column's room
 	viewportOff  map[string]bool // windows the user took out of the prompt's context

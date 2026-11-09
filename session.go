@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"sort"
 	"strings"
 	"time"
@@ -286,9 +287,19 @@ func (a *app) replyMeta(c *ui.Context, t *Turn) {
 				ui.Text(c, harnessName(h)).FontSize(10).FontWeight(500).TextColor(p.textTertiary)
 			})
 		} else {
-			ui.Box(c.Key("fork")).Size(22, 22).Center().Children(func() {
+			fb := ui.ButtonBase(c.Key("fork")).Size(22, 22).Center().Radius(4).Label(m("chat_fork_here")).Tooltip(m("chat_fork_here")).FocusRing(false).Children(func() {
+				if a.forking == t.ID {
+					a.spinner(c, 12, p.metaText())
+					return
+				}
 				ui.Icon(c, icon("git-fork")).Size(14, 14).TextColor(p.metaText())
 			})
+			if fb.Hovered() {
+				fb.Background(p.hover)
+			}
+			if fb.Clicked() && a.forking == "" {
+				a.forkTurn(a.route.sessionID(), t.ID)
+			}
 		}
 		if t.Meta.RuntimeArchiveStatus == "ready" {
 			ui.Icon(c, icon("archive")).Size(12, 12).TextColor(p.textTertiary)
@@ -987,4 +998,36 @@ func usageLabel(u *Usage) string {
 		parts = append(parts, "↓"+kilo(u.Output))
 	}
 	return strings.Join(parts, " ")
+}
+
+// forkTurn starts a chat that goes on from a turn, and opens it.
+func (a *app) forkTurn(sessionID, turnID string) {
+	if sessionID == "" {
+		return
+	}
+	a.forking = turnID
+	inSpace := a.route.area() == areaSpace
+	a.act(func(ctx context.Context) error {
+		var out struct {
+			Session *Session `json:"session"`
+		}
+		err := a.api.do(ctx, "POST", "/api/sessions/"+url.PathEscape(sessionID)+"/turns/"+url.PathEscape(turnID)+"/fork", map[string]any{}, &out)
+		a.update(func() {
+			a.forking = ""
+			if err != nil || out.Session == nil {
+				return
+			}
+			s := out.Session
+			a.sessions = append([]*Session{s}, a.sessions...)
+			if inSpace {
+				a.go_(route{kind: routeSpaceSession, space: s.SpaceID, session: s.ID})
+			} else {
+				a.go_(route{kind: routeSession, session: s.ID})
+			}
+		})
+		if err == nil {
+			a.refresh()
+		}
+		return err
+	})
 }

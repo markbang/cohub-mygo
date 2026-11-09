@@ -579,7 +579,7 @@ func (a *app) checkpointView(c *ui.Context, spaceID, id string) {
 					ui.Text(c, m("cp_no_changes_since_save")).FontSize(12).TextColor(p.textTertiary)
 				default:
 					for _, f := range sum.Files {
-						ui.Row(c.Key("chg-"+f.Path)).Gap(8).Children(func() {
+						ui.Row(c.Key("chg-" + f.Path)).Gap(8).Children(func() {
 							ui.Text(c, f.Status).FontSize(10).FontWeight(600).Font(fontMono).TextColor(p.warning).Width(12)
 							ui.Text(c, f.Path).FontSize(12).Font(fontMono).TextColor(p.textSecond).SingleLine().Grow(1)
 							ui.Text(c, fmt.Sprintf("+%d −%d", f.Additions, f.Deletions)).FontSize(11).Font(fontMono).TextColor(p.textTertiary)
