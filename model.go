@@ -109,6 +109,7 @@ type app struct {
 	commerce                     *commerceForm
 	harnesses                    map[string]harnessState // the composer's harness by chat or Space
 	newLabelFor, newLabelName    string
+	selectedSpaces               map[string]bool
 	feedback                     feedbackForm
 	lastG                        time.Time
 	inHeader                     bool    // building a header: compact icon buttons grow to 40px
@@ -146,35 +147,36 @@ type app struct {
 
 func newApp() *app {
 	a := &app{
-		now:           time.Now,
-		spaceSessions: map[string][]*Session{},
-		timelines:     map[string]*sessionTurns{},
-		usage7d:       map[string]*SpaceUsage{},
-		labels:        map[string][]*Label{},
-		labelItems:    map[string][]LabelItem{},
-		loading:       map[string]bool{},
-		seen:          map[string]time.Time{},
-		groupsOpen:    map[string]bool{"labels": true, "chats": true, "all": true, "saves": true},
-		menus:         map[string]bool{},
-		foldOpen:      map[string]bool{},
-		modelChoices:  map[string]modelChoice{},
-		images:        newImageCache(),
-		sidebarOpen:   true,
-		chats:         chatsFilter{source: "web"},
-		mediaFilter:   "all",
-		chipChats:     map[string][]*Session{},
-		editors:       map[string]*fileEdit{},
-		viewportOff:   map[string]bool{},
-		looseSessions: map[string]*Session{},
-		cpTab:         map[string]int{},
-		boardViews:    map[string]*boardView{},
-		harnesses:     map[string]harnessState{},
-		spaceEdits:    map[string]*spaceEdit{},
-		walletForms:   map[string]*walletForm{},
-		panelOpen:     true,
-		pal:           lightPalette(),
-		route:         route{kind: -1},
-		theme:         "system",
+		now:            time.Now,
+		spaceSessions:  map[string][]*Session{},
+		timelines:      map[string]*sessionTurns{},
+		usage7d:        map[string]*SpaceUsage{},
+		labels:         map[string][]*Label{},
+		labelItems:     map[string][]LabelItem{},
+		loading:        map[string]bool{},
+		seen:           map[string]time.Time{},
+		groupsOpen:     map[string]bool{"labels": true, "chats": true, "all": true, "saves": true},
+		menus:          map[string]bool{},
+		foldOpen:       map[string]bool{},
+		modelChoices:   map[string]modelChoice{},
+		images:         newImageCache(),
+		sidebarOpen:    true,
+		chats:          chatsFilter{source: "web"},
+		mediaFilter:    "all",
+		chipChats:      map[string][]*Session{},
+		editors:        map[string]*fileEdit{},
+		viewportOff:    map[string]bool{},
+		looseSessions:  map[string]*Session{},
+		cpTab:          map[string]int{},
+		boardViews:     map[string]*boardView{},
+		harnesses:      map[string]harnessState{},
+		selectedSpaces: map[string]bool{},
+		spaceEdits:     map[string]*spaceEdit{},
+		walletForms:    map[string]*walletForm{},
+		panelOpen:      true,
+		pal:            lightPalette(),
+		route:          route{kind: -1},
+		theme:          "system",
 	}
 	a.pages.init()
 	a.md.Reveal = &markdown.Reveal{Unit: markdown.ByWord}

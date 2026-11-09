@@ -29,7 +29,42 @@ func (a *app) spacesView(c *ui.Context) {
 			a.go_(route{kind: routeNewSpace})
 		}
 	}
-	if a.compact {
+	if len(a.selectedSpaces) > 0 {
+		a.header(c, func() {
+			if a.iconButton(c.Key("cancel"), "x", m("common_cancel"), false).Clicked() {
+				a.selectedSpaces = map[string]bool{}
+			}
+			ui.Text(c, m("label_selected_count", "count", len(a.selectedSpaces))).FontSize(13).FontWeight(600).Grow(1)
+			ids := []string{}
+			allPinned := true
+			for id := range a.selectedSpaces {
+				ids = append(ids, id)
+				if sp := a.space(id); sp == nil || !sp.IsPinned {
+					allPinned = false
+				}
+			}
+			pin, pinL := "pin", m("command_pin")
+			if allPinned {
+				pin, pinL = "pin-off", m("command_unpin")
+			}
+			if a.iconButton(c.Key("pin"), pin, pinL, false).Clicked() {
+				for _, id := range ids {
+					a.setSpacePinned(id, !allPinned)
+				}
+				a.selectedSpaces = map[string]bool{}
+			}
+			arch, archL := "archive", m("spaces_archive")
+			if a.spacesNav == 4 {
+				arch, archL = "archive-restore", m("spaces_unarchive")
+			}
+			if a.iconButton(c.Key("archive"), arch, archL, false).Clicked() {
+				for _, id := range ids {
+					a.setSpaceArchived(id, a.spacesNav != 4)
+				}
+				a.selectedSpaces = map[string]bool{}
+			}
+		})
+	} else if a.compact {
 		a.compactListHeader(c, c.TitleBar(), m("spaces_title"), actions)
 	} else {
 		a.header(c, func() {
@@ -84,7 +119,26 @@ func (a *app) spacesView(c *ui.Context) {
 		}
 		row := ui.Row(c.Key(sp.ID)).Gap(10).AlignItems(ui.Center).Height(rowH).Padding(0, 6).Radius(6)
 		row.Children(func() {
-			a.avatarSeed(c, sp.avatar(), sp.Name, sp.ID, size, 8)
+			selecting := len(a.selectedSpaces) > 0
+			on := a.selectedSpaces[sp.ID]
+			lead := ui.ButtonBase(c.Key("lead")).Size(size, size).Label(m("spaces_selected_aria", "name", sp.Name)).FocusRing(false).Children(func() {
+				a.avatarSeed(c, sp.avatar(), sp.Name, sp.ID, size, 8)
+				if on || selecting || row.Hovered() {
+					mark := ui.Box(c.Key("mark")).Absolute().Bottom(-4).Right(-4).Size(18, 18).Radius(9).Border(2, p.bgPrimary).Center()
+					if on {
+						mark.Background(p.brand).Children(func() { ui.Icon(c, icon("check")).Size(10, 10).TextColor(p.brandFg) })
+					} else {
+						mark.Background(p.bgElevated)
+					}
+				}
+			})
+			if lead.Clicked() {
+				if on {
+					delete(a.selectedSpaces, sp.ID)
+				} else {
+					a.selectedSpaces[sp.ID] = true
+				}
+			}
 			ui.Column(c).Grow(1).MinWidth(0).Gap(2).Children(func() {
 				fs, sub, meta := float32(14), float32(12), float32(11)
 				if a.compact {
@@ -163,7 +217,7 @@ func (a *app) spaceRowMenu(c *ui.Context, anchor ui.Element, sp *Space) {
 		items = append(items, menuItem{icon: "settings", label: m("sidebar_space_settings"), run: func() { a.go_(route{kind: routeSpaceSettings, space: sp.ID}) }})
 	}
 	items[len(items)-1].divider = true
-	items = append(items, menuItem{icon: "circle-check", label: m("spaces_select")})
+	items = append(items, menuItem{icon: "circle-check", label: m("spaces_select"), run: func() { a.selectedSpaces[sp.ID] = true }})
 	a.menuWidth(c, anchor, &open, 200, items)
 	a.menus[key] = open
 	if t := a.labelTarget; t != nil && t.kind == "space" && t.ref == sp.ID {
