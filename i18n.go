@@ -23,7 +23,9 @@ var locale = "zh-CN"
 // extraMessages are the app's words the web's catalogs lack, as
 // zh-CN and en.
 var extraMessages = map[string][2]string{
-	"x_more": {"更多", "More"},
+	"x_display_type":      {"输入发送到屏幕…", "Type to the display…"},
+	"x_display_scroll":    {"滚动", "Scroll"},
+	"x_more":              {"更多", "More"},
 	"x_runtime_offline":   {"本机运行时离线", "The local runtime is offline"},
 	"x_name":              {"名称", "Name"},
 	"x_sign_out_detail":   {"会同时退出 cohub 命令行的登录。", "This also signs the cohub CLI out."},

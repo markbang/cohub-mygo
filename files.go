@@ -442,6 +442,9 @@ func (a *app) openFile(spaceID, p string) {
 		r = route{kind: routeSpace, space: spaceID}
 	}
 	r.win = "file:" + p
+	if strings.HasSuffix(strings.ToLower(p), ".board") {
+		r.win = "board:" + p
+	}
 	a.go_(r)
 }
 

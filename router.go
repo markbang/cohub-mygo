@@ -218,5 +218,8 @@ func (r route) file() string {
 	if f, ok := strings.CutPrefix(r.win, "file:"); ok {
 		return f
 	}
+	if f, ok := strings.CutPrefix(r.win, "board:"); ok {
+		return f
+	}
 	return ""
 }

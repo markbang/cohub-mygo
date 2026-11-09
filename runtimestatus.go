@@ -220,9 +220,21 @@ func (a *app) runtimeStatus(c *ui.Context, spaceID string) {
 							if name == "" {
 								name = d.ID
 							}
-							ui.Row(c.Key(d.ID)).Height(36).Gap(8).AlignItems(ui.Baseline).Children(func() {
-								ui.Text(c, name).FontSize(13).TextColor(p.textSecond).SingleLine()
-								meta(itoa(d.Width) + "×" + itoa(d.Height))
+							d := d
+							ui.Row(c.Key(d.ID)).Height(36).Gap(8).AlignItems(ui.Center).Children(func() {
+								ui.Row(c).Grow(1).Gap(8).AlignItems(ui.Baseline).Children(func() {
+									ui.Text(c, name).FontSize(13).TextColor(p.textSecond).SingleLine()
+									meta(itoa(d.Width) + "×" + itoa(d.Height))
+								})
+								if a.can(spaceID, "sandbox.view") {
+									b := ui.ButtonBase(c.Key("open")).Height(28).Padding(0, 10).Radius(6).Background(p.bgInput).Border(1, p.borderSubtle).Center().FocusRing(false).Children(func() {
+										ui.Text(c, m("runtime_display_open")).FontSize(12).TextColor(p.textSecond)
+									})
+									if b.Clicked() {
+										open = false
+										a.openDisplay(spaceID, d.ID)
+									}
+								}
 							})
 						}
 					})

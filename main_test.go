@@ -2,9 +2,15 @@ package main
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"image"
+	"image/jpeg"
 	"image/png"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -619,5 +625,53 @@ func TestMessageKeys(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+// TestDisplayWindow draws a display's frames from /capture and sends a
+// click on it to /input as the display's pointer.
+func TestDisplayWindow(t *testing.T) {
+	frame := image.NewRGBA(image.Rect(0, 0, 400, 300))
+	for i := range frame.Pix {
+		frame.Pix[i] = 200
+	}
+	var jpg bytes.Buffer
+	jpeg.Encode(&jpg, frame, nil)
+	var inputs []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/displays"):
+			w.Write([]byte(`{"displays":[{"id":"d1","name":"Screen","width":400,"height":300,"input":true}]}`))
+		case strings.HasSuffix(r.URL.Path, "/capture"):
+			fmt.Fprintf(w, `{"mimeType":"image/jpeg","data":%q,"width":400,"height":300}`, base64.StdEncoding.EncodeToString(jpg.Bytes()))
+		case strings.HasSuffix(r.URL.Path, "/input"):
+			b, _ := io.ReadAll(r.Body)
+			inputs = append(inputs, string(b))
+			w.Write([]byte(`{"applied":2}`))
+		default:
+			w.Write([]byte(`{}`))
+		}
+	}))
+	defer srv.Close()
+	a := demoApp(t)
+	a.api = &client{base: srv.URL, http: srv.Client(), token: "x", expires: time.Now().Add(time.Hour)}
+	a.sync = true
+	id := a.spaces[0].ID
+	a.route = route{kind: routeSpace, space: id, win: "display:d1"}
+	tt := ui.NewTester(a.view, 1440, 900)
+	for i := 0; i < 4; i++ {
+		tt.Frame()
+		a.flush()
+	}
+	if a.displayState == nil || a.displayState.frame == nil {
+		t.Fatal("no frame")
+	}
+	if err := tt.Click(m("display_live")); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	a.flush()
+	if len(inputs) != 1 || !strings.Contains(inputs[0], `"action":"down"`) || !strings.Contains(inputs[0], `"action":"up"`) {
+		t.Fatalf("inputs %q", inputs)
 	}
 }

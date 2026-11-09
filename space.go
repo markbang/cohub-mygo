@@ -441,6 +441,17 @@ func (a *app) windowPane(c *ui.Context) {
 		title = path.Base(r.file())
 	case r.port() != "":
 		title, iconName = ":"+r.port(), "globe"
+	case r.display() != "":
+		title, iconName = r.display(), "monitor"
+		ds, _ := a.displays(r.space)
+		for _, d := range ds {
+			if d.ID == r.display() {
+				title = firstNonEmpty(d.Name, d.ID)
+				if d.Kind == "agent" {
+					title = m("runtime_display_agent")
+				}
+			}
+		}
 	case r.kind == routeSpaceCheckpoint:
 		title, iconName = m("sidebar_new_save"), "save"
 		if r.sub != "new" {
@@ -501,6 +512,8 @@ func (a *app) windowPane(c *ui.Context) {
 				a.fileView(c, r.space, r.file())
 			case r.port() != "":
 				a.portView(c, r.space, r.port())
+			case r.display() != "":
+				a.displayView(c, r.space, r.display())
 			case r.kind == routeSpaceCheckpoint:
 				a.checkpointView(c, r.space, r.sub)
 			case r.kind == routeSpaceTask:

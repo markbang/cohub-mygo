@@ -110,6 +110,8 @@ type app struct {
 	harnesses                    map[string]harnessState // the composer's harness by chat or Space
 	newLabelFor, newLabelName    string
 	compMenu                     composerMenu
+	displayTyped                 string
+	displayState                 *displayView
 	portToast                    *portToast
 	publish                      *publishForm
 	danmakuWidth                 float32
