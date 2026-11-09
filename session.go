@@ -708,7 +708,18 @@ func (a *app) composer(c *ui.Context, running bool) {
 				}
 				a.modelPicker(c)
 				ui.Spacer(c)
-				a.iconButton(c.Key("mic"), "mic", m("x_voice"), false)
+				listening := a.voice != nil && a.voice.active
+				label := m("composer_start_voice")
+				if listening {
+					label = m("composer_stop_voice")
+				}
+				mic := a.iconButton(c.Key("mic"), "mic", label, listening)
+				if listening {
+					mic.Background(p.errorC.Alpha(0.12))
+				}
+				if mic.Clicked() {
+					a.toggleVoice()
+				}
 				empty := strings.TrimSpace(a.draft) == "" && len(a.attachments) == 0
 				send := ui.ButtonBase(c.Key("send")).Size(36, 36).Radius(18).Center().FocusRing(false).Children(func() {
 					switch {

@@ -73,8 +73,9 @@ type app struct {
 	prefs        prefs
 	sidebarOpen  bool
 	attachments  []*attachment // the composer's files, before they are sent
-	inHeader     bool          // building a header: compact icon buttons grow to 40px
-	width        float32       // the window's width, as media queries see it
+	voice        *voiceInput
+	inHeader     bool    // building a header: compact icon buttons grow to 40px
+	width        float32 // the window's width, as media queries see it
 	purchase     purchaseState
 	redeem       redeemState
 	subsPage     int
