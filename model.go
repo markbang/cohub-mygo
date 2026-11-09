@@ -112,6 +112,8 @@ type app struct {
 	harnesses                    map[string]harnessState // the composer's harness by chat or Space
 	newLabelFor, newLabelName    string
 	compMenu                     composerMenu
+	openWith                     *openWithState
+	fileHandlers                 *fileHandlerCache
 	handledCommands              map[string]bool
 	displayTyped                 string
 	displayState                 *displayView

@@ -97,6 +97,7 @@ func (a *app) view(c *ui.Context) {
 	a.toastView(c)
 	a.portToastView(c)
 	a.publishDialog(c)
+	a.openWithDialog(c)
 }
 
 // toastView is .toast-surface: what went wrong, for five seconds.

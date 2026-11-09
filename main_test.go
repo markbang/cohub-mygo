@@ -715,3 +715,82 @@ func TestDesktopCommand(t *testing.T) {
 		t.Fatal("ran another client's command")
 	}
 }
+
+// TestOpenWith lists the Apps that open a file's type, and choosing one
+// "always" makes it the Space's default in .cohub/apps.json.
+func TestOpenWith(t *testing.T) {
+	const app1, app2 = "11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222"
+	installed := `{"format":"cohub.space-apps","version":1,"apps":[{"id":"` + app2 + `","ref":"bob/s/viewer","url":"https://x","enabled":true,"opens":[".csv"]}]}`
+	var written string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == "PUT" && strings.HasSuffix(r.URL.Path, "/fs/file"):
+			b, _ := io.ReadAll(r.Body)
+			written = string(b)
+			w.Write([]byte(`{"size":1,"mtimeMs":2}`))
+		case strings.HasSuffix(r.URL.Path, "/fs/file"):
+			fmt.Fprintf(w, `{"path":".cohub/apps.json","kind":"text","content":%q,"size":10,"mtimeMs":5}`, installed)
+		case strings.HasPrefix(r.URL.Path, "/api/apps/space/"):
+			fmt.Fprintf(w, `{"apps":[{"id":%q,"slug":"board","status":"published","meta":{"title":"Board","fileHandlers":".board .csv"}},{"id":"x","slug":"off","status":"disabled","meta":{"fileHandlers":[".csv"]}}]}`, app1)
+		case strings.HasSuffix(r.URL.Path, "/"+app2):
+			fmt.Fprintf(w, `{"app":{"id":%q,"slug":"viewer","status":"published","meta":{"title":"Viewer","fileHandlers":["csv"]}},"publicUrl":"https://x","owner":{"username":"bob"},"space":{"slug":"s"}}`, app2)
+		case strings.HasSuffix(r.URL.Path, "/"+app1):
+			fmt.Fprintf(w, `{"app":{"id":%q,"slug":"board","status":"published","meta":{"title":"Board","fileHandlers":".board .csv"}},"publicUrl":"https://b","owner":{"username":"me"},"space":{"slug":"home"}}`, app1)
+		case strings.Count(r.URL.Path, "/") == 3 && strings.HasPrefix(r.URL.Path, "/api/spaces/"):
+			w.Write([]byte(`{"access":{"permissions":["file.edit"]}}`))
+		default:
+			w.Write([]byte(`{}`))
+		}
+	}))
+	defer srv.Close()
+	a := demoApp(t)
+	a.api = &client{base: srv.URL, http: srv.Client(), token: "x", expires: time.Now().Add(time.Hour)}
+	a.sync = true
+	id := a.spaces[0].ID
+	a.route = route{kind: routeSpace, space: id}
+	tt := ui.NewTester(a.view, 1440, 900)
+	a.openFileWith(id, "data/q.csv")
+	for i := 0; i < 3; i++ {
+		a.flush()
+		tt.Frame()
+	}
+	st := a.openWith
+	if st == nil || !st.loaded || len(st.cands) != 2 || st.def != app2 {
+		t.Fatalf("open with %+v", st)
+	}
+	snapshot(t, tt, "desktop-open-with")
+	if err := tt.Click(m("open_with_always", "extension", ".csv")); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	if !st.always {
+		t.Fatal("always is off")
+	}
+	if err := tt.Click("Board"); err != nil {
+		t.Fatal(err)
+	}
+	a.flush()
+	tt.Frame()
+	if a.route.win != "app:"+app1+":data/q.csv" {
+		t.Fatalf("window %q", a.route.win)
+	}
+	var in struct {
+		Content  string         `json:"content"`
+		Expected map[string]any `json:"expected"`
+	}
+	json.Unmarshal([]byte(written), &in)
+	var doc installedApps
+	json.Unmarshal([]byte(in.Content), &doc)
+	if in.Expected == nil || len(doc.Apps) != 2 {
+		t.Fatalf("written %s", written)
+	}
+	if id, _ := installedHandler(doc, "x.csv"); id != app1 {
+		t.Fatalf("default %q in %s", id, in.Content)
+	}
+	// The file now opens in its App.
+	a.route = route{kind: routeSpace, space: id}
+	a.openFile(id, "data/q.csv")
+	if a.route.win != "app:"+app1+":data/q.csv" {
+		t.Fatalf("open %q", a.route.win)
+	}
+}

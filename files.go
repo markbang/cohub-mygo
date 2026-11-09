@@ -249,6 +249,7 @@ func (a *app) fileActions(spaceID, p string, dir bool) []menuItem {
 		}
 	}
 	if !dir {
+		items = append(items, menuItem{icon: "app-window", label: m("file_open_with"), run: func() { a.openFileWith(spaceID, p) }})
 		items = append(items, menuItem{icon: "download", label: m("file_download"), run: func() { a.downloadFile(spaceID, p) }})
 		items = append(items, menuItem{icon: "list-tree", label: m("inline_label_as"), run: func() {
 			a.labelTarget = &labelTarget{space: spaceID, kind: "file", ref: p}
@@ -433,7 +434,17 @@ func (a *app) uploadPaths(spaceID, dir string, paths []string) {
 
 // openFile shows a Space file in the window, beside the chat or the Space
 // the main column shows, as the web's ?window=file:.
+// A file whose type the Space opens with an App opens in that App.
 func (a *app) openFile(spaceID, p string) {
+	if id := a.defaultFileApp(spaceID, p); id != "" {
+		a.openFileInApp(spaceID, p, id)
+		return
+	}
+	a.openFileBuiltin(spaceID, p)
+}
+
+// fileRoute is the route a window opens on beside what the Space shows.
+func (a *app) fileRoute(spaceID string) route {
 	r := a.route
 	switch {
 	case r.space != spaceID:
@@ -441,6 +452,12 @@ func (a *app) openFile(spaceID, p string) {
 	case r.kind == routeSpaceCheckpoint || r.kind == routeSpaceTask || r.kind == routeSpaceCron || r.kind == routeSpaceApp:
 		r = route{kind: routeSpace, space: spaceID}
 	}
+	return r
+}
+
+// openFileBuiltin opens the file in Cohub's own viewer.
+func (a *app) openFileBuiltin(spaceID, p string) {
+	r := a.fileRoute(spaceID)
 	r.win = "file:" + p
 	if strings.HasSuffix(strings.ToLower(p), ".board") {
 		r.win = "board:" + p

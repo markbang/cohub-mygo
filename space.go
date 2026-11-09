@@ -86,8 +86,10 @@ type appRec struct {
 	PublishedAt   time.Time `json:"publishedAt"`
 	UpdatedAt     time.Time `json:"updatedAt"`
 	Meta          struct {
-		Title string `json:"title"`
-		Icon  string `json:"icon"`
+		Title        string `json:"title"`
+		Icon         string `json:"icon"`
+		Description  string `json:"description"`
+		FileHandlers any    `json:"fileHandlers"`
 	} `json:"meta"`
 }
 
@@ -308,6 +310,7 @@ func (a *app) panelContent(c *ui.Context, tab int) {
 func (a *app) filesPanel(c *ui.Context, spaceID string) {
 	p := a.pal
 	edit := a.can(spaceID, "file.edit")
+	a.warmFileHandlers(spaceID)
 	ui.Row(c.Key("files-head")).Height(36).Gap(2).AlignItems(ui.Center).Padding(0, 6, 0, 12).Children(func() {
 		ui.Text(c, m("files_title")).FontSize(12).FontWeight(600).Grow(1)
 		if a.uploading > 0 {
