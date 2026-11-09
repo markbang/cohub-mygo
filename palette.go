@@ -49,6 +49,7 @@ type paletteItem struct {
 	sub      string
 	owner    *Profile
 	avatar   string
+	seed     string
 	time     string
 	pinned   bool
 	choose   func()
@@ -72,7 +73,7 @@ func (a *app) paletteItems() []paletteItem {
 			desc = "Space"
 		}
 		return paletteItem{
-			key: "space:" + sp.ID, title: sp.Name, sub: oneLine(desc), owner: sp.OwnerProfile, avatar: sp.avatar(),
+			key: "space:" + sp.ID, title: sp.Name, sub: oneLine(desc), owner: sp.OwnerProfile, avatar: sp.avatar(), seed: sp.ID,
 			time: dateTime(sp.activity(), now), pinned: sp.IsPinned,
 			choose: func() { a.openSpace(sp.ID) },
 		}
@@ -116,7 +117,7 @@ func (a *app) paletteItems() []paletteItem {
 			name, av := a.spaceName(se.SpaceID)
 			sess := se
 			items = append(items, paletteItem{
-				key: "session:" + se.ID, title: se.displayTitle(), sub: name, avatar: av, owner: se.UserProfile,
+				key: "session:" + se.ID, title: se.displayTitle(), sub: name, avatar: av, seed: se.SpaceID, owner: se.UserProfile,
 				time: dateTime(se.when(), now), choose: func() { a.openSession(sess) },
 			})
 		}
@@ -245,7 +246,11 @@ func (a *app) paletteRow(c *ui.Context, it paletteItem, sel bool, choose func())
 				ui.Icon(c, icon("plus")).Size(16, 16).TextColor(p.brand)
 			})
 		} else {
-			a.avatar(c, it.avatar, it.title, 36, 8)
+			name := it.title
+			if strings.HasPrefix(it.key, "session:") {
+				name = it.sub
+			}
+			a.avatarSeed(c, it.avatar, name, it.seed, 36, 8)
 		}
 		ui.Column(c).Grow(1).MinWidth(0).Gap(3).Children(func() {
 			ui.Text(c, it.title).FontSize(14).FontWeight(500).SingleLine()

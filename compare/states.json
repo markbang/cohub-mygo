@@ -77,7 +77,8 @@
   "path": "/spaces",
   "actions": [
    {
-    "click": "全部 Space"
+    "click": "全部 Space",
+    "wait": 2500
    }
   ]
  },
@@ -274,7 +275,8 @@
   "path": "/spaces",
   "actions": [
    {
-    "click": "置顶"
+    "click": "置顶",
+    "wait": 2500
    }
   ]
  },

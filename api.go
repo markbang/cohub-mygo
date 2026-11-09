@@ -48,6 +48,7 @@ type Space struct {
 	CreatedAt          time.Time      `json:"createdAt"`
 	LastActivityAt     time.Time      `json:"lastActivityAt"`
 	PersonalActivityAt time.Time      `json:"personalActivityAt"`
+	JoinedAt           time.Time      `json:"joinedAt"`
 	PublicProfile      *publicProfile `json:"publicProfile"`
 	OwnerProfile       *Profile       `json:"ownerProfile"`
 	SandboxStatus      string         `json:"sandboxStatus"`

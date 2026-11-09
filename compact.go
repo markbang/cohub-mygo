@@ -74,7 +74,7 @@ func (a *app) compactChats(c *ui.Context) {
 			s := list[i]
 			row := ui.Row(c.Key(s.ID)).Gap(12).AlignItems(ui.Center).Height(68).Padding(0, 20).Children(func() {
 				name, av := a.spaceName(s.SpaceID)
-				a.avatar(c, av, name, 40, 10)
+				a.avatarSeed(c, av, name, s.SpaceID, 40, 10)
 				ui.Column(c).Grow(1).MinWidth(0).Gap(4).Children(func() {
 					ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
 						ui.Text(c, s.displayTitle()).FontSize(16).FontWeight(500).SingleLine().Grow(1).MinWidth(0)

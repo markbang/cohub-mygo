@@ -32,7 +32,7 @@ func (a *app) sessionView(c *ui.Context) {
 			if a.route.area() == areaChats && !a.compact {
 				name, av := a.spaceName(s.SpaceID)
 				crumb := ui.Row(c.Key("crumb")).Gap(6).AlignItems(ui.Center).Shrink(0).MaxWidth(220).Cursor(ui.CursorPointer).Children(func() {
-					a.avatar(c, av, name, 18, 4)
+					a.avatarSeed(c, av, name, s.SpaceID, 18, 4)
 					ui.Text(c, name).FontSize(13).SingleLine().TextColor(p.text)
 				})
 				crumb.OnClick(func() { a.openSpace(s.SpaceID) })

@@ -53,6 +53,8 @@ type palette struct {
 	warning ui.Color
 	info    ui.Color
 
+	identity [8]ui.Color // --identity-1…8, the avatar tones
+
 	popBg   ui.Color // the palette's panel
 	popHead ui.Color
 }

@@ -103,7 +103,7 @@ func (a *app) spaceChip(c *ui.Context, id, name, avatar string) {
 	on := a.chip == id
 	b := ui.ButtonBase(c.Key("chip-"+id)).Row().Gap(5).AlignItems(ui.Center).Height(26).Padding(0, 6).Radius(6).Label(name).FocusRing(false).Children(func() {
 		if id != "" {
-			a.avatar(c, avatar, name, 16, 4)
+			a.avatarSeed(c, avatar, name, id, 16, 4)
 		}
 		col := p.textSecond
 		if on {
@@ -131,7 +131,7 @@ func (a *app) sessionRow(c *ui.Context, s *Session) {
 	now := a.now()
 	row := ui.Row(c.Key(s.ID)).Gap(10).AlignItems(ui.Center).Height(52).Padding(0, 6).Radius(6).Children(func() {
 		name, av := a.spaceName(s.SpaceID)
-		a.avatar(c, av, name, 36, 8)
+		a.avatarSeed(c, av, name, s.SpaceID, 36, 8)
 		ui.Column(c).Grow(1).MinWidth(0).Gap(2).Children(func() {
 			ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
 				ui.Text(c, s.displayTitle()).FontSize(14).FontWeight(500).SingleLine().Grow(1).MinWidth(0)
@@ -232,7 +232,7 @@ func (a *app) spaceSidebar(c *ui.Context) {
 	}
 	ui.Column(c).Shrink(0).BorderWidth(1, 0, 1, 0).BorderColor(p.borderSubtle).Padding(0, 6).Children(func() {
 		sw := ui.Row(c.Key("switcher")).Gap(8).AlignItems(ui.Center).Height(46).Padding(0, 6).Radius(6).Children(func() {
-			a.avatar(c, av, name, 26, 6)
+			a.avatarSeed(c, av, name, spaceID, 26, 6)
 			ui.Text(c, name).FontSize(13).FontWeight(500).SingleLine().Grow(1).MinWidth(0)
 			ui.Icon(c, icon("chevron-down")).Size(14, 14).TextColor(p.textTertiary)
 		})

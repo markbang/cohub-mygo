@@ -2,6 +2,7 @@ package main
 
 import (
 	"embed"
+	"fmt"
 	"math"
 	"regexp"
 	"strconv"
@@ -381,6 +382,13 @@ func buildPalette(name, custom string) *palette {
 			if c, ok := parseColor(v, vars); ok {
 				*f.field(p) = c.color()
 			}
+		}
+	}
+	for i := range p.identity {
+		if c, ok := parseColor(fmt.Sprintf("var(--identity-%d)", i+1), vars); ok {
+			p.identity[i] = c.color()
+		} else {
+			p.identity[i] = p.textTertiary
 		}
 	}
 	font := resolveVar(vars["font-sans"], vars, 0)

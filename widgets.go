@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf16"
 
 	"github.com/egoist/mygo/ui"
 )
@@ -90,24 +91,42 @@ func preview(s string) string {
 	return oneLine(s)
 }
 
+// initials is avatar-initials.ts: two letters for Latin-like names (from
+// two words, else the first word), one glyph for CJK or emoji.
 func initials(name string) string {
-	var out []rune
-	for _, w := range strings.Fields(name) {
-		r := []rune(w)
-		out = append(out, unicode.ToUpper(r[0]))
-		if len(out) == 2 {
-			break
+	var words [][]rune
+	var cur []rune
+	for _, r := range name {
+		if unicode.IsLetter(r) || unicode.IsNumber(r) || wide(r) {
+			cur = append(cur, r)
+		} else if len(cur) > 0 {
+			words, cur = append(words, cur), nil
 		}
 	}
-	if len(out) == 1 {
-		if r := []rune(strings.Fields(name)[0]); len(r) > 1 {
-			out = append(out, unicode.ToUpper(r[1]))
-		}
+	if len(cur) > 0 {
+		words = append(words, cur)
 	}
-	if len(out) == 0 {
-		return "?"
+	if len(words) == 0 {
+		return "SP"
 	}
-	return string(out)
+	first := words[0][0]
+	if wide(first) {
+		return string(first)
+	}
+	var second rune
+	if len(words) > 1 && !wide(words[1][0]) {
+		second = words[1][0]
+	} else if len(words[0]) > 1 && !wide(words[0][1]) {
+		second = words[0][1]
+	}
+	if second == 0 {
+		return strings.ToUpper(string(first))
+	}
+	return strings.ToUpper(string([]rune{first, second}))
+}
+
+func wide(r rune) bool {
+	return unicode.In(r, unicode.Han, unicode.Hiragana, unicode.Katakana, unicode.Hangul, unicode.Bopomofo) || r >= 0x1F300
 }
 
 func hue(s string) float32 {
@@ -118,17 +137,72 @@ func hue(s string) float32 {
 
 // avatar draws a picture from url, or initials on a tint of the name's hue.
 func (a *app) avatar(c *ui.Context, url, name string, size, radius float32) ui.Element {
+	return a.avatarSeed(c, url, name, name, size, radius)
+}
+
+// avatarSeed is Avatar.svelte: the image, or a tile toned by the seed (a
+// Space's id) with the name's monogram. A radius under half the size asks
+// for a tile, which takes the web's radius for that size.
+func (a *app) avatarSeed(c *ui.Context, url, name, seed string, size, radius float32) ui.Element {
+	p := a.pal
+	if radius*2 < size {
+		radius = tileRadius(size)
+	}
 	if bmp := a.images.get(url); bmp != nil {
-		return ui.Image(c, bmp).Size(size, size).Fit(ui.Cover).Radius(radius).Border(1, a.pal.borderSubtle.Alpha(0.6))
+		return ui.Image(c, bmp).Size(size, size).Fit(ui.Cover).Radius(radius).Border(1, p.borderSubtle)
 	}
-	h := hue(name)
-	bg, fg := ui.Oklch(0.94, 0.035, h), ui.Oklch(0.48, 0.11, h)
-	if a.pal.dark {
-		bg, fg = ui.Oklch(0.32, 0.05, h), ui.Oklch(0.82, 0.09, h)
+	mark := initials(name)
+	tone := p.identity[identityTone(seed)]
+	pair, single := monoSizes(size)
+	fs, fw := pair, 600
+	if len([]rune(mark)) == 1 {
+		fs, fw = single, 500
 	}
-	return ui.Box(c).Size(size, size).Radius(radius).Background(bg).Center().Children(func() {
-		ui.Text(c, initials(name)).FontSize(size * 0.36).FontWeight(600).TextColor(fg).Font(fontMono).SingleLine()
+	return ui.Box(c).Size(size, size).Radius(radius).Background(p.bgPrimary.MixOklab(tone, 0.16)).
+		Border(1, tone.Alpha(0.24)).Center().Shrink(0).Children(func() {
+		ui.Text(c, mark).FontSize(fs).FontWeight(fw).TextColor(tone).SingleLine()
 	})
+}
+
+// identityTone is avatar-identity.ts: FNV-1a over the seed's UTF-16 units,
+// one of eight tones.
+func identityTone(seed string) int {
+	seed = strings.TrimSpace(seed)
+	h := uint32(0x811c9dc5)
+	for _, u := range utf16.Encode([]rune(seed)) {
+		h ^= uint32(u)
+		h *= 0x01000193
+	}
+	return int(h % 8)
+}
+
+// tileRadius and monoSizes are Avatar.svelte's SIZES.
+func tileRadius(size float32) float32 {
+	switch {
+	case size <= 16:
+		return 5
+	case size <= 20:
+		return 6
+	case size <= 28:
+		return 8
+	case size <= 40:
+		return 10
+	}
+	return 14
+}
+
+func monoSizes(size float32) (pair, single float32) {
+	switch {
+	case size <= 16:
+		return 7, 9
+	case size <= 20:
+		return 8, 11
+	case size <= 28:
+		return 11, 14
+	case size <= 40:
+		return 13, 18
+	}
+	return 17, 24
 }
 
 // iconButton is a square, quiet button showing an icon, as the web's
@@ -242,13 +316,15 @@ func (a *app) menuWidth(c *ui.Context, anchor ui.Element, open *bool, width floa
 			if row.Hovered() {
 				row.Background(p.hover)
 			}
-			run := it.run
-			row.Cursor(ui.CursorPointer).OnClick(func() {
+			// Clicked, not OnClick: OnClick runs after the build, when the
+			// caller has already stored *open.
+			row.Cursor(ui.CursorPointer)
+			if row.Clicked() {
 				*open = false
-				if run != nil {
-					run()
+				if it.run != nil {
+					it.run()
 				}
-			})
+			}
 		}
 	})
 }

@@ -96,6 +96,8 @@ func TestSpacesDirectoryOpensSpace(t *testing.T) {
 	if a.route.kind != routeSpaces || !tt.HasText("全部 Space") || !tt.HasText("Personal Home Space") {
 		t.Fatalf("route %v, texts %q", a.route, tt.Texts())
 	}
+	tt.Advance(time.Second)
+	tt.Frame()
 	snapshot(t, tt, "desktop-spaces-light")
 	if err := tt.Click("Personal Home Space"); err != nil {
 		t.Fatal(err)
@@ -240,6 +242,7 @@ func TestCompare(t *testing.T) {
 			}
 			a.route, a.back = route{kind: -1}, nil
 			a.palette, a.menus, a.userMenu, a.compactNav, a.panelTab = paletteState{}, map[string]bool{}, false, false, 0
+			a.sidebarOpen, a.spacesNav, a.spaceList = true, 0, ui.ListState{}
 			a.theme = "light"
 			if s.Dark {
 				a.theme = "dark"
@@ -360,4 +363,29 @@ func TestEnglish(t *testing.T) {
 		}
 	}
 	snapshot(t, tt, "desktop-chat-en")
+}
+
+func TestSpaceRowMenuArchives(t *testing.T) {
+	a := demoApp(t)
+	tt := ui.NewTester(a.view, 1440, 900)
+	tt.Click("Space")
+	list := a.filteredSpaces(0, "")
+	var target *Space
+	for _, s := range list {
+		if !s.IsPinned {
+			target = s
+			break
+		}
+	}
+	if target == nil {
+		t.Skip("every demo Space is pinned")
+	}
+	a.menus["space-row:"+target.ID] = true
+	tt.Frame()
+	if err := tt.Click(m("spaces_archive")); err != nil {
+		t.Fatal(err)
+	}
+	if !target.IsArchived || a.menus["space-row:"+target.ID] {
+		t.Fatalf("%s not archived, or the menu stayed open; route %v menus %v", target.Name, a.route, a.menus)
+	}
 }

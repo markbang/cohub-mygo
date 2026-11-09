@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/egoist/mygo/ui"
 )
@@ -21,7 +22,7 @@ func (a *app) spacesView(c *ui.Context) {
 			a.logo(c, 30)
 			ui.Text(c, "Space").FontSize(17).FontWeight(600).Grow(1).MarginStart(6)
 		} else {
-			ui.Spacer(c)
+			ui.Text(c, m("spaces_title")).FontSize(13).FontWeight(600).Grow(1).SingleLine()
 		}
 		a.iconButton(c.Key("search"), "search", m("command_placeholder_space"), false).OnClick(func() { a.palette.open(paletteSpaces) })
 		add := ui.ButtonBase(c.Key("new-space")).Size(28, 28).Center().Radius(6).Label(m("spaces_new")).FocusRing(false).Children(func() {
@@ -60,28 +61,61 @@ func (a *app) spacesView(c *ui.Context) {
 	if a.compact {
 		size = 40
 	}
+	// The open row menu is drawn after the list, so the list's rows do not
+	// clip it.
+	var menuAt ui.Element
+	var menuSpace *Space
 	ui.List(c.Key("spaces"), &a.spaceList, len(list), func(i int) {
 		sp := list[i]
-		row := ui.Row(c.Key(sp.ID)).Gap(10).AlignItems(ui.Center).Padding(8, 6).Radius(6).Children(func() {
-			a.avatar(c, sp.avatar(), sp.Name, size, 8)
-			ui.Column(c).Grow(1).MinWidth(0).Gap(3).Children(func() {
-				fs := float32(14)
+		rowH := float32(52)
+		if a.compact {
+			rowH = 60
+		}
+		row := ui.Row(c.Key(sp.ID)).Gap(10).AlignItems(ui.Center).Height(rowH).Padding(0, 6).Radius(6)
+		row.Children(func() {
+			a.avatarSeed(c, sp.avatar(), sp.Name, sp.ID, size, 8)
+			ui.Column(c).Grow(1).MinWidth(0).Gap(2).Children(func() {
+				fs, sub, meta := float32(14), float32(12), float32(11)
 				if a.compact {
-					fs = 16
+					fs, sub, meta = 16, 14, 12
 				}
-				ui.Text(c, sp.Name).FontSize(fs).SingleLine()
-				desc := sp.Description
-				if desc == "" {
-					desc = m("spaces_row_no_description")
+				ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
+					ui.Text(c, sp.Name).FontSize(fs).FontWeight(500).LineHeight((fs + 4) / fs).SingleLine().Grow(1).MinWidth(0)
+					if sp.IsPinned && a.spacesNav != 3 {
+						ui.Icon(c, icon("pin")).Size(12, 12).TextColor(p.placeholder)
+					}
+					ui.Text(c, relTime(sp.LastActivityAt, now)).FontSize(meta).TextColor(p.placeholder).Shrink(0)
+				})
+				desc, quiet := spaceSubtitle(sp)
+				col := p.textTertiary
+				if quiet {
+					col = p.placeholder
 				}
-				ui.Text(c, oneLine(desc)).FontSize(fs - 2).TextColor(p.textTertiary).SingleLine()
+				ui.Text(c, oneLine(desc)).FontSize(sub).LineHeight((sub + 4) / sub).TextColor(col).SingleLine()
 			})
-			ui.Row(c).Gap(6).AlignItems(ui.Center).AlignSelf(ui.Start).Margin(4, 0, 0, 0).Shrink(0).Children(func() {
-				if sp.IsPinned {
-					ui.Icon(c, icon("pin")).Size(12, 12).TextColor(p.textTertiary)
+			if !a.compact {
+				key := "space-row:" + sp.ID
+				open := a.menus[key]
+				more := ui.ButtonBase(c.Key("more")).Size(28, 28).Center().Radius(6).Label(m("inline_more_actions")).FocusRing(false).Children(func() {
+					col := p.textTertiary
+					if open {
+						col = p.text
+					}
+					ui.Icon(c, icon("ellipsis")).Size(16, 16).TextColor(col)
+				})
+				if !open && !row.Hovered() {
+					more.Opacity(0)
 				}
-				ui.Text(c, relTime(sp.activity(), now)).FontSize(11).TextColor(p.textTertiary)
-			})
+				if open || more.Hovered() {
+					more.Background(p.active)
+				}
+				if more.Clicked() {
+					a.menus[key] = !open
+				}
+				if open {
+					menuAt, menuSpace = more, sp
+				}
+			}
 		})
 		a.pressable(row, false)
 		row.OnClick(func() { a.openSpace(sp.ID) })
@@ -90,6 +124,36 @@ func (a *app) spacesView(c *ui.Context) {
 			ui.Text(c, m("x_no_spaces")).FontSize(13).TextColor(p.textTertiary).Padding(20)
 		}
 	})
+	if menuSpace != nil {
+		a.spaceRowMenu(c, menuAt, menuSpace)
+	}
+}
+
+// spaceRowMenu is SpaceRowMenu.svelte.
+func (a *app) spaceRowMenu(c *ui.Context, anchor ui.Element, sp *Space) {
+	key := "space-row:" + sp.ID
+	open := a.menus[key]
+	pin, arch := "pin", "archive"
+	pinL, archL := m("command_pin"), m("spaces_archive")
+	if sp.IsPinned {
+		pin, pinL = "pin-off", m("command_unpin")
+	}
+	if sp.IsArchived {
+		arch, archL = "archive-restore", m("spaces_unarchive")
+	}
+	items := []menuItem{
+		{icon: pin, label: pinL, run: func() { a.setSpacePinned(sp.ID, !sp.IsPinned) }},
+		{icon: arch, label: archL, run: func() { a.setSpaceArchived(sp.ID, !sp.IsArchived) }},
+		{icon: "tag", label: m("spaces_label_add") + "…"},
+		{icon: "wallet", label: m("wallet_title"), run: func() { a.go_(route{kind: routeSpaceWallet, space: sp.ID}) }},
+	}
+	if sp.Relation != "public" {
+		items = append(items, menuItem{icon: "settings", label: m("sidebar_space_settings"), run: func() { a.go_(route{kind: routeSpaceSettings, space: sp.ID}) }})
+	}
+	items[len(items)-1].divider = true
+	items = append(items, menuItem{icon: "circle-check", label: m("spaces_select")})
+	a.menuWidth(c, anchor, &open, 200, items)
+	a.menus[key] = open
 }
 
 // spaceHome is a Space with no chat open: its card, and the composer
@@ -120,7 +184,7 @@ func (a *app) spaceHome(c *ui.Context) {
 				return
 			}
 			ui.Row(c).Gap(16).AlignItems(ui.Center).Children(func() {
-				a.avatar(c, sp.avatar(), sp.Name, 48, 8)
+				a.avatarSeed(c, sp.avatar(), sp.Name, sp.ID, 48, 8)
 				ui.Column(c).Gap(2).MinWidth(0).Children(func() {
 					ui.Row(c).Gap(10).AlignItems(ui.Center).Children(func() {
 						ui.Text(c, sp.Name).FontSize(34).FontWeight(600).LetterSpacing(-0.5).SingleLine()
@@ -163,4 +227,19 @@ func compactCount(n int64) string {
 		return fmt.Sprintf("%.1fK", float64(n)/1e3)
 	}
 	return fmt.Sprint(n)
+}
+
+// spaceSubtitle is the row's second line: the description, else the
+// owner's handle for a Space someone else owns (SpacesListPane subtitleOf).
+func spaceSubtitle(sp *Space) (string, bool) {
+	if d := strings.TrimSpace(sp.Description); d != "" {
+		return d, false
+	}
+	if o := sp.OwnerProfile; sp.Relation != "" && sp.Relation != "owner" && o != nil {
+		if h := strings.TrimSpace(o.Username); h != "" {
+			return "@" + h, true
+		}
+		return strings.TrimSpace(o.DisplayName), true
+	}
+	return m("spaces_row_no_description"), true
 }

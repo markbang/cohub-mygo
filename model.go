@@ -538,9 +538,19 @@ func (a *app) filteredSpaces(nav int, query string) []*Space {
 		}
 		out = append(out, s)
 	}
-	if nav == 1 {
-		sort.SliceStable(out, func(i, j int) bool { return strings.ToLower(out[i].Name) < strings.ToLower(out[j].Name) })
+	// The web sorts "recent" by the user's own activity and every other
+	// filter by when they joined the Space (spaces-filter.ts).
+	at := func(s *Space) time.Time { return s.JoinedAt }
+	if nav == 0 {
+		at = (*Space).activity
 	}
+	sort.SliceStable(out, func(i, j int) bool {
+		ti, tj := at(out[i]), at(out[j])
+		if !ti.Equal(tj) {
+			return ti.After(tj)
+		}
+		return out[i].ID > out[j].ID
+	})
 	return out
 }
 
@@ -718,4 +728,56 @@ func (a *app) loadCustomTheme() {
 			os.WriteFile(path, []byte(css), 0o644)
 		}
 	}
+}
+
+// setSpacePinned and setSpaceArchived are space-pins.svelte.ts: flip the
+// flags at once, then write the system labels, putting them back if the
+// write fails. Pinning unarchives and archiving unpins.
+func (a *app) setSpacePinned(id string, pinned bool) {
+	patch := map[string]any{"removeLabelRefs": []string{"Pinned"}}
+	if pinned {
+		patch = map[string]any{"addLabelRefs": []string{"Pinned"}, "removeLabelRefs": []string{"Archived"}}
+	}
+	a.setSpaceFlags(id, func(s *Space) {
+		s.IsPinned = pinned
+		if pinned {
+			s.IsArchived = false
+		}
+	}, patch)
+}
+
+func (a *app) setSpaceArchived(id string, archived bool) {
+	patch := map[string]any{"removeLabelRefs": []string{"Archived"}}
+	if archived {
+		patch = map[string]any{"addLabelRefs": []string{"Archived"}, "removeLabelRefs": []string{"Pinned"}}
+	}
+	a.setSpaceFlags(id, func(s *Space) {
+		s.IsArchived = archived
+		if archived {
+			s.IsPinned = false
+		}
+	}, patch)
+}
+
+func (a *app) setSpaceFlags(id string, flip func(*Space), patch map[string]any) {
+	sp := a.space(id)
+	if sp == nil {
+		return
+	}
+	pinned, archived := sp.IsPinned, sp.IsArchived
+	flip(sp)
+	if a.api == nil {
+		return
+	}
+	patch["resourceRefs"] = []string{id}
+	a.spawn(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := a.api.do(ctx, "PATCH", "/api/me/resources/space/labels/batch", patch, nil); err != nil {
+			a.update(func() {
+				sp.IsPinned, sp.IsArchived = pinned, archived
+				a.status = m("x_error") + ": " + err.Error()
+			})
+		}
+	})
 }

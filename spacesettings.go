@@ -156,7 +156,7 @@ func (a *app) spaceProfile(c *ui.Context, d *spaceDetail) {
 			av = d.PublicProfile.AvatarURL
 		}
 		ui.Column(c).Width(64).AlignItems(ui.Center).Gap(6).Children(func() {
-			a.avatar(c, av, d.Name, 56, 28)
+			a.avatarSeed(c, av, d.Name, a.route.space, 56, 28)
 			ui.Row(c).Gap(4).AlignItems(ui.Center).Children(func() {
 				ui.Icon(c, icon("upload")).Size(12, 12).TextColor(p.textTertiary)
 				ui.Text(c, m("space_change")).FontSize(11).TextColor(p.textTertiary)
