@@ -1,0 +1,5 @@
+{
+  "name": "Cohub",
+  "identifier": "live.cohub.desktop",
+  "urlSchemes": ["cohub"]
+}
