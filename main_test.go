@@ -255,6 +255,7 @@ func TestCompare(t *testing.T) {
 			a.palette, a.menus, a.userMenu, a.compactNav, a.panelTab = paletteState{}, map[string]bool{}, false, false, 0
 			a.sidebarOpen, a.spacesNav, a.spaceList = true, 0, ui.ListState{}
 			a.shareOpen, a.statsFor, a.labelTarget, a.renaming = false, "", nil, ""
+			a.draft = ""
 			a.theme = "light"
 			if s.Dark {
 				a.theme = "dark"
@@ -295,6 +296,8 @@ func TestCompare(t *testing.T) {
 					tt.TypeKey(ui.Cmd, ui.KeyK, "")
 				case act["scroll"] != nil:
 					tt.Scroll(float32(w)/2, float32(h)/2, 0, float32(act["scroll"].(float64)))
+				case act["type"] != nil:
+					tt.Type(act["type"].(string))
 				}
 				settle()
 			}

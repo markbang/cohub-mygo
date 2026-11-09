@@ -476,5 +476,45 @@
     "wait": 2500
    }
   ]
+ },
+ {
+  "name": "composer-slash",
+  "path": "/spaces/{SPACE}",
+  "actions": [
+   {
+    "css": "textarea",
+    "wait": 500
+   },
+   {
+    "type": "/",
+    "wait": 2500
+   }
+  ],
+  "app": [
+   {
+    "type": "/",
+    "wait": 2500
+   }
+  ]
+ },
+ {
+  "name": "composer-mention",
+  "path": "/spaces/{SPACE}",
+  "actions": [
+   {
+    "css": "textarea",
+    "wait": 500
+   },
+   {
+    "type": "@rou",
+    "wait": 2500
+   }
+  ],
+  "app": [
+   {
+    "type": "@rou",
+    "wait": 2500
+   }
+  ]
  }
 ]

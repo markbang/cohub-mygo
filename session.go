@@ -669,7 +669,15 @@ func (a *app) composer(c *ui.Context, running bool) {
 			if !a.compact {
 				in.AutoFocus()
 			}
+			if a.draftCaret >= 0 {
+				in.SetTextSelection(a.draftCaret, a.draftCaret)
+				a.draftCaret = -1
+			}
+			menuKey := a.composerMenus(c, in)
 			in.OnTextKey(func(k ui.TextKey) bool {
+				if menuKey != nil && menuKey(k) {
+					return true
+				}
 				if k.Key == ui.KeyEnter && k.Mods == 0 && !a.compact {
 					a.draft = k.Text()
 					a.send()

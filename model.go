@@ -109,6 +109,8 @@ type app struct {
 	commerce                     *commerceForm
 	harnesses                    map[string]harnessState // the composer's harness by chat or Space
 	newLabelFor, newLabelName    string
+	compMenu                     composerMenu
+	draftCaret                   int
 	inviteBusy                   bool
 	inviteErr                    string
 	selectedSpaces               map[string]bool
@@ -173,6 +175,7 @@ func newApp() *app {
 		boardViews:     map[string]*boardView{},
 		harnesses:      map[string]harnessState{},
 		selectedSpaces: map[string]bool{},
+		draftCaret:     -1,
 		spaceEdits:     map[string]*spaceEdit{},
 		walletForms:    map[string]*walletForm{},
 		panelOpen:      true,
