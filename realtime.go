@@ -151,6 +151,8 @@ func (rt *realtime) handle(env wsEnvelope) {
 			rt.rooms[r] = true
 		}
 		rt.mu.Unlock()
+	case env.Type == "desktop.command.dispatched":
+		rt.a.update(func() { rt.a.desktopCommandDispatched(env.Payload) })
 	case env.Type == "session.turn.notify":
 		rt.a.turnNotified(env.Payload)
 		rt.dueLists()

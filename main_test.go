@@ -675,3 +675,37 @@ func TestDisplayWindow(t *testing.T) {
 		t.Fatalf("inputs %q", inputs)
 	}
 }
+
+// TestDesktopCommand opens the file an agent asks this client to show,
+// and reports it applied.
+func TestDesktopCommand(t *testing.T) {
+	var calls []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls = append(calls, r.Method+" "+r.URL.Path+" "+r.Header.Get("X-Cohub-Source-Client"))
+		if strings.HasSuffix(r.URL.Path, "/accept") {
+			w.Write([]byte(`{"accepted":true}`))
+			return
+		}
+		w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+	a := demoApp(t)
+	a.api = &client{base: srv.URL, http: srv.Client(), token: "x", expires: time.Now().Add(time.Hour), clientID: "mygo-test-client"}
+	a.sync = true
+	id := a.spaces[0].ID
+	payload := fmt.Sprintf(`{"commandId":"c1","targetClientId":"mygo-test-client","command":{"type":"desktop.open","target":{"kind":"file","path":"docs/a.md"}},"source":{"spaceId":%q}}`, id)
+	a.desktopCommandDispatched([]byte(payload))
+	a.flush()
+	if a.route.file() != "docs/a.md" || a.route.space != id {
+		t.Fatalf("route %+v", a.route)
+	}
+	if len(calls) < 2 || !strings.HasSuffix(calls[1], "/result mygo-test-client") {
+		t.Fatalf("calls %q", calls)
+	}
+	n := len(calls)
+	a.desktopCommandDispatched([]byte(strings.Replace(payload, `"mygo-test-client"`, `"other"`, 1)))
+	a.flush()
+	if len(calls) != n {
+		t.Fatal("ran another client's command")
+	}
+}

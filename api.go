@@ -374,8 +374,9 @@ type Me struct {
 // client talks to the Cohub API with the account of the `cohub` CLI, the
 // one the desktop shells share.
 type client struct {
-	base string
-	http *http.Client
+	base     string
+	http     *http.Client
+	clientID string // this install's, as X-Cohub-Source-Client
 
 	mu      sync.Mutex
 	token   string
@@ -391,7 +392,7 @@ type cliAuth struct {
 var errNoAccount = errors.New("no Cohub account: run `cohub auth login`")
 
 func newClient() (*client, error) {
-	cl := &client{base: "https://api.cohub.live", http: &http.Client{Timeout: 30 * time.Second}}
+	cl := &client{base: "https://api.cohub.live", http: &http.Client{Timeout: 30 * time.Second}, clientID: clientID()}
 	if v := os.Getenv("COHUB_API_URL"); v != "" {
 		cl.base = strings.TrimRight(v, "/")
 	}
@@ -457,6 +458,9 @@ func (cl *client) do(ctx context.Context, method, path string, body, out any) er
 	}
 	req.Header.Set("Authorization", "Bearer "+tok)
 	req.Header.Set("X-Cohub-Source-Via", "desktop-mygo")
+	if cl.clientID != "" {
+		req.Header.Set("X-Cohub-Source-Client", cl.clientID)
+	}
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
