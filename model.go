@@ -77,7 +77,8 @@ type app struct {
 	purchase     purchaseState
 	redeem       redeemState
 	subsPage     int
-	compactPanel bool // the side panel, over the chat in the compact shell
+	mediaFilter  string // the media panel's type: all, image, video, audio
+	compactPanel bool   // the side panel, over the chat in the compact shell
 	panelOpen    bool
 	userMenu     bool
 	palette      paletteState
@@ -121,6 +122,7 @@ func newApp() *app {
 		images:        newImageCache(),
 		sidebarOpen:   true,
 		chats:         chatsFilter{source: "web"},
+		mediaFilter:   "all",
 		chipChats:     map[string][]*Session{},
 		panelOpen:     true,
 		pal:           lightPalette(),
@@ -731,6 +733,9 @@ func (ic *imageCache) fetch(url string) (*ui.Bitmap, error) {
 	b, err := io.ReadAll(io.LimitReader(res.Body, 8<<20))
 	if err != nil {
 		return nil, err
+	}
+	if isWebP(b) {
+		return decodeWebP(b)
 	}
 	return ui.DecodeBitmap(b)
 }

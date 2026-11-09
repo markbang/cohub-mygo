@@ -168,8 +168,22 @@ func (a *app) rightPanel(c *ui.Context) {
 	if a.compact {
 		width = 0
 	}
-	tabs := []struct{ icon, label string }{{"message-square", m("side_panel_tab_session")}, {"copy", m("resource_app_files")}, {"images", m("side_panel_tab_media")}, {"layout-template", m("side_panel_tab_apps")}}
-	col := ui.Column(c).Shrink(0).Background(p.bgPrimary).BorderWidth(0, 0, 0, 1).BorderColor(p.borderSubtle)
+	tabs := []struct{ icon, label string }{{"message-square", m("side_panel_tab_session")}, {"files", m("files_title")}, {"images", m("side_panel_tab_media")}, {"panels-top-left", m("side_panel_tab_apps")}}
+	if a.can(a.currentSpace(), "cronjob.view") {
+		tabs = append(tabs, struct{ icon, label string }{"clock", m("side_panel_tab_scheduled")})
+	}
+	if a.panelTab >= len(tabs) {
+		a.panelTab = 0
+	}
+	// The tab bar drops its icons once the tabs overflow it.
+	icons := len(tabs) <= 4
+	// The panel shows the page's content color through; the file tree
+	// lays its own primary background over the whole panel.
+	bg := p.bgContent
+	if a.panelTab == 1 {
+		bg = p.bgPrimary
+	}
+	col := ui.Column(c).Shrink(0).Background(bg).BorderWidth(0, 0, 0, 1).BorderColor(p.borderSubtle)
 	if width > 0 {
 		col.Width(width)
 	} else {
@@ -178,23 +192,28 @@ func (a *app) rightPanel(c *ui.Context) {
 	col.Children(func() {
 		ui.Row(c).Height(headerHeight).Shrink(0).AlignItems(ui.Center).Padding(0, 8+bar.Right, 0, 8).Gap(2).DragWindow().Children(func() {
 			for i, t := range tabs {
-				if i > 0 {
-					ui.Box(c).Width(1).Height(12).Background(p.borderSubtle).Margin(0, 3)
+				if i == 1 {
+					ui.Box(c).Width(1).Height(14).Background(p.borderSubtle).Margin(0, 4)
 				}
 				on := a.panelTab == i
-				b := ui.ButtonBase(c.Key(t.label)).Row().Gap(5).AlignItems(ui.Center).Height(26).Padding(0, 6).Radius(6).Label(t.label).FocusRing(false).Children(func() {
+				// .tab-key: 28px, 11px medium, the chosen one on a raised pill.
+				b := ui.ButtonBase(c.Key(t.label)).Row().Gap(6).AlignItems(ui.Center).Height(28).Padding(0, 8).Radius(5).Label(t.label).FocusRing(false)
+				hover := b.Hovered()
+				b.Children(func() {
 					col := p.textTertiary
-					if on {
+					switch {
+					case on:
 						col = p.text
+					case hover:
+						col = p.textSecond
 					}
-					ui.Icon(c, icon(t.icon)).Size(13, 13).TextColor(col)
-					txt := ui.Text(c, t.label).FontSize(12).TextColor(col).SingleLine()
-					if on {
-						txt.FontWeight(600)
+					if icons {
+						ui.Icon(c, icon(t.icon)).Size(14, 14).TextColor(col)
 					}
+					ui.Text(c, t.label).FontSize(11).FontWeight(500).TextColor(col).SingleLine()
 				})
-				if b.Hovered() && !on {
-					b.Background(p.hover)
+				if on {
+					b.Background(p.tabKeyBg)
 				}
 				if b.Clicked() {
 					a.panelTab = i

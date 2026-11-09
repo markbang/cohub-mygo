@@ -317,5 +317,24 @@
     "click": "兑换"
    }
   ]
+ },
+ {
+  "name": "panel-media-grid",
+  "path": "/spaces/{MEDIA_SPACE}",
+  "actions": [
+   {
+    "click": "媒体",
+    "wait": 2500
+   }
+  ],
+  "app": [
+   {
+    "clickLabel": "媒体"
+   }
+  ]
+ },
+ {
+  "name": "panel-session-outputs",
+  "path": "/spaces/{SPACE_MOBILE}/sessions/{FILES_SESSION}"
  }
 ]

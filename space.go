@@ -265,29 +265,15 @@ func (a *app) panelContent(c *ui.Context) {
 			return
 		}
 	case 2:
-		ui.Row(c.Key("media-tabs")).Gap(2).Padding(8, 8, 0, 8).Children(func() {
-			for i, l := range []string{m("sidebar_all"), m("media_filter_image"), m("media_filter_video"), m("media_filter_audio")} {
-				b := ui.ButtonBase(c.Key(l)).Height(24).Padding(0, 6).Radius(5).Center().FocusRing(false).Children(func() {
-					col := p.textTertiary
-					if i == 0 {
-						col = p.text
-					}
-					t := ui.Text(c, l).FontSize(11).TextColor(col)
-					if i == 0 {
-						t.FontWeight(600)
-					}
-				})
-				_ = b
-			}
-		})
-		ui.Column(c.Key("media-empty")).Padding(16).Gap(10).Children(func() {
-			ui.Text(c, m("x_media_empty")).FontSize(12).TextColor(p.textTertiary)
-			ui.Row(c).Gap(6).AlignItems(ui.Center).Margin(0, ui.Auto).Children(func() {
-				ui.Icon(c, icon("external-link")).Size(12, 12).TextColor(p.textTertiary)
-				ui.Text(c, m("x_media_browse")).FontSize(11).TextColor(p.textTertiary)
-			})
-		})
+		if spaceID != "" {
+			a.mediaPanel(c, spaceID, "", true)
+		}
 		return
+	case 4:
+		if spaceID != "" {
+			a.scheduledPanel(c, spaceID)
+			return
+		}
 	case 3:
 		if spaceID != "" {
 			apps, _, ok := loadJSON[struct {
@@ -318,12 +304,12 @@ func (a *app) panelContent(c *ui.Context) {
 			return
 		}
 	}
+	if spaceID != "" {
+		a.sessionOutputs(c, spaceID, a.route.sessionID())
+		return
+	}
 	ui.Column(c).Grow(1).Padding(16, 14).Children(func() {
-		msg := m("x_panel_session")
-		if a.route.sessionID() == "" {
-			msg = m("x_panel_new")
-		}
-		ui.Text(c, msg).FontSize(12).LineHeight(1.6).TextColor(p.textTertiary)
+		ui.Text(c, m("session_outputs_no_chat")).FontSize(12).LineHeight(1.6).TextColor(p.textTertiary)
 	})
 }
 

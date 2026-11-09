@@ -16,7 +16,11 @@ type spaceDetail struct {
 	PublicProfile *publicProfile `json:"publicProfile"`
 	OwnerProfile  *Profile       `json:"ownerProfile"`
 	SandboxStatus string         `json:"sandboxStatus"`
-	Meta          struct {
+	Access        *struct {
+		Role        string   `json:"role"`
+		Permissions []string `json:"permissions"`
+	} `json:"access"`
+	Meta struct {
 		Config struct {
 			Sandbox struct {
 				Spec        string `json:"spec"`
@@ -440,3 +444,13 @@ func (a *app) walletPage(c *ui.Context) {
 }
 
 var _ = url.PathEscape
+
+// can tells whether the user's access to the Space grants the permission,
+// as SpaceWorkspacePage hasAccessPermission. It loads the Space's detail.
+func (a *app) can(spaceID, permission string) bool {
+	if spaceID == "" {
+		return false
+	}
+	d, _, _ := loadJSON[spaceDetail](a, "space:"+spaceID, sp(spaceID))
+	return d != nil && d.Access != nil && contains(d.Access.Permissions, permission)
+}
