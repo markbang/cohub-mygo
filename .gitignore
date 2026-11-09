@@ -4,3 +4,8 @@ mygo_windows_*.syso
 /screenshots/live-*
 /screenshots/web-reference-*
 /screenshots/window-*
+/compare/web/
+/compare/app/
+/compare/side/
+/compare/vars.json
+/tools/webshot/node_modules

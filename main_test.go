@@ -1,9 +1,13 @@
 package main
 
 import (
+	"encoding/json"
 	"image/png"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -21,14 +25,10 @@ func demoApp(t *testing.T) *app {
 	return a
 }
 
-// snapshot writes the tester's frame to $SNAPSHOT_DIR/name.png when set.
-func snapshot(t *testing.T, tt *ui.Tester, name string) {
-	dir := os.Getenv("SNAPSHOT_DIR")
-	if dir == "" {
-		return
-	}
-	os.MkdirAll(dir, 0o755)
-	f, err := os.Create(filepath.Join(dir, name+".png"))
+func writePNG(t *testing.T, tt *ui.Tester, path string) {
+	t.Helper()
+	os.MkdirAll(filepath.Dir(path), 0o755)
+	f, err := os.Create(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,11 +38,35 @@ func snapshot(t *testing.T, tt *ui.Tester, name string) {
 	}
 }
 
+// snapshot writes the tester's frame to $SNAPSHOT_DIR/name.png when set.
+func snapshot(t *testing.T, tt *ui.Tester, name string) {
+	if dir := os.Getenv("SNAPSHOT_DIR"); dir != "" {
+		writePNG(t, tt, filepath.Join(dir, name+".png"))
+	}
+}
+
+func TestRoutes(t *testing.T) {
+	for _, path := range []string{
+		"/sessions", "/sessions/new", "/sessions/abc", "/spaces", "/spaces/new", "/spaces/s1",
+		"/spaces/s1/sessions/abc", "/spaces/s1/sessions/new", "/spaces/s1/settings", "/spaces/s1/activity",
+		"/spaces/s1/wallet", "/spaces/s1/files/docs/a.md", "/spaces/s1/checkpoints/new", "/spaces/s1/tasks/t1",
+		"/spaces/s1/cronjobs/c1", "/settings/general", "/settings/billing",
+	} {
+		r := parseRoute(path)
+		if got := r.String(); got != path && !(path == "/spaces/s1/sessions/new" && got == "/spaces/s1/sessions/new") {
+			t.Errorf("%s parses to %+v, which is %s", path, r, got)
+		}
+	}
+	if r := parseRoute("/spaces/s1/settings#access"); r.sub != "access" {
+		t.Errorf("settings section %q", r.sub)
+	}
+}
+
 func TestDesktopOpensLatestChat(t *testing.T) {
 	a := demoApp(t)
 	tt := ui.NewTester(a.view, 1440, 900)
-	if a.selSession != "demo-0" {
-		t.Fatalf("selected %q, want the latest chat", a.selSession)
+	if a.route.sessionID() != "demo-0" {
+		t.Fatalf("route %v, want the latest chat", a.route)
 	}
 	for _, want := range []string{"对话", "全部", "看看这个 https://nsh.dev/", "消息", "本对话", "bangwu"} {
 		if !tt.HasText(want) {
@@ -69,19 +93,31 @@ func TestSpacesDirectoryOpensSpace(t *testing.T) {
 	if err := tt.Click("Space"); err != nil {
 		t.Fatal(err)
 	}
-	a.selSession = ""
-	tt.Frame()
-	if !tt.HasText("全部 Space") || !tt.HasText("Personal Home Space") {
-		t.Fatalf("texts %q", tt.Texts())
+	if a.route.kind != routeSpaces || !tt.HasText("全部 Space") || !tt.HasText("Personal Home Space") {
+		t.Fatalf("route %v, texts %q", a.route, tt.Texts())
 	}
 	snapshot(t, tt, "desktop-spaces-light")
 	if err := tt.Click("Personal Home Space"); err != nil {
 		t.Fatal(err)
 	}
-	if a.selSpace != "s5" || !tt.HasText("新建对话") || !tt.HasText("Created by") {
-		t.Fatalf("space %q, texts %q", a.selSpace, tt.Texts())
+	if a.route.kind != routeSpace || a.route.space != "s5" || !tt.HasText("新建对话") || !tt.HasText("Created by") {
+		t.Fatalf("route %v, texts %q", a.route, tt.Texts())
 	}
 	snapshot(t, tt, "desktop-space-light")
+}
+
+func TestPaletteOpensSpace(t *testing.T) {
+	a := demoApp(t)
+	tt := ui.NewTester(a.view, 1440, 900)
+	tt.TypeKey(ui.Cmd, ui.KeyK, "")
+	if !a.palette.shown || !tt.HasText("Run Command") {
+		t.Fatalf("palette %v, texts %q", a.palette.shown, tt.Texts())
+	}
+	tt.Type("worldloom")
+	tt.TypeKey(0, ui.KeyEnter, "")
+	if a.palette.shown || a.route.kind != routeSpace || a.route.space != "s6" {
+		t.Fatalf("route %v after choosing", a.route)
+	}
 }
 
 func TestDarkTheme(t *testing.T) {
@@ -96,8 +132,8 @@ func TestDarkTheme(t *testing.T) {
 func TestCompactLayout(t *testing.T) {
 	a := demoApp(t)
 	tt := ui.NewTester(a.view, 390, 844)
-	if a.selSession != "" {
-		t.Fatalf("compact layout opened %q by itself", a.selSession)
+	if a.route.sessionID() != "" {
+		t.Fatalf("compact layout opened %v by itself", a.route)
 	}
 	for _, want := range []string{"对话", "Space", "账户", "修复详情页按钮放大"} {
 		if !tt.HasText(want) {
@@ -108,8 +144,8 @@ func TestCompactLayout(t *testing.T) {
 	if err := tt.Click("看看这个 https://nsh.dev/"); err != nil {
 		t.Fatal(err)
 	}
-	if a.selSession != "demo-0" || !tt.HasText("消息") {
-		t.Fatalf("session %q", a.selSession)
+	if a.route.sessionID() != "demo-0" || !tt.HasText("消息") {
+		t.Fatalf("route %v", a.route)
 	}
 	snapshot(t, tt, "compact-chat")
 }
@@ -131,54 +167,6 @@ func TestComposerSendsWithEnter(t *testing.T) {
 	}
 }
 
-// TestLiveSnapshot renders the signed-in account's real data, for comparing
-// with the web app: COHUB_LIVE=1 SNAPSHOT_DIR=screenshots go test -run Live.
-func TestLiveSnapshot(t *testing.T) {
-	if os.Getenv("COHUB_LIVE") == "" {
-		t.Skip("COHUB_LIVE not set")
-	}
-	a := newApp()
-	a.seenPath = ""
-	cl, err := newClient()
-	if err != nil {
-		t.Skip(err)
-	}
-	a.api = cl
-	a.images.onLoad = nil
-	a.refresh()
-	if a.status != "" {
-		t.Fatal(a.status)
-	}
-	session := os.Getenv("COHUB_LIVE_SESSION")
-	if session == "" {
-		session = a.sessions[0].ID
-	}
-	a.autoPicked = true
-	a.selSession = session
-	a.loadTurns(session)
-	tt := ui.NewTester(a.view, 1440, 900)
-	a.images.wait(20 * time.Second)
-	tt.Frame()
-	snapshot(t, tt, "live-chat")
-	a.rail, a.selSession = railSpaces, ""
-	tt.Frame()
-	a.images.wait(20 * time.Second)
-	tt.Frame()
-	snapshot(t, tt, "live-spaces")
-	a.rail, a.selSpace = railSpaces, a.spaces[0].ID
-	a.loadSpaceSessions(a.spaces[0].ID)
-	tt.Frame()
-	a.images.wait(10 * time.Second)
-	tt.Frame()
-	snapshot(t, tt, "live-space")
-	tc := ui.NewTester(a.view, 390, 844)
-	a.rail, a.selSpace = railChats, ""
-	tc.Frame()
-	a.images.wait(10 * time.Second)
-	tc.Frame()
-	snapshot(t, tc, "live-compact")
-}
-
 func TestPreviewDropsMarkdown(t *testing.T) {
 	for in, want := range map[string]string{
 		"## 执行结果 **结论**: 76 个":         "执行结果 结论: 76 个",
@@ -188,5 +176,115 @@ func TestPreviewDropsMarkdown(t *testing.T) {
 		if got := preview(in); got != want {
 			t.Errorf("preview(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+// compareState is a state of compare/states.json, which the web's
+// screenshots (tools/webshot) and the app's are taken in.
+type compareState struct {
+	Name    string           `json:"name"`
+	Path    string           `json:"path"`
+	Size    []int            `json:"size"`
+	Dark    bool             `json:"dark"`
+	Actions []map[string]any `json:"actions"`
+	App     []map[string]any `json:"app"`
+}
+
+// TestCompare renders the states of compare/states.json with the signed-in
+// account into compare/app, and puts each beside the web's in compare/side:
+//
+//	COHUB_LIVE=1 go test -run Compare [-compare regexp]
+func TestCompare(t *testing.T) {
+	if os.Getenv("COHUB_LIVE") == "" {
+		t.Skip("COHUB_LIVE not set")
+	}
+	var states []compareState
+	var vars map[string]string
+	b, _ := os.ReadFile("compare/states.json")
+	if err := json.Unmarshal(b, &states); err != nil {
+		t.Fatal(err)
+	}
+	b, _ = os.ReadFile("compare/vars.json")
+	json.Unmarshal(b, &vars)
+	fill := func(s string) string {
+		for k, v := range vars {
+			s = strings.ReplaceAll(s, "{"+k+"}", v)
+		}
+		return s
+	}
+	only := regexp.MustCompile(os.Getenv("COMPARE"))
+	cl, err := newClient()
+	if err != nil {
+		t.Skip(err)
+	}
+	a := newApp()
+	a.seenPath = ""
+	a.sync = true
+	a.api = cl
+	a.images.onLoad = nil
+	a.refresh()
+	if a.status != "" {
+		t.Fatal(a.status)
+	}
+	for _, s := range states {
+		if !only.MatchString(s.Name) {
+			continue
+		}
+		t.Run(s.Name, func(t *testing.T) {
+			w, h := 1440, 900
+			if len(s.Size) == 2 {
+				w, h = s.Size[0], s.Size[1]
+			}
+			a.route, a.back = route{kind: -1}, nil
+			a.palette, a.menus, a.userMenu, a.compactNav = paletteState{}, map[string]bool{}, false, false
+			a.theme = "light"
+			if s.Dark {
+				a.theme = "dark"
+			}
+			a.compact = w < compactWidth
+			a.navigate(fill(s.Path))
+			tt := ui.NewTesterWith(a.view, w, h, ui.TesterOptions{Dark: s.Dark})
+			settle := func() {
+				for i := 0; i < 6; i++ {
+					tt.Frame()
+					a.images.wait(15 * time.Second)
+					if !a.flush() {
+						break
+					}
+				}
+				tt.Frame()
+			}
+			settle()
+			actions := s.App
+			if actions == nil {
+				actions = s.Actions
+			}
+			for _, act := range actions {
+				switch {
+				case act["click"] != nil:
+					if err := tt.Click(fill(act["click"].(string))); err != nil {
+						t.Log(err)
+					}
+				case act["clickLabel"] != nil:
+					if err := tt.Click(fill(act["clickLabel"].(string))); err != nil {
+						t.Log(err)
+					}
+				case act["key"] == "Control+k":
+					tt.TypeKey(ui.Cmd, ui.KeyK, "")
+				case act["scroll"] != nil:
+					tt.Scroll(float32(w)/2, float32(h)/2, 0, float32(act["scroll"].(float64)))
+				}
+				settle()
+			}
+			tt.Advance(3 * time.Second)
+			settle()
+			app := filepath.Join("compare", "app", s.Name+".png")
+			writePNG(t, tt, app)
+			web := filepath.Join("compare", "web", s.Name+".png")
+			if _, err := os.Stat(web); err == nil {
+				os.MkdirAll("compare/side", 0o755)
+				exec.Command("montage", web, app, "-tile", "2x1", "-geometry", "+6+0", "-background", "#888", filepath.Join("compare", "side", s.Name+".png")).Run()
+			}
+		})
 	}
 }

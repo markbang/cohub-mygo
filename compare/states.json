@@ -1,0 +1,203 @@
+[
+ {
+  "name": "chat",
+  "path": "/sessions/{SESSION}"
+ },
+ {
+  "name": "chat-process",
+  "path": "/sessions/{SESSION}",
+  "actions": [
+   {
+    "scroll": -30000,
+    "wait": 1500
+   },
+   {
+    "textPart": " 步 · ",
+    "wait": 9000
+   }
+  ],
+  "app": [
+   {
+    "scroll": -30000
+   },
+   {
+    "click": "12 步 · 14 个工具 · ↑319.3k (缓存 237.4k) ↓4.2k · US$0.541 · 2分 30秒"
+   }
+  ]
+ },
+ {
+  "name": "chat-top",
+  "path": "/sessions/{SESSION}",
+  "actions": [
+   {
+    "scroll": -30000,
+    "wait": 1500
+   }
+  ],
+  "app": [
+   {
+    "scroll": -30000
+   }
+  ]
+ },
+ {
+  "name": "chat-more",
+  "path": "/sessions/{SESSION}",
+  "actions": [
+   {
+    "css": "main button[aria-expanded=false]",
+    "wait": 800
+   }
+  ]
+ },
+ {
+  "name": "chat-running",
+  "path": "/sessions/{RUNNING}"
+ },
+ {
+  "name": "chat-dark",
+  "path": "/sessions/{SESSION}",
+  "dark": true
+ },
+ {
+  "name": "chat-new",
+  "path": "/sessions/new"
+ },
+ {
+  "name": "spaces",
+  "path": "/spaces"
+ },
+ {
+  "name": "spaces-all",
+  "path": "/spaces",
+  "actions": [
+   {
+    "click": "全部 Space"
+   }
+  ]
+ },
+ {
+  "name": "space",
+  "path": "/spaces/{SPACE}"
+ },
+ {
+  "name": "space-session",
+  "path": "/spaces/{SPACE}/sessions/{SESSION}"
+ },
+ {
+  "name": "space-settings",
+  "path": "/spaces/{SPACE}/settings"
+ },
+ {
+  "name": "space-activity",
+  "path": "/spaces/{SPACE}/activity"
+ },
+ {
+  "name": "space-checkpoint-new",
+  "path": "/spaces/{SPACE}/checkpoints/new"
+ },
+ {
+  "name": "space-wallet",
+  "path": "/spaces/{SPACE}/wallet"
+ },
+ {
+  "name": "space-files",
+  "path": "/spaces/{SPACE}/files/"
+ },
+ {
+  "name": "settings-general",
+  "path": "/settings/general"
+ },
+ {
+  "name": "settings-billing",
+  "path": "/settings/billing"
+ },
+ {
+  "name": "settings-activity",
+  "path": "/settings/activity"
+ },
+ {
+  "name": "settings-rules",
+  "path": "/settings/rules"
+ },
+ {
+  "name": "settings-referrals",
+  "path": "/settings/referrals"
+ },
+ {
+  "name": "settings-channels",
+  "path": "/settings/channels"
+ },
+ {
+  "name": "palette",
+  "path": "/sessions/{SESSION}",
+  "actions": [
+   {
+    "key": "Control+k"
+   }
+  ]
+ },
+ {
+  "name": "compact-chats",
+  "path": "/sessions",
+  "size": [
+   390,
+   844
+  ]
+ },
+ {
+  "name": "compact-chat",
+  "path": "/sessions/{SESSION}",
+  "size": [
+   390,
+   844
+  ]
+ },
+ {
+  "name": "compact-spaces",
+  "path": "/spaces",
+  "size": [
+   390,
+   844
+  ]
+ },
+ {
+  "name": "panel-files",
+  "path": "/spaces/{SPACE}",
+  "actions": [
+   {
+    "click": "文件",
+    "wait": 2500
+   }
+  ]
+ },
+ {
+  "name": "panel-media",
+  "path": "/spaces/{SPACE}/sessions/{SESSION}",
+  "actions": [
+   {
+    "click": "媒体",
+    "wait": 2500
+   }
+  ]
+ },
+ {
+  "name": "panel-apps",
+  "path": "/spaces/{SPACE_MOBILE}",
+  "actions": [
+   {
+    "click": "应用",
+    "wait": 2500
+   }
+  ]
+ },
+ {
+  "name": "panel-chat-files",
+  "path": "/spaces/{SPACE_MOBILE}/sessions/{SESSION_MOBILE}",
+  "actions": [
+   {
+    "wait": 1500
+   }
+  ]
+ }
+]

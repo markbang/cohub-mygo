@@ -15,39 +15,29 @@ const (
 // panel on desktops, as the web app's (app) layout; one column with a tab
 // bar below 768 DIPs, as its compact shell.
 func (a *app) view(c *ui.Context) {
-	dark := c.Theme().Dark
-	switch a.themeMode {
-	case themeLight:
-		dark = false
-	case themeDark:
-		dark = true
-	}
-	if dark != a.pal.dark || a.pal.bgPrimary == (ui.Color{}) {
-		if dark {
-			a.pal = darkPalette()
-		} else {
-			a.pal = lightPalette()
-		}
-	}
-	a.pal.apply(c)
-	a.md.Theme = a.markdownTheme(c)
+	a.applyTheme(c)
 
 	c.OnShortcut(ui.Cmd, ui.KeyB, func() { a.sidebarOpen = !a.sidebarOpen })
 	c.OnShortcut(ui.Cmd, ui.KeyO, func() { a.newChat() })
-	c.OnShortcut(ui.Cmd|ui.Shift, ui.KeyL, func() { a.themeMode = (a.themeMode + 1) % 3 })
+	c.OnShortcut(ui.Cmd, ui.KeyK, func() { a.palette.toggle(paletteAll) })
+	c.OnShortcut(ui.Cmd, ui.KeyComma, func() { a.go_(route{kind: routeSettings, sub: "general"}) })
+	c.OnShortcut(ui.Cmd, ui.KeyBracketLeft, func() { a.goBack() })
 
 	w, _ := c.Size()
-	a.compact = w < compactWidth
-	if !a.compact && a.rail == railAccount {
-		a.rail = railChats
+	if a.route.kind < 0 {
+		a.compact = w < compactWidth
+		a.navigate("/sessions")
 	}
-	if !a.compact && a.rail == railChats && a.selSession == "" && !a.autoPicked && len(a.sessions) > 0 {
-		// /sessions opens the latest chat, as the web does.
-		a.autoPicked = true
-		a.openSession(a.sessions[0])
+	compact := w < compactWidth
+	if compact != a.compact {
+		a.compact = compact
+		if !compact && a.route.kind == routeSessions {
+			a.show(a.route)
+		}
 	}
 	if a.compact {
 		a.compactView(c)
+		a.paletteView(c)
 		return
 	}
 	p := a.pal
@@ -55,51 +45,89 @@ func (a *app) view(c *ui.Context) {
 		if a.sidebarOpen {
 			a.sidebar(c)
 		}
-		ui.Column(c).Grow(1).MinWidth(0).Background(p.bgContent).Children(func() {
-			switch {
-			case a.selSession != "":
-				a.sessionView(c)
-			case a.selSpace != "":
-				a.newChatView(c)
-			case a.rail == railSpaces:
-				a.spacesView(c)
-			default:
-				a.emptyView(c)
-			}
+		bg := p.bgPrimary
+		switch a.route.kind {
+		case routeSession, routeSpaceSession, routeSpace, routeSpaceNewSession:
+			bg = p.chatBg.Over(p.bgPrimary)
+		}
+		ui.Column(c).Grow(1).MinWidth(0).Background(bg).Children(func() {
+			a.page(c)
 		})
-		if a.panelOpen && (a.selSession != "" || a.selSpace != "") && w >= 1100 {
+		if a.panelOpen && a.showsPanel() && w >= 1100 {
 			a.rightPanel(c)
 		}
 	})
+	a.paletteView(c)
 }
 
-func (a *app) newChat() {
-	current := a.session(a.selSession)
-	a.selSession = ""
-	if a.selSpace == "" {
-		if s := current; s != nil {
-			a.selSpace = s.SpaceID
-		} else if a.chip != "" {
-			a.selSpace = a.chip
-		} else if len(a.spaces) > 0 {
-			a.selSpace = a.spaces[0].ID
-		}
+// showsPanel tells whether the route has the panel beside it: chats and
+// a Space's new chat.
+func (a *app) showsPanel() bool {
+	switch a.route.kind {
+	case routeSession, routeSpaceSession, routeSpace, routeSpaceNewSession:
+		return true
+	}
+	return false
+}
+
+// page builds the main column of the route.
+func (a *app) page(c *ui.Context) {
+	switch a.route.kind {
+	case routeSession, routeSpaceSession:
+		a.sessionView(c)
+	case routeSpace, routeSpaceNewSession:
+		a.spaceHome(c)
+	case routeSpaces, routeNewSpace:
+		a.spacesView(c)
+	case routeSpaceSettings:
+		a.spaceSettings(c)
+	case routeSpaceActivity:
+		a.activityPage(c, a.route.space)
+	case routeSpaceWallet:
+		a.walletPage(c)
+	case routeSpaceFiles:
+		a.filesPage(c)
+	case routeSpaceCheckpoint:
+		a.checkpointPage(c)
+	case routeSpaceTask:
+		a.taskPage(c)
+	case routeSpaceCron:
+		a.cronPage(c)
+	case routeSettings:
+		a.settingsPage(c)
+	default:
+		a.emptyView(c)
 	}
 }
 
-// header is the 40 DIP bar above every main column, which drags the window.
+// newChat starts a chat: in the route's Space, else in one the picker
+// asks for.
+func (a *app) newChat() {
+	if sp := a.currentSpace(); sp != "" && a.route.area() == areaSpace {
+		a.go_(route{kind: routeSpace, space: sp})
+		return
+	}
+	a.go_(route{kind: routeNewSession})
+}
+
+// header is the 40 DIP bar above a main column, which drags the window.
 func (a *app) header(c *ui.Context, fn func()) {
 	p := a.pal
 	bar := c.TitleBar()
-	ui.Row(c).Height(headerHeight).Shrink(0).Gap(8).AlignItems(ui.Center).
-		Padding(0, 12+bar.Right, 0, 16).BorderWidth(0, 0, 1, 0).BorderColor(p.borderSubtle).
+	right := float32(12)
+	if !a.panelOpen || !a.showsPanel() || a.compact {
+		right += bar.Right
+	}
+	ui.Row(c).Height(headerHeight).Shrink(0).Gap(4).AlignItems(ui.Center).
+		Padding(0, right, 0, 12).BorderWidth(0, 0, 1, 0).BorderColor(p.borderSubtle).
 		DragWindow().Children(fn)
 }
 
 func (a *app) emptyView(c *ui.Context) {
 	p := a.pal
 	a.header(c, func() {
-		ui.Text(c, "对话").FontWeight(500).Grow(1)
+		a.headerLead(c)
+		ui.Text(c, "对话").FontSize(13).Grow(1)
 	})
 	ui.Column(c).Grow(1).Center().Gap(8).Children(func() {
 		if a.status != "" && a.me == nil {
@@ -114,15 +142,16 @@ func (a *app) emptyView(c *ui.Context) {
 // rightPanel is the panel beside a chat: what it made and changed.
 func (a *app) rightPanel(c *ui.Context) {
 	p := a.pal
+	bar := c.TitleBar()
 	tabs := []struct{ icon, label string }{{"message-square", "本对话"}, {"copy", "文件"}, {"images", "媒体"}, {"layout-template", "应用"}}
 	ui.Column(c).Width(panelWidth).Shrink(0).Background(p.bgPrimary).BorderWidth(0, 0, 0, 1).BorderColor(p.borderSubtle).Children(func() {
-		ui.Row(c).Height(headerHeight).Shrink(0).AlignItems(ui.Center).Padding(0, 8).Gap(2).DragWindow().Children(func() {
+		ui.Row(c).Height(headerHeight).Shrink(0).AlignItems(ui.Center).Padding(0, 8+bar.Right, 0, 8).Gap(2).DragWindow().Children(func() {
 			for i, t := range tabs {
 				if i > 0 {
-					ui.Box(c).Width(1).Height(12).Background(p.borderSubtle).Margin(0, 4)
+					ui.Box(c).Width(1).Height(12).Background(p.borderSubtle).Margin(0, 3)
 				}
 				on := a.panelTab == i
-				b := ui.ButtonBase(c.Key(t.label)).Row().Gap(5).AlignItems(ui.Center).Padding(4, 6).Radius(6).FocusRing(false).Children(func() {
+				b := ui.ButtonBase(c.Key(t.label)).Row().Gap(5).AlignItems(ui.Center).Height(26).Padding(0, 6).Radius(6).Label(t.label).FocusRing(false).Children(func() {
 					col := p.textTertiary
 					if on {
 						col = p.text
@@ -141,12 +170,6 @@ func (a *app) rightPanel(c *ui.Context) {
 				}
 			}
 		})
-		ui.Column(c).Grow(1).Padding(16).Children(func() {
-			msg := []string{"本对话中 Agent 生成的媒体和改动的文件会显示在这里。", "Space 的文件会显示在这里。", "生成的图片和视频会显示在这里。", "发布的应用会显示在这里。"}[a.panelTab]
-			if a.selSession == "" && a.panelTab == 0 {
-				msg = "开始对话后，这里会显示它生成的媒体和改动的文件。"
-			}
-			ui.Text(c, msg).FontSize(12).LineHeight(1.6).TextColor(p.textTertiary)
-		})
+		ui.Column(c).Grow(1).MinHeight(0).Children(func() { a.panelContent(c) })
 	})
 }

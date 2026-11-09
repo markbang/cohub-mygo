@@ -39,6 +39,7 @@ func init() {
 		{"Geist-Medium.ttf", "Geist"},
 		{"Geist-SemiBold.ttf", "Geist"},
 		{"GeistMono-Regular.ttf", "Geist Mono"},
+		{"Figtree.ttf", "Figtree"},
 	} {
 		b, _ := fontFiles.ReadFile("fonts/" + f.file)
 		if err := ui.RegisterFont(b, f.family); err != nil {

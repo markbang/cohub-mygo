@@ -28,6 +28,18 @@ func relTime(t, now time.Time) string {
 	return t.Format("2006.01.02")
 }
 
+// dateTime is the palette's time: the time today, the date before.
+func dateTime(t, now time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	t, now = t.Local(), now.Local()
+	if t.Year() == now.Year() && t.YearDay() == now.YearDay() {
+		return t.Format("15:04")
+	}
+	return t.Format("2006.01.02")
+}
+
 func elapsed(since, now time.Time) string {
 	d := now.Sub(since)
 	switch {
@@ -152,21 +164,99 @@ func (a *app) dot(c *ui.Context, col ui.Color, size float32) ui.Element {
 	return ui.Box(c).Size(size, size).Radius(size / 2).Background(col).Shrink(0)
 }
 
-// chip is a rounded control of the composer: an optional avatar, a label
-// and a chevron.
-func (a *app) pill(c *ui.Context, label string, lead func()) ui.Element {
+// pill is a rounded control of the composer: an optional lead, a label,
+// a quieter second label and a chevron.
+func (a *app) pill(c *ui.Context, label, sub string, lead func()) ui.Element {
 	p := a.pal
-	b := ui.ButtonBase(c).Row().Gap(5).AlignItems(ui.Center).Padding(4, 8, 4, 8).Radius(999).Border(1, p.borderSubtle).FocusRing(false).Children(func() {
+	b := ui.ButtonBase(c).Row().Gap(5).AlignItems(ui.Center).Height(28).Padding(0, 8, 0, 9).Radius(999).Border(1, p.borderSubtle).Label(label).FocusRing(false).Children(func() {
 		if lead != nil {
 			lead()
 		}
 		ui.Text(c, label).FontSize(12).TextColor(p.textSecond).SingleLine()
+		if sub != "" {
+			ui.Text(c, sub).FontSize(11).TextColor(p.placeholder).SingleLine()
+		}
 		ui.Icon(c, icon("chevron-down")).Size(12, 12).TextColor(p.placeholder)
 	})
 	if b.Hovered() {
 		b.Background(p.hover)
 	}
 	return b
+}
+
+type menuItem struct {
+	icon, label, hint string
+	checked           bool
+	danger            bool
+	run               func()
+}
+
+// menu is a popover of rows below anchor, as the web's dropdown menus.
+func (a *app) menu(c *ui.Context, anchor ui.Element, open *bool, items []menuItem) {
+	p := a.pal
+	ui.Popover(c, anchor, open, func() {
+		ui.Column(c).Gap(1).MinWidth(168).Children(func() {
+			for _, it := range items {
+				if it.label == "" {
+					ui.Divider(c).Margin(3, 0)
+					continue
+				}
+				row := ui.Row(c.Key(it.label)).Gap(8).AlignItems(ui.Center).Height(30).Padding(0, 8).Radius(5).Children(func() {
+					col := p.textSecond
+					if it.danger {
+						col = p.errorC
+					}
+					if it.icon != "" {
+						ui.Icon(c, icon(it.icon)).Size(14, 14).TextColor(col)
+					}
+					ui.Text(c, it.label).FontSize(13).TextColor(col).Grow(1)
+					if it.hint != "" {
+						ui.Text(c, it.hint).FontSize(11).TextColor(p.placeholder)
+					}
+					if it.checked {
+						ui.Icon(c, icon("check")).Size(14, 14).TextColor(p.brand)
+					}
+				})
+				a.pressable(row, false)
+				run := it.run
+				row.OnClick(func() {
+					*open = false
+					if run != nil {
+						run()
+					}
+				})
+			}
+		})
+	})
+}
+
+// clock is a message's time: the time today, the day and time before.
+func clock(t, now time.Time) string { return relTime(t, now) }
+
+// duration is formatDurationMs in Chinese.
+func duration(ms int64) string {
+	if ms < 1000 {
+		return fmt.Sprintf("%d毫秒", max(1, ms))
+	}
+	if ms < 10_000 {
+		return fmt.Sprintf("%.1f秒", float64(ms)/1000)
+	}
+	sec := (ms + 500) / 1000
+	if sec < 60 {
+		return fmt.Sprintf("%d秒", sec)
+	}
+	min, sec := sec/60, sec%60
+	if min < 60 {
+		if sec > 0 {
+			return fmt.Sprintf("%d分 %d秒", min, sec)
+		}
+		return fmt.Sprintf("%d分", min)
+	}
+	h, min := min/60, min%60
+	if min > 0 {
+		return fmt.Sprintf("%d时 %d分", h, min)
+	}
+	return fmt.Sprintf("%d时", h)
 }
 
 func (a *app) spinner(c *ui.Context, size float32, col ui.Color) ui.Element {

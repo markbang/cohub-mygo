@@ -63,9 +63,9 @@ func (s *Space) avatar() string {
 	return s.PublicProfile.AvatarURL
 }
 
-// activity is when the space was last used, as the web's "recent" sort.
+// activity is when the user last used the space, as the web's "recent" sort.
 func (s *Space) activity() time.Time {
-	if s.PersonalActivityAt.After(s.LastActivityAt) {
+	if !s.PersonalActivityAt.IsZero() {
 		return s.PersonalActivityAt
 	}
 	return s.LastActivityAt
@@ -124,8 +124,98 @@ type Block struct {
 	Type     string          `json:"type"`
 	Text     string          `json:"text"`
 	Thinking string          `json:"thinking"`
+	ID       string          `json:"id"`
 	Name     string          `json:"name"`
 	Args     json.RawMessage `json:"arguments"`
+	Input    json.RawMessage `json:"input"`
+	IsError  bool            `json:"is_error"`
+	ToolUse  string          `json:"tool_use_id"`
+	Meta     *blockMeta      `json:"_meta"`
+}
+
+type blockMeta struct {
+	Summary    string `json:"summary"`
+	ToolStatus string `json:"toolStatus"`
+	Timing     *struct {
+		DurationMs int64 `json:"durationMs"`
+	} `json:"timing"`
+}
+
+// StepMessage is one model call of a turn's work, from its intermediate file.
+type StepMessage struct {
+	ID         string    `json:"id"`
+	Sequence   int       `json:"sequence"`
+	Text       string    `json:"text"`
+	Model      string    `json:"model"`
+	StopReason string    `json:"stopReason"`
+	Error      string    `json:"errorMessage"`
+	Usage      *Usage    `json:"usage"`
+	DurationMs int64     `json:"durationMs"`
+	CreatedAt  time.Time `json:"createdAt"`
+	Content    []Block   `json:"content"`
+	Meta       struct {
+		MessageKind string `json:"messageKind"`
+	} `json:"meta"`
+}
+
+func (m *StepMessage) hasText() bool {
+	for _, b := range m.Content {
+		if b.Type == "text" && strings.TrimSpace(b.Text) != "" {
+			return true
+		}
+	}
+	return false
+}
+
+// Model is a language model a chat can use.
+type Model struct {
+	Provider string `json:"provider"`
+	ID       string `json:"id"`
+	Model    struct {
+		Name             string             `json:"name"`
+		Reasoning        bool               `json:"reasoning"`
+		ContextWindow    int64              `json:"contextWindow"`
+		ThinkingLevelMap map[string]*string `json:"thinkingLevelMap"`
+	} `json:"model"`
+}
+
+// levels returns the thinking levels the model takes, in order.
+func (m *Model) levels() []string {
+	var out []string
+	for _, l := range []string{"off", "minimal", "low", "medium", "high", "xhigh", "max"} {
+		if v, ok := m.Model.ThinkingLevelMap[l]; ok && v != nil {
+			out = append(out, l)
+		}
+	}
+	return out
+}
+
+type modelChoice struct{ provider, id, level string }
+
+// Label is a Space's label, with the system's source, user and channel trees.
+type Label struct {
+	ID        string   `json:"id"`
+	Name      string   `json:"name"`
+	Slug      string   `json:"slug"`
+	Source    string   `json:"source"`
+	SystemKey string   `json:"systemKey"`
+	Depth     int      `json:"depth"`
+	Children  []*Label `json:"children"`
+}
+
+type LabelItem struct {
+	ResourceType string `json:"resourceType"`
+	ResourceRef  string `json:"resourceRef"`
+}
+
+// SpaceUsage sums a Space's language model use over some days.
+type SpaceUsage struct {
+	Totals struct {
+		TotalTokens  int64   `json:"totalTokens"`
+		RequestCount int64   `json:"requestCount"`
+		CostTotal    float64 `json:"costTotal"`
+	} `json:"totals"`
+	Days int `json:"days"`
 }
 
 type Usage struct {
@@ -134,12 +224,32 @@ type Usage struct {
 	CacheRead   int64 `json:"cacheRead"`
 	CacheWrite  int64 `json:"cacheWrite"`
 	TotalTokens int64 `json:"totalTokens"`
+	Cost        *struct {
+		Total float64 `json:"total"`
+	} `json:"cost"`
+}
+
+func (u *Usage) cost() float64 {
+	if u == nil || u.Cost == nil {
+		return 0
+	}
+	return u.Cost.Total
 }
 
 type intermediateSummary struct {
-	MessageCount  int  `json:"messageCount"`
-	ToolCallCount int  `json:"toolCallCount"`
-	HasError      bool `json:"hasError"`
+	MessageCount  int    `json:"messageCount"`
+	ToolCallCount int    `json:"toolCallCount"`
+	HasError      bool   `json:"hasError"`
+	Usage         *Usage `json:"usage"`
+	DurationMs    int64  `json:"durationMs"`
+}
+
+type turnMeta struct {
+	Harness                string `json:"harness"`
+	Source                 string `json:"source"`
+	FinalMessageDurationMs int64  `json:"finalMessageDurationMs"`
+	RequestedThinkingLevel string `json:"requestedThinkingLevel"`
+	RuntimeArchiveStatus   string `json:"runtimeArchiveStatus"`
 }
 
 // Turn is one exchange of a session: the user's message and the reply.
@@ -159,11 +269,12 @@ type Turn struct {
 	DurationMs          int64                `json:"durationMs"`
 	TotalUsage          *Usage               `json:"totalUsage"`
 	IntermediateSummary *intermediateSummary `json:"intermediateSummary"`
-	Meta                struct {
-		Harness string `json:"harness"`
-		Source  string `json:"source"`
-	} `json:"meta"`
-	AuthorProfile *Profile `json:"authorProfile"`
+	Meta                turnMeta             `json:"meta"`
+	AuthorProfile       *Profile             `json:"authorProfile"`
+	FinalUsage          *Usage               `json:"finalUsage"`
+	IntermediateIndex   *struct {
+		MessagesObjectKey string `json:"messagesObjectKey"`
+	} `json:"intermediateIndex"`
 }
 
 func (t *Turn) running() bool {
@@ -361,10 +472,16 @@ func (cl *client) snapshot(ctx context.Context, sessionID string) (*streamSnapsh
 }
 
 // prompt sends text to a session of a space, or to a new one without sessionID.
-func (cl *client) prompt(ctx context.Context, spaceID, sessionID, text string) (string, error) {
+func (cl *client) prompt(ctx context.Context, spaceID, sessionID, text string, model modelChoice) (string, error) {
 	in := map[string]any{"content": []map[string]string{{"type": "text", "text": text}}, "source": "web"}
 	if sessionID != "" {
 		in["sessionId"] = sessionID
+	}
+	if model.id != "" {
+		in["model"], in["provider"] = model.id, model.provider
+	}
+	if model.level != "" {
+		in["thinkingLevel"] = model.level
 	}
 	var out struct {
 		SessionID string `json:"sessionId"`
@@ -379,6 +496,67 @@ func (cl *client) prompt(ctx context.Context, spaceID, sessionID, text string) (
 		out.SessionID = out.Session.ID
 	}
 	return out.SessionID, nil
+}
+
+func (cl *client) models(ctx context.Context) ([]*Model, error) {
+	var out map[string][]*Model
+	if err := cl.do(ctx, "GET", "/api/models", nil, &out); err != nil {
+		return nil, err
+	}
+	return out["cohub"], nil
+}
+
+func (cl *client) labels(ctx context.Context, spaceID string) ([]*Label, error) {
+	var out struct {
+		Labels []*Label `json:"labels"`
+	}
+	return out.Labels, cl.do(ctx, "GET", "/api/spaces/"+url.PathEscape(spaceID)+"/labels", nil, &out)
+}
+
+func (cl *client) labelItems(ctx context.Context, spaceID, ref string) ([]LabelItem, error) {
+	var out struct {
+		Items []LabelItem `json:"items"`
+	}
+	q := url.Values{"ref": {ref}, "limit": {"100"}}
+	return out.Items, cl.do(ctx, "GET", "/api/spaces/"+url.PathEscape(spaceID)+"/labels/items?"+q.Encode(), nil, &out)
+}
+
+func (cl *client) spaceUsage(ctx context.Context, spaceID string, days int) (*SpaceUsage, error) {
+	var out SpaceUsage
+	return &out, cl.do(ctx, "GET", fmt.Sprintf("/api/spaces/%s/usage?days=%d", url.PathEscape(spaceID), days), nil, &out)
+}
+
+// steps loads the intermediate messages of a turn, through a signed URL.
+func (cl *client) steps(ctx context.Context, sessionID, turnID, objectKey string) ([]*StepMessage, error) {
+	var signed struct {
+		URLs map[string]string `json:"urls"`
+	}
+	if err := cl.do(ctx, "POST", fmt.Sprintf("/api/sessions/%s/turns/%s/signed-urls", url.PathEscape(sessionID), url.PathEscape(turnID)),
+		map[string]any{"objectKeys": []string{objectKey}}, &signed); err != nil {
+		return nil, err
+	}
+	u := signed.URLs[objectKey]
+	if u == "" {
+		return nil, errors.New("no signed URL for the steps")
+	}
+	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
+	if err != nil {
+		return nil, err
+	}
+	res, err := cl.http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	var file struct {
+		Messages []*StepMessage `json:"messages"`
+	}
+	return file.Messages, json.NewDecoder(res.Body).Decode(&file)
+}
+
+// get reads any JSON endpoint, for pages that show what they read.
+func (cl *client) get(ctx context.Context, path string, out any) error {
+	return cl.do(ctx, "GET", path, nil, out)
 }
 
 func (cl *client) abort(ctx context.Context, sessionID string) error {

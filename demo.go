@@ -67,10 +67,7 @@ func loadDemo(a *app) {
 			Model:            "claude-opus-5-5", ThinkingLevel: "high", StartedAt: at(12 * time.Minute), CompletedAt: &done,
 			TotalUsage:          &Usage{Input: 1100, CacheRead: 137100, Output: 1300},
 			IntermediateSummary: &intermediateSummary{MessageCount: 19, ToolCallCount: 19},
-			Meta: struct {
-				Harness string `json:"harness"`
-				Source  string `json:"source"`
-			}{Harness: "pi", Source: "web"},
+			Meta:                turnMeta{Harness: "pi", Source: "web", FinalMessageDurationMs: 19181, RequestedThinkingLevel: "high"},
 		},
 		{
 			ID: "t2", Sequence: 2, Status: "running", AuthorProfile: me,

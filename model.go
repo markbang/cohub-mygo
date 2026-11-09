@@ -17,22 +17,6 @@ import (
 	"github.com/egoist/mygo/ui/markdown"
 )
 
-type rail int
-
-const (
-	railChats rail = iota
-	railSpaces
-	railAccount // compact layouts only
-)
-
-type themeMode int
-
-const (
-	themeSystem themeMode = iota
-	themeLight
-	themeDark
-)
-
 // sessionTurns is what the timeline of one session shows.
 type sessionTurns struct {
 	turns   []*Turn
@@ -42,50 +26,66 @@ type sessionTurns struct {
 	// live is the reply of the running turn so far, from the stream snapshot.
 	live      string
 	liveTurn  string
-	liveSteps int
+	liveSteps []Block
+	// steps are the loaded intermediate messages of turns, by turn ID.
+	steps    map[string][]*StepMessage
+	expanded map[string]bool
 }
 
-// app is the whole state of the window: data from the API and what the
-// user chose. Only the main thread touches it; work on goroutines hands
-// its results over with update.
+// app is the whole state of the window: data from the API and where the
+// user is. Only the main thread touches it; work on goroutines hands its
+// results over with update.
 type app struct {
 	win *mygo.Window
 	api *client
 	now func() time.Time
+	// sync runs loads when the test flushes them instead of on goroutines.
+	sync    bool
+	pending []func()
 
-	status string // connection state shown in headers, "" when fine
+	status string // connection state, "" when fine
 	me     *Me
 
 	spaces        []*Space
 	sessions      []*Session // across spaces, most recent first
 	spaceSessions map[string][]*Session
 	timelines     map[string]*sessionTurns
+	usage7d       map[string]*SpaceUsage
+	labels        map[string][]*Label
+	labelItems    map[string][]LabelItem
+	models        []*Model
+	loading       map[string]bool
 	seen          map[string]time.Time
 	seenPath      string
 	images        *imageCache
+	pages         pageData
 
-	// What the window shows.
-	rail        rail
-	chip        string // the chats sidebar's Space filter, "" for all
-	selSpace    string
-	selSession  string
-	spacesNav   int
-	panelTab    int
-	themeMode   themeMode
-	sidebarOpen bool
-	panelOpen   bool
-	userMenu    bool
-	draft       string
-	sending     bool
-	sendErr     string
-	autoPicked  bool
+	route        route
+	back         []route
+	chip         string // the chats sidebar's Space filter, "" for all
+	spacesNav    int
+	panelTab     int
+	theme        string // a built-in theme's name, or "system"
+	prefs        prefs
+	sidebarOpen  bool
+	panelOpen    bool
+	userMenu     bool
+	palette      paletteState
+	draft        string
+	sending      bool
+	sendErr      string
+	groupsOpen   map[string]bool
+	compactNav   bool // the compact shell's drawer
+	menus        map[string]bool
+	foldOpen     map[string]bool
+	modelChoices map[string]modelChoice
 
 	sessionList ui.ListState
 	spaceList   ui.ListState
 	timeline    ui.ListState
 	md          markdown.Options
 	mdTheme     *markdown.Theme
-	mdThemeDark bool
+	mdThemeKey  string
 	pal         *palette
 	compact     bool
 }
@@ -95,12 +95,23 @@ func newApp() *app {
 		now:           time.Now,
 		spaceSessions: map[string][]*Session{},
 		timelines:     map[string]*sessionTurns{},
+		usage7d:       map[string]*SpaceUsage{},
+		labels:        map[string][]*Label{},
+		labelItems:    map[string][]LabelItem{},
+		loading:       map[string]bool{},
 		seen:          map[string]time.Time{},
+		groupsOpen:    map[string]bool{"labels": true, "chats": true, "all": true},
+		menus:         map[string]bool{},
+		foldOpen:      map[string]bool{},
+		modelChoices:  map[string]modelChoice{},
 		images:        newImageCache(),
 		sidebarOpen:   true,
 		panelOpen:     true,
 		pal:           lightPalette(),
+		route:         route{kind: -1},
+		theme:         "system",
 	}
+	a.pages.init()
 	a.md.Reveal = &markdown.Reveal{Unit: markdown.ByWord}
 	a.images.onLoad = func(fn func()) { a.update(fn) }
 	if dir, err := os.UserConfigDir(); err == nil {
@@ -108,6 +119,12 @@ func newApp() *app {
 		if b, err := os.ReadFile(a.seenPath); err == nil {
 			json.Unmarshal(b, &a.seen)
 		}
+		a.prefs.path = filepath.Join(dir, "cohub-mygo", "prefs.json")
+		a.prefs.load()
+		if a.prefs.Theme != "" {
+			a.theme = a.prefs.Theme
+		}
+		setLocale(a.prefs.Lang)
 	}
 	return a
 }
@@ -122,6 +139,45 @@ func (a *app) update(fn func()) {
 	a.win.Update(fn)
 }
 
+// spawn runs slow work off the main thread, or queues it for flush in tests.
+func (a *app) spawn(fn func()) {
+	if a.sync {
+		a.pending = append(a.pending, fn)
+		return
+	}
+	go fn()
+}
+
+// flush runs the queued work, and the work it queues, in tests.
+func (a *app) flush() bool {
+	ran := false
+	for i := 0; i < 8 && len(a.pending) > 0; i++ {
+		work := a.pending
+		a.pending = nil
+		for _, fn := range work {
+			fn()
+		}
+		ran = true
+	}
+	return ran
+}
+
+// once starts a load keyed by key unless one ran: views ask for what they
+// show, and each piece loads once until reload drops its key.
+func (a *app) once(key string, fn func(ctx context.Context)) {
+	if a.api == nil || a.loading[key] {
+		return
+	}
+	a.loading[key] = true
+	a.spawn(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		fn(ctx)
+	})
+}
+
+func (a *app) reload(key string) { delete(a.loading, key) }
+
 // start connects to the API and keeps the data fresh.
 func (a *app) start() {
 	cl, err := newClient()
@@ -132,8 +188,10 @@ func (a *app) start() {
 	}
 	a.api = cl
 	a.status = "连接中…"
-	go a.refresh()
-	go a.poll()
+	a.spawn(a.refresh)
+	if !a.sync {
+		go a.poll()
+	}
 }
 
 func (a *app) refresh() {
@@ -144,12 +202,14 @@ func (a *app) refresh() {
 		me       *Me
 		spaces   []*Space
 		sessions []*Session
+		models   []*Model
 		errs     [3]error
 	)
-	wg.Add(3)
+	wg.Add(4)
 	go func() { defer wg.Done(); me, errs[0] = a.api.me(ctx) }()
 	go func() { defer wg.Done(); spaces, errs[1] = a.api.spaces(ctx) }()
 	go func() { defer wg.Done(); sessions, errs[2] = a.api.mySessions(ctx) }()
+	go func() { defer wg.Done(); models, _ = a.api.models(ctx) }()
 	wg.Wait()
 	a.update(func() {
 		for _, err := range errs {
@@ -164,10 +224,16 @@ func (a *app) refresh() {
 		a.spaces = spaces
 		sort.SliceStable(sessions, func(i, j int) bool { return sessions[i].when().After(sessions[j].when()) })
 		a.sessions = sessions
+		if models != nil {
+			a.models = models
+		}
+		if a.route.kind == routeSessions && len(sessions) > 0 && !a.compact {
+			a.go_(route{kind: routeSession, session: sessions[0].ID})
+		}
 	})
 }
 
-// poll refreshes the lists every 15 seconds and the open session every
+// poll refreshes the lists every 16 seconds and the open session every
 // two while it has a turn running.
 func (a *app) poll() {
 	tick := time.NewTicker(2 * time.Second)
@@ -178,15 +244,11 @@ func (a *app) poll() {
 		running := false
 		done := make(chan struct{})
 		a.update(func() {
-			sessionID, spaceID = a.selSession, a.selSpace
+			sessionID, spaceID = a.route.sessionID(), a.route.space
 			if s := a.session(sessionID); s != nil {
 				running = s.running()
 			}
-			if tl := a.timelines[sessionID]; tl != nil {
-				for _, t := range tl.turns {
-					running = running || t.running()
-				}
-			}
+			running = running || lastRunning(a.timelines[sessionID])
 			close(done)
 		})
 		<-done
@@ -214,11 +276,7 @@ func (a *app) loadTurns(sessionID string) {
 		snap, _ = a.api.snapshot(ctx, sessionID)
 	}
 	a.update(func() {
-		tl := a.timelines[sessionID]
-		if tl == nil {
-			tl = &sessionTurns{}
-			a.timelines[sessionID] = tl
-		}
+		tl := a.timelineOf(sessionID)
 		tl.loaded = true
 		if err != nil {
 			tl.err = err.Error()
@@ -226,19 +284,27 @@ func (a *app) loadTurns(sessionID string) {
 		}
 		tl.err = ""
 		tl.turns, tl.hasMore = page.Turns, page.HasMore
-		tl.live, tl.liveSteps = "", 0
+		tl.live, tl.liveSteps = "", nil
 		if snap != nil && snap.Snapshot != nil && snap.Snapshot.Current != nil {
 			tl.live = joinText(snap.Snapshot.Current.Content)
 			tl.liveTurn = snap.Snapshot.TurnID
-			tl.liveSteps = len(snap.Snapshot.IntermediateMessages)
+			tl.liveSteps = snap.Snapshot.Current.Content
 		}
 		if s := a.session(sessionID); s != nil && len(page.Turns) > 0 {
-			last := page.Turns[len(page.Turns)-1]
-			if !last.running() && s.ActiveTurn != nil {
+			if !page.Turns[len(page.Turns)-1].running() {
 				s.ActiveTurn = nil
 			}
 		}
 	})
+}
+
+func (a *app) timelineOf(id string) *sessionTurns {
+	tl := a.timelines[id]
+	if tl == nil {
+		tl = &sessionTurns{steps: map[string][]*StepMessage{}, expanded: map[string]bool{}}
+		a.timelines[id] = tl
+	}
+	return tl
 }
 
 func (a *app) loadSpaceSessions(spaceID string) {
@@ -257,33 +323,72 @@ func (a *app) loadSpaceSessions(spaceID string) {
 	})
 }
 
-// openSession shows a session and loads its turns.
+// navigate goes to a path of the web app's scheme.
+func (a *app) navigate(path string) { a.go_(parseRoute(path)) }
+
+// go_ shows r, remembering where the window was for goBack.
+func (a *app) go_(r route) {
+	if r == a.route {
+		return
+	}
+	a.back = append(a.back, a.route)
+	if len(a.back) > 50 {
+		a.back = a.back[1:]
+	}
+	a.show(r)
+}
+
+func (a *app) goBack() {
+	if len(a.back) == 0 {
+		a.show(route{kind: routeSessions})
+		return
+	}
+	r := a.back[len(a.back)-1]
+	a.back = a.back[:len(a.back)-1]
+	a.show(r)
+}
+
+func (a *app) show(r route) {
+	prevSession := a.route.sessionID()
+	a.route = r
+	a.sendErr = ""
+	a.userMenu = false
+	if r.kind == routeSessions && !a.compact && len(a.sessions) > 0 {
+		// /sessions opens the latest chat, as the web does.
+		a.route = route{kind: routeSession, session: a.sessions[0].ID}
+	}
+	if r.kind == routeNewSession {
+		a.palette.open(paletteSpaces)
+	}
+	if id := a.route.sessionID(); id != "" && id != prevSession {
+		a.timeline = ui.ListState{}
+		if s := a.session(id); s != nil {
+			a.markSeen(s)
+		}
+		a.timelineOf(id)
+		if a.api != nil {
+			a.spawn(func() { a.loadTurns(id) })
+		}
+	}
+	if sp := a.route.space; sp != "" && a.route.area() == areaSpace {
+		a.once("space-sessions:"+sp, func(context.Context) { a.loadSpaceSessions(sp) })
+	}
+}
+
+// openSession shows a chat where the window is: in the Space's sidebar
+// inside a Space, among all chats elsewhere.
 func (a *app) openSession(s *Session) {
 	if s == nil {
 		return
 	}
-	a.selSession = s.ID
-	a.sendErr = ""
-	if a.rail == railSpaces {
-		a.selSpace = s.SpaceID
+	if a.route.area() == areaSpace {
+		a.go_(route{kind: routeSpaceSession, space: s.SpaceID, session: s.ID})
+		return
 	}
-	a.timeline = ui.ListState{}
-	a.markSeen(s)
-	if a.timelines[s.ID] == nil {
-		a.timelines[s.ID] = &sessionTurns{}
-	}
-	if a.api != nil {
-		go a.loadTurns(s.ID)
-	}
+	a.go_(route{kind: routeSession, session: s.ID})
 }
 
-func (a *app) openSpace(id string) {
-	a.rail = railSpaces
-	a.selSpace = id
-	a.selSession = ""
-	a.sendErr = ""
-	go a.loadSpaceSessions(id)
-}
+func (a *app) openSpace(id string) { a.go_(route{kind: routeSpace, space: id}) }
 
 func (a *app) markSeen(s *Session) {
 	a.seen[s.ID] = s.when()
@@ -291,14 +396,15 @@ func (a *app) markSeen(s *Session) {
 		return
 	}
 	b, _ := json.Marshal(a.seen)
+	path := a.seenPath
 	go func() {
-		os.MkdirAll(filepath.Dir(a.seenPath), 0o755)
-		os.WriteFile(a.seenPath, b, 0o644)
+		os.MkdirAll(filepath.Dir(path), 0o755)
+		os.WriteFile(path, b, 0o644)
 	}()
 }
 
 func (a *app) unread(s *Session) bool {
-	if s.ID == a.selSession || s.running() {
+	if s.ID == a.route.sessionID() || s.running() {
 		return false
 	}
 	seen, ok := a.seen[s.ID]
@@ -333,6 +439,31 @@ func (a *app) space(id string) *Space {
 	return nil
 }
 
+// spaceName returns the name and picture of a Space, from the list or
+// from a session's summary of it.
+func (a *app) spaceName(id string) (name, avatar string) {
+	if sp := a.space(id); sp != nil {
+		return sp.Name, sp.avatar()
+	}
+	for _, s := range a.sessions {
+		if s.SpaceID == id && s.Space != nil {
+			return s.Space.Name, s.Space.avatarURL()
+		}
+	}
+	return "", ""
+}
+
+// currentSpace is the Space of the route, or of the chat it shows.
+func (a *app) currentSpace() string {
+	if a.route.space != "" {
+		return a.route.space
+	}
+	if s := a.session(a.route.sessionID()); s != nil {
+		return s.SpaceID
+	}
+	return ""
+}
+
 // chatSpaces are the chips above the chats: Spaces with recent chats, in
 // the order of their latest.
 func (a *app) chatSpaces() []*Space {
@@ -363,11 +494,12 @@ func (a *app) visibleSessions() []*Session {
 	return out
 }
 
-func (a *app) filteredSpaces() []*Space {
+func (a *app) filteredSpaces(nav int, query string) []*Space {
 	var out []*Space
+	q := strings.ToLower(strings.TrimSpace(query))
 	for _, s := range a.spaces {
-		switch a.spacesNav {
-		case 0:
+		switch nav {
+		case 0, 1:
 			if s.IsArchived {
 				continue
 			}
@@ -384,26 +516,26 @@ func (a *app) filteredSpaces() []*Space {
 				continue
 			}
 		}
+		if q != "" && !strings.Contains(strings.ToLower(s.Name+" "+s.Description), q) {
+			continue
+		}
 		out = append(out, s)
 	}
-	if a.spacesNav == 1 {
-		out = append([]*Space(nil), out...)
+	if nav == 1 {
 		sort.SliceStable(out, func(i, j int) bool { return strings.ToLower(out[i].Name) < strings.ToLower(out[j].Name) })
 	}
 	return out
 }
 
-// send sends the composer's text to the open session, or starts one in
-// the open Space.
+// send sends the composer's text to the open chat, or starts one in the
+// route's Space.
 func (a *app) send() {
 	text := strings.TrimSpace(a.draft)
 	if text == "" || a.sending {
 		return
 	}
-	spaceID, sessionID := a.selSpace, a.selSession
-	if s := a.session(sessionID); s != nil {
-		spaceID = s.SpaceID
-	}
+	sessionID := a.route.sessionID()
+	spaceID := a.currentSpace()
 	if spaceID == "" {
 		a.sendErr = "先选择一个 Space"
 		return
@@ -414,10 +546,11 @@ func (a *app) send() {
 	}
 	a.sending, a.sendErr = true, ""
 	a.draft = ""
-	go func() {
+	inSpace := a.route.area() == areaSpace
+	a.spawn(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		id, err := a.api.prompt(ctx, spaceID, sessionID, text)
+		id, err := a.api.prompt(ctx, spaceID, sessionID, text, a.composerModel())
 		a.update(func() {
 			a.sending = false
 			if err != nil {
@@ -425,32 +558,35 @@ func (a *app) send() {
 				a.draft = text
 				return
 			}
-			if id != "" && a.selSession == "" {
-				a.selSession = id
-				a.timelines[id] = &sessionTurns{}
+			if id != "" && sessionID == "" {
+				if inSpace {
+					a.go_(route{kind: routeSpaceSession, space: spaceID, session: id})
+				} else {
+					a.go_(route{kind: routeSession, session: id})
+				}
 			}
 		})
 		if id != "" {
 			a.loadTurns(id)
 		}
 		a.refresh()
-	}()
+	})
 }
 
 func (a *app) abort() {
-	id := a.selSession
+	id := a.route.sessionID()
 	if a.api == nil || id == "" {
 		return
 	}
-	go func() {
+	a.spawn(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 		a.api.abort(ctx, id)
 		a.loadTurns(id)
-	}()
+	})
 }
 
-// imageCache loads avatars from the CDN once each.
+// imageCache loads pictures from the CDN once each.
 type imageCache struct {
 	mu     sync.Mutex
 	m      map[string]*ui.Bitmap
@@ -520,7 +656,7 @@ func (ic *imageCache) fetch(url string) (*ui.Bitmap, error) {
 	return ui.DecodeBitmap(b)
 }
 
-// wait blocks until every image asked for has loaded or failed (snapshots).
+// wait blocks until every image asked for has loaded or failed (tests).
 func (ic *imageCache) wait(d time.Duration) {
 	deadline := time.Now().Add(d)
 	for time.Now().Before(deadline) {
@@ -532,4 +668,8 @@ func (ic *imageCache) wait(d time.Duration) {
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
+}
+
+func lastRunning(tl *sessionTurns) bool {
+	return tl != nil && len(tl.turns) > 0 && tl.turns[len(tl.turns)-1].running()
 }
