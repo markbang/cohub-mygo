@@ -185,6 +185,7 @@ func newApp() *app {
 	}
 	a.pages.init()
 	a.md.Reveal = &markdown.Reveal{Unit: markdown.ByWord}
+	a.md.OnLink = func(u string) { a.openLink(u) }
 	a.images.onLoad = func(fn func()) { a.update(fn) }
 	if dir, err := os.UserConfigDir(); err == nil {
 		a.seenPath = filepath.Join(dir, "cohub-mygo", "seen.json")
@@ -1024,4 +1025,42 @@ func (a *app) resolveSlug(sub string) {
 		})
 		return nil
 	})
+}
+
+// appPath is where a link goes in the app: cohub://spaces/<id> (a
+// mention), a cohub.live address or a path of the web's, or false for
+// a link that leaves for the browser.
+func appPath(raw string) (string, bool) {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "", false
+	}
+	path := u.Path
+	switch {
+	case u.Scheme == "cohub" && u.Host != "":
+		path = "/" + u.Host + u.Path
+	case u.Scheme == "" && u.Host == "" && strings.HasPrefix(raw, "/"):
+	case (u.Scheme == "https" || u.Scheme == "http") && (u.Host == "cohub.live" || u.Host == "www.cohub.live"):
+		if path == "" || path == "/" || strings.HasPrefix(path, "/docs") || strings.HasPrefix(path, "/zh") ||
+			strings.HasPrefix(path, "/pricing") || strings.HasPrefix(path, "/changelog") || strings.HasPrefix(path, "/trending") {
+			return "", false
+		}
+	default:
+		return "", false
+	}
+	if u.RawQuery != "" {
+		path += "?" + u.RawQuery
+	}
+	return path, true
+}
+
+// openLink opens a link: in the app where it has the page, else in the
+// browser. It reports whether the app took it.
+func (a *app) openLink(raw string) bool {
+	if path, ok := appPath(raw); ok {
+		a.navigate(path)
+		return true
+	}
+	a.openURL(raw)
+	return false
 }

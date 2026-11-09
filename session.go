@@ -173,7 +173,7 @@ func (a *app) turnView(c *ui.Context, sessionID string, t *Turn, tl *sessionTurn
 	p := a.pal
 	if prompt := strings.TrimSpace(t.prompt()); prompt != "" {
 		ui.Column(c.Key("user")).AlignSelf(ui.End).MaxWidthPercent(100).Gap(4).Children(func() {
-			ui.Text(c, prompt).Selectable().FontSize(14).LineHeight(1.65).TextColor(p.text).
+			a.userText(c, prompt).Selectable().FontSize(14).LineHeight(1.65).TextColor(p.text).
 				Padding(6, 8).Radius(12, 12, 6, 12).Background(p.userBubble)
 			a.metaRow(c.Key("user-meta"), func() {
 				a.metaCopy(c, prompt)

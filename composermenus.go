@@ -507,3 +507,38 @@ func (a *app) highlight(c *ui.Context, s, q string, size float32) func() {
 		).SingleLine()
 	}
 }
+
+var mentionLinkRe = regexp.MustCompile(`@\[([^\]\n]+)\]\((cohub://(?:spaces|apps)/[^\s)]+)\)`)
+
+// userText is a message the user wrote, its mentions of Spaces and apps
+// as the web's chips: "@name" on the brand's muted color. A click on a
+// message that mentions one place opens it.
+func (a *app) userText(c *ui.Context, s string) ui.Element {
+	locs := mentionLinkRe.FindAllStringSubmatchIndex(s, -1)
+	if locs == nil {
+		return ui.Text(c, s)
+	}
+	p := a.pal
+	var spans []ui.Span
+	last := 0
+	for _, l := range locs {
+		if l[0] > last {
+			spans = append(spans, ui.Span{Text: s[last:l[0]], Color: p.text})
+		}
+		spans = append(spans, ui.Span{Text: "@" + s[l[2]:l[3]], Weight: 500, Size: 14 * 0.92, Color: p.brandMutedFg,
+			Background: p.brandMuted, Radius: 5, PaddingX: 6, PaddingY: 2})
+		last = l[1]
+	}
+	if last < len(s) {
+		spans = append(spans, ui.Span{Text: s[last:], Color: p.text})
+	}
+	e := ui.RichText(c, spans...)
+	if len(locs) == 1 {
+		e.Cursor(ui.CursorPointer)
+	}
+	if len(locs) == 1 && e.Clicked() {
+		l := locs[0]
+		a.openLink(s[l[4]:l[5]])
+	}
+	return e
+}

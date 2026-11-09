@@ -551,3 +551,22 @@ func TestTypingIsNotAShortcut(t *testing.T) {
 		t.Fatalf("draft %q", a.draft)
 	}
 }
+
+func TestAppPath(t *testing.T) {
+	for in, want := range map[string]string{
+		"cohub://spaces/s1":             "/spaces/s1",
+		"cohub://spaces/s1/sessions/x":  "/spaces/s1/sessions/x",
+		"https://cohub.live/spaces/s1":  "/spaces/s1",
+		"/sessions/abc":                 "/sessions/abc",
+		"https://example.com/a":         "",
+		"https://cohub.live/docs/intro": "",
+	} {
+		got, ok := appPath(in)
+		if !ok {
+			got = ""
+		}
+		if got != want {
+			t.Errorf("%s: %q, want %q", in, got, want)
+		}
+	}
+}
