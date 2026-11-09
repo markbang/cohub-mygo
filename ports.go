@@ -184,3 +184,20 @@ func (a *app) portView(c *ui.Context, spaceID, port string) {
 
 // publishPort publishes the port as an app, as the web's Publish App.
 func (a *app) publishPort(spaceID, port string) { a.openPublish(spaceID, "port", port) }
+
+// webSurface stands for a window the web draws as a web page, an app's
+// surface: a native client without a web view opens it in the browser.
+func (a *app) webSurface(c *ui.Context, link string) {
+	p := a.pal
+	ui.Column(c.Key("surface")).Grow(1).Center().Padding(24).Background(p.bgContent).Children(func() {
+		ui.Column(c).MaxWidth(360).Gap(8).AlignItems(ui.Center).Children(func() {
+			ui.Box(c).Size(40, 40).Radius(8).Border(1, p.borderSubtle).Background(p.bgSurface).Center().Children(func() {
+				ui.Icon(c, icon("panels-top-left")).Size(20, 20).TextColor(p.textTertiary)
+			})
+			ui.Text(c, m("x_port_external")).FontSize(12).LineHeight(1.6).TextColor(p.textTertiary).TextAlign(ui.Center)
+			if a.button(c, "external-link", m("port_open_external"), true).Clicked() {
+				c.OpenURL(link)
+			}
+		})
+	})
+}

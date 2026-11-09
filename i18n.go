@@ -23,6 +23,7 @@ var locale = "zh-CN"
 // extraMessages are the app's words the web's catalogs lack, as
 // zh-CN and en.
 var extraMessages = map[string][2]string{
+	"x_port_external":     {"这个页面在浏览器中运行。", "This page runs in your browser."},
 	"x_display_type":      {"输入发送到屏幕…", "Type to the display…"},
 	"x_display_scroll":    {"滚动", "Scroll"},
 	"x_more":              {"更多", "More"},

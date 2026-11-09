@@ -441,6 +441,8 @@ func (a *app) windowPane(c *ui.Context) {
 		title = path.Base(r.file())
 	case r.port() != "":
 		title, iconName = ":"+r.port(), "globe"
+	case strings.HasPrefix(r.win, "app:") || strings.HasPrefix(r.win, "work:"):
+		title, iconName = m("x_apps"), "panels-top-left"
 	case r.display() != "":
 		title, iconName = r.display(), "monitor"
 		ds, _ := a.displays(r.space)
@@ -514,6 +516,8 @@ func (a *app) windowPane(c *ui.Context) {
 				a.portView(c, r.space, r.port())
 			case r.display() != "":
 				a.displayView(c, r.space, r.display())
+			case strings.HasPrefix(r.win, "app:") || strings.HasPrefix(r.win, "work:"):
+				a.webSurface(c, "https://cohub.live"+r.String())
 			case r.kind == routeSpaceCheckpoint:
 				a.checkpointView(c, r.space, r.sub)
 			case r.kind == routeSpaceTask:
