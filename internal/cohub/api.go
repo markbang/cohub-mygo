@@ -130,7 +130,21 @@ type Block struct {
 	Input    json.RawMessage `json:"input"`
 	IsError  bool            `json:"is_error"`
 	ToolUse  string          `json:"tool_use_id"`
+	Content  json.RawMessage `json:"content"` // a tool result's
 	Meta     *BlockMeta      `json:"_meta"`
+}
+
+// ResultText is a tool result's content: its text, or its blocks' text.
+func (b Block) ResultText() string {
+	var s string
+	if json.Unmarshal(b.Content, &s) == nil {
+		return s
+	}
+	var blocks []Block
+	if json.Unmarshal(b.Content, &blocks) == nil {
+		return JoinText(blocks)
+	}
+	return ""
 }
 
 type BlockMeta struct {
@@ -154,7 +168,10 @@ type StepMessage struct {
 	CreatedAt  time.Time `json:"createdAt"`
 	Content    []Block   `json:"content"`
 	Meta       struct {
-		MessageKind string `json:"messageKind"`
+		MessageKind     string `json:"messageKind"`
+		TurnID          string `json:"turnId"`
+		MessageOrdinal  *int   `json:"messageOrdinal"`
+		StreamMessageID string `json:"streamMessageId"`
 	} `json:"meta"`
 }
 
@@ -260,11 +277,35 @@ type IntermediateSummary struct {
 }
 
 type TurnMeta struct {
-	Harness                string `json:"harness"`
-	Source                 string `json:"source"`
-	FinalMessageDurationMs int64  `json:"finalMessageDurationMs"`
-	RequestedThinkingLevel string `json:"requestedThinkingLevel"`
-	RuntimeArchiveStatus   string `json:"runtimeArchiveStatus"`
+	Harness                string       `json:"harness"`
+	Source                 string       `json:"source"`
+	FinalMessageDurationMs int64        `json:"finalMessageDurationMs"`
+	RequestedThinkingLevel string       `json:"requestedThinkingLevel"`
+	RuntimeArchiveStatus   string       `json:"runtimeArchiveStatus"`
+	ClientMessageID        string       `json:"clientMessageId"`
+	ContextWindow          int64        `json:"contextWindow"`
+	Metrics                *TurnMetrics `json:"metrics"`
+	// RequestSource is where the prompt came from: another chat, when an
+	// agent there sent it.
+	RequestSource *struct {
+		Via       string `json:"via"`
+		SessionID string `json:"sessionId"`
+	} `json:"requestSource"`
+}
+
+// TurnMetrics are how a turn ran: its model requests and tools, timed.
+type TurnMetrics struct {
+	ExecutionStartedAt int64 `json:"executionStartedAt"` // Unix ms
+	Tools              *struct {
+		Calls    int     `json:"calls"`
+		ActiveMs float64 `json:"activeMs"`
+	} `json:"tools"`
+	Requests map[string]*struct {
+		DurationMs       float64  `json:"durationMs"`
+		FirstTokenMs     *float64 `json:"firstTokenMs"`
+		OutputDurationMs *float64 `json:"outputDurationMs"`
+		Usage            *Usage   `json:"usage"`
+	} `json:"requests"`
 }
 
 // Turn is one exchange of a session: the user's message and the reply.
@@ -272,6 +313,7 @@ type Turn struct {
 	ID                  string               `json:"id"`
 	Sequence            int                  `json:"sequence"`
 	Status              string               `json:"status"`
+	Intent              string               `json:"intent"`
 	UserContent         []Block              `json:"userContent"`
 	UserText            string               `json:"userText"`
 	UserUUID            string               `json:"userUuid"`
@@ -296,6 +338,9 @@ type Turn struct {
 func (t *Turn) Running() bool {
 	return t.CompletedAt == nil && t.Status != "completed" && t.Status != "failed" && t.Status != "aborted" && t.Status != "cancelled"
 }
+
+// Queued tells whether the turn is a follow-up waiting for the one running.
+func (t *Turn) Queued() bool { return t.Status == "queued" && t.Intent == "followup" }
 
 func JoinText(blocks []Block) string {
 	var b strings.Builder
@@ -330,12 +375,15 @@ type StreamSnapshot struct {
 		TurnID  string `json:"turnId"`
 		Seq     int    `json:"seq"`
 		Current *struct {
-			Content    []map[string]any `json:"content"`
-			AppendPath *string          `json:"appendPath"`
+			MessageID      string           `json:"messageId"`
+			MessageOrdinal *int             `json:"messageOrdinal"`
+			Content        []map[string]any `json:"content"`
+			AppendPath     *string          `json:"appendPath"`
 		} `json:"current"`
 		IntermediateMessages []struct {
-			MessageID string  `json:"messageId"`
-			Content   []Block `json:"content"`
+			StepMessage
+			MessageID      string `json:"messageId"`
+			MessageOrdinal *int   `json:"messageOrdinal"`
 		} `json:"intermediateMessages"`
 	} `json:"snapshot"`
 }
@@ -465,13 +513,21 @@ func (cl *Client) Do(ctx context.Context, method, path string, body, out any) er
 	}
 	if res.StatusCode >= 300 {
 		b, _ := io.ReadAll(io.LimitReader(res.Body, 512))
-		return fmt.Errorf("%s %s: %d %s", method, path, res.StatusCode, strings.TrimSpace(string(b)))
+		return &StatusError{Status: res.StatusCode, msg: fmt.Sprintf("%s %s: %d %s", method, path, res.StatusCode, strings.TrimSpace(string(b)))}
 	}
 	if out == nil {
 		return nil
 	}
 	return json.NewDecoder(res.Body).Decode(out)
 }
+
+// StatusError is a response the API refused, with its status.
+type StatusError struct {
+	Status int
+	msg    string
+}
+
+func (e *StatusError) Error() string { return e.msg }
 
 func (cl *Client) Me(ctx context.Context) (*Me, error) {
 	var me Me
@@ -500,14 +556,26 @@ func (cl *Client) Turns(ctx context.Context, sessionID string, limit int) (*Turn
 	return &page, cl.Do(ctx, "GET", fmt.Sprintf("/api/sessions/%s/turns?limit=%d", url.PathEscape(sessionID), limit), nil, &page)
 }
 
+// TurnsBefore returns the turns before the one of sequence before, oldest
+// first.
+func (cl *Client) TurnsBefore(ctx context.Context, sessionID string, before, limit int) (*TurnsPage, error) {
+	var page TurnsPage
+	return &page, cl.Do(ctx, "GET", fmt.Sprintf("/api/sessions/%s/turns?limit=%d&cursor=%d", url.PathEscape(sessionID), limit, before), nil, &page)
+}
+
 func (cl *Client) Snapshot(ctx context.Context, sessionID string) (*StreamSnapshot, error) {
 	var s StreamSnapshot
 	return &s, cl.Do(ctx, "GET", "/api/sessions/"+url.PathEscape(sessionID)+"/turns/stream-snapshot", nil, &s)
 }
 
-// Prompt sends text to a session of a space, or to a new one without sessionID.
-func (cl *Client) Prompt(ctx context.Context, spaceID, sessionID string, content []map[string]any, model ModelChoice) (string, error) {
-	in := map[string]any{"content": content, "source": "web", "clientMessageId": NewID()}
+// Prompt sends content to a session of a space, or to a new one without
+// sessionID. It runs at once, or as a follow-up after the turn running.
+// clientMessageID names the message, as its turn's meta keeps it.
+func (cl *Client) Prompt(ctx context.Context, spaceID, sessionID string, content []map[string]any, model ModelChoice, clientMessageID string) (string, error) {
+	if clientMessageID == "" {
+		clientMessageID = NewID()
+	}
+	in := map[string]any{"content": content, "source": "web", "clientMessageId": clientMessageID, "intent": "followup"}
 	if sessionID != "" {
 		in["sessionId"] = sessionID
 	}
@@ -601,6 +669,20 @@ func (cl *Client) Get(ctx context.Context, path string, out any) error {
 
 func (cl *Client) Abort(ctx context.Context, sessionID string) error {
 	return cl.Do(ctx, "POST", "/api/sessions/"+url.PathEscape(sessionID)+"/abort", map[string]any{}, nil)
+}
+
+// SteerTurn runs a queued follow-up now, interrupting the turn running.
+func (cl *Client) SteerTurn(ctx context.Context, spaceID, sessionID, turnID string) error {
+	return cl.Do(ctx, "POST", followupPath(spaceID, sessionID, turnID, "steer"), nil, nil)
+}
+
+// CancelTurn drops a queued follow-up.
+func (cl *Client) CancelTurn(ctx context.Context, spaceID, sessionID, turnID string) error {
+	return cl.Do(ctx, "POST", followupPath(spaceID, sessionID, turnID, "cancel"), nil, nil)
+}
+
+func followupPath(spaceID, sessionID, turnID, action string) string {
+	return "/api/spaces/" + url.PathEscape(spaceID) + "/sessions/" + url.PathEscape(sessionID) + "/turns/" + url.PathEscape(turnID) + "/" + action
 }
 
 type SessionFork struct {

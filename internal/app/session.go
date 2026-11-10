@@ -73,7 +73,7 @@ func (a *app) sessionView(c *ui.Context) {
 		}
 	})
 
-	turns := tl.turns
+	turns := tl.shown()
 	a.timeline.Key = func(i int) any { return turns[i].ID }
 	a.timeline.FollowEnd = true
 	a.timeline.FollowAnimation = &ui.Smooth
@@ -96,6 +96,13 @@ func (a *app) sessionView(c *ui.Context) {
 				ui.Text(c, m("x_no_messages")).FontSize(13).TextColor(p.textTertiary).Margin(ui.Auto)
 			}
 		})
+		// Scrolled up to the first turn loaded, the turns before it load.
+		if first, last := a.timeline.Visible(); len(turns) > 0 && last >= first && first == 0 && tl.hasMore {
+			a.loadOlderTurns(id)
+		}
+		if tl.loadingOlder {
+			ui.Box(c.Key("older")).Attach(ui.AnchorTop, ui.AnchorTop).Top(12).Children(func() { a.spinner(c, 16, p.textTertiary) })
+		}
 		if !a.compact && len(turns) > 0 {
 			a.turnRail(c, turns)
 		}
@@ -111,28 +118,71 @@ func (a *app) sessionView(c *ui.Context) {
 		}
 	})
 	if s != nil {
+		a.followups(c, s, tl)
 		a.approvals(c, s, tl)
+		a.archivedNotice(c, s)
 	}
 	a.composer(c, s != nil && s.Running() || lastRunning(tl))
 }
 
+// archivedNotice is the line above the composer of an archived chat, as the
+// web's: sending restores it, or the button does now.
+func (a *app) archivedNotice(c *ui.Context, s *cohub.Session) {
+	if s.ArchivedAt == nil {
+		return
+	}
+	p := a.pal
+	pad := float32(24)
+	if a.compact {
+		pad = 16
+	}
+	ui.Row(c.Key("archived")).Shrink(0).Padding(0, pad, 4, pad).Children(func() {
+		ui.Row(c).FillWidth().MaxWidth(chatMaxWidth).Margin(0, ui.Auto).Gap(8).AlignItems(ui.Center).Children(func() {
+			ui.Icon(c, icon("archive")).Size(14, 14).TextColor(p.textTertiary)
+			ui.Text(c, m("session_archived_notice")).FontSize(12).TextColor(p.textTertiary).SingleLine().Grow(1).MinWidth(0)
+			b := ui.ButtonBase(c.Key("unarchive")).Padding(2, 6).Radius(4).Label(m("session_unarchive")).FocusRing(false)
+			hover := b.Hovered()
+			b.Children(func() {
+				col := p.textSecond
+				if hover {
+					col = p.text
+				}
+				ui.Text(c, m("session_unarchive")).FontSize(12).TextColor(col)
+			})
+			if hover {
+				b.Background(p.hover)
+			}
+			if b.Clicked() {
+				a.setSessionArchived(s, false)
+			}
+		})
+	})
+}
+
 // turnRail is TurnRail.svelte: a hairline down the timeline's right with a
-// mark for each turn, the one in view in the brand's color.
+// mark for each turn, the one in view in the brand's color. Hovering a
+// mark opens the turn navigator beside it.
 func (a *app) turnRail(c *ui.Context, turns []*cohub.Turn) {
 	p := a.pal
 	first, last := a.timeline.Visible()
 	n := len(turns)
 	line := p.borderSubtle.Alpha(0.65)
 	thumb := p.placeholder.Alpha(0.35)
-	ui.Box(c.Key("rail")).Attach(ui.AnchorTopRight, ui.AnchorTopRight).Top(4).Right(4).Width(28).HeightPercent(97).PassThrough().
-		Draw(func(pt *ui.Painter, r ui.Rect) {
-			pt.Fill(ui.Rect{X: r.X + r.W - 14, Y: r.Y, W: 1, H: r.H}, line, 0)
-			if n > 1 && last >= first {
-				top := r.H * float32(first) / float32(n)
-				h := max(r.H*float32(last-first+1)/float32(n), 24)
-				pt.Fill(ui.Rect{X: r.X + r.W - 15, Y: r.Y + min(top, r.H-h), W: 3, H: h}, thumb, 1.5)
-			}
-		}).Children(func() {
+	nav := &a.turnNav
+	rail := ui.Box(c.Key("rail")).Attach(ui.AnchorTopRight, ui.AnchorTopRight).Top(4).Right(4).Width(28).HeightPercent(97).PassThrough()
+	// The rail passes the pointer through: it is hovered over its marks
+	// and the navigator, which are inside it.
+	nav.hold(c, rail.Hovered())
+	railH := rail.Bounds().H
+	rail.Draw(func(pt *ui.Painter, r ui.Rect) {
+		pt.Fill(ui.Rect{X: r.X + r.W - 14, Y: r.Y, W: 1, H: r.H}, line, 0)
+		if n > 1 && last >= first {
+			top := r.H * float32(first) / float32(n)
+			h := max(r.H*float32(last-first+1)/float32(n), 24)
+			pt.Fill(ui.Rect{X: r.X + r.W - 15, Y: r.Y + min(top, r.H-h), W: 3, H: h}, thumb, 1.5)
+		}
+	}).Children(func() {
+		at := float32(-1)
 		for i, t := range turns {
 			cur := i == first
 			col := p.placeholder.Alpha(0.85)
@@ -141,23 +191,38 @@ func (a *app) turnRail(c *ui.Context, turns []*cohub.Turn) {
 				col = p.errorC
 			case "running":
 				col = p.success
+			case "interrupted":
+				col = p.warning
 			}
 			w, h := float32(6), float32(10)
 			if cur {
-				w, h = 12, 20
+				w, h, col = 12, 20, p.brand
 			}
 			top := float32(0)
 			if n > 1 {
 				top = float32(i) / float32(n-1) * 94
 			}
 			mark := ui.ButtonBase(c.Key(t.ID)).Absolute().TopPercent(top).Right(2).Size(24, h+4).Center().
-				Label(fmt.Sprintf("Turn %d", t.Sequence)).FocusRing(false).Children(func() {
+				Label(m("turnrail_jump_turn", "n", t.Sequence)).FocusRing(false)
+			if mark.Hovered() {
+				nav.show(t.ID)
+				if !cur {
+					w, col = 10, col.Alpha(1)
+				}
+			}
+			if nav.open && nav.turn == t.ID {
+				at = railH*top/100 + (h+4)/2
+			}
+			mark.Children(func() {
 				ui.Box(c).Size(w, h).Radius(w/2).Background(col).Border(1, p.chatBg.Over(p.bgPrimary).Alpha(0.9))
 			})
-			idx := i
+			id := t.ID
 			if mark.Clicked() {
-				a.timeline.ScrollTo(idx, ui.Start)
+				a.jumpToTurn(id)
 			}
+		}
+		if nav.open && at >= 0 && railH > 0 {
+			a.turnNavigator(c, turns, at, railH)
 		}
 	})
 }
@@ -182,11 +247,22 @@ func (a *app) turnView(c *ui.Context, sessionID string, t *cohub.Turn, tl *sessi
 				Padding(6, 8).Radius(12, 12, 6, 12).Background(p.userBubble)
 			a.metaRow(c.Key("user-meta"), func() {
 				a.metaCopy(c, prompt)
+				a.sentFrom(c, sessionID, t)
 				if pr := t.AuthorProfile; pr != nil {
-					ui.Row(c).Gap(4).AlignItems(ui.Center).Children(func() {
+					who := ui.Row(c).Gap(4).AlignItems(ui.Center).Children(func() {
 						a.avatar(c, pr.AvatarURL, pr.Name(), 14, 7)
 						ui.Text(c, pr.Name()).FontSize(11).TextColor(p.metaText())
 					})
+					if pr.Username != "" {
+						who.Tooltip(pr.Name() + " · @" + pr.Username)
+					}
+				}
+				if t.Status == "cancelled" {
+					tip := m("chat_not_sent_to_agent")
+					if pr := t.AuthorProfile; pr != nil {
+						tip = m("chat_cancelled_by", "name", pr.Name())
+					}
+					ui.Text(c, m("chat_cancelled")).FontSize(11).TextColor(p.metaText()).Tooltip(tip)
 				}
 			}, t.StartedAt)
 		})
@@ -197,8 +273,10 @@ func (a *app) turnView(c *ui.Context, sessionID string, t *cohub.Turn, tl *sessi
 
 	// The final message: its thinking, then the reply, as Markdown.
 	reply := t.Reply()
-	if running && tl.live != "" && (tl.liveTurn == "" || tl.liveTurn == t.ID) {
-		reply = tl.live
+	if st := tl.liveOf(t); running && st != nil {
+		if live := cohub.JoinText(st.Current()); live != "" {
+			reply = live
+		}
 	}
 	if !running {
 		for _, b := range t.AssistantContent {
@@ -222,8 +300,37 @@ func (a *app) turnView(c *ui.Context, sessionID string, t *cohub.Turn, tl *sessi
 			ui.Text(c, t.ErrorMessage).FontSize(12).TextColor(p.errorC)
 		})
 	}
-	if !running && reply != "" {
+	// An interrupted turn has its line too, with what it spent.
+	if !running && (reply != "" || t.Status == "interrupted") {
 		a.replyMeta(c.Key("reply-meta"), t)
+	}
+}
+
+// sentFrom is the chat a prompt came from, when an agent there sent it, as
+// a link to it.
+func (a *app) sentFrom(c *ui.Context, sessionID string, t *cohub.Turn) {
+	src := t.Meta.RequestSource
+	if src == nil || src.SessionID == "" || src.SessionID == sessionID {
+		return
+	}
+	p := a.pal
+	label := m("sent_from_chat")
+	if s := a.session(src.SessionID); s != nil {
+		label = m("sent_from", "title", chatTitle(s))
+	}
+	b := ui.ButtonBase(c.Key("sent-from")).Row().Gap(4).AlignItems(ui.Center).MaxWidth(192).Shrink(1).MinWidth(0).
+		Label(label).Tooltip(label).FocusRing(false)
+	hover := b.Hovered()
+	b.Children(func() {
+		col := p.placeholder.Alpha(0.7)
+		if hover {
+			col = p.textSecond
+		}
+		ui.Icon(c, icon("corner-down-left")).Size(12, 12).TextColor(p.brand.Alpha(0.6))
+		ui.Text(c, label).FontSize(11).TextColor(col).SingleLine().MinWidth(0)
+	})
+	if b.Clicked() {
+		a.go_(route{kind: routeSession, session: src.SessionID})
 	}
 }
 
@@ -234,14 +341,15 @@ func (a *app) metaRow(c *ui.Context, fn func(), at time.Time) {
 		fn()
 		ui.Spacer(c).MinWidth(24)
 		if !at.IsZero() {
-			ui.Text(c, clock(at, a.now())).FontSize(11).TextColor(a.pal.metaText()).Shrink(0)
+			ui.Text(c, clock(at, a.now())).FontSize(11).TextColor(a.pal.metaText()).Shrink(0).
+				Tooltip(at.Local().Format("2006-01-02 15:04:05"))
 		}
 	})
 }
 
 func (a *app) metaCopy(c *ui.Context, text string) {
 	p := a.pal
-	b := ui.ButtonBase(c.Key("copy")).Size(22, 22).Center().Radius(4).Label(m("copy")).FocusRing(false).Children(func() {
+	b := ui.ButtonBase(c.Key("copy")).Size(22, 22).Center().Radius(4).Label(m("chat_copy_message")).Tooltip(m("chat_copy_message")).FocusRing(false).Children(func() {
 		ui.Icon(c, icon("copy")).Size(14, 14).TextColor(p.metaText())
 	})
 	if b.Hovered() {
@@ -312,15 +420,43 @@ func (a *app) replyMeta(c *ui.Context, t *cohub.Turn) {
 		if t.Meta.RuntimeArchiveStatus == "ready" {
 			ui.Icon(c, icon("archive")).Size(12, 12).TextColor(p.textTertiary)
 		}
-		ui.Text(c, t.Model).FontSize(11).TextColor(p.metaText()).SingleLine().MinWidth(0)
+		model := ui.Text(c, t.Model).FontSize(11).TextColor(p.metaText()).SingleLine().MinWidth(0)
+		if t.Provider != "" {
+			model.Tooltip(t.Provider + "/" + t.Model)
+		}
 		if lv := levelName(t.Meta.RequestedThinkingLevel, t.ThinkingLevel); lv != "" {
 			ui.Text(c, lv).FontSize(11).TextColor(p.metaText()).Shrink(0)
 		}
-		if u := usageLabel(t.FinalUsage); u != "" {
-			ui.Text(c, u).FontSize(11).TextColor(p.metaText()).Shrink(0)
-		}
-		if d := t.Meta.FinalMessageDurationMs; d > 0 {
-			ui.Text(c, duration(d)).FontSize(11).TextColor(p.metaText()).Shrink(0)
+		// The tokens and time open the turn's statistics, as the web's.
+		if u, d := usageLabel(t.FinalUsage), t.Meta.FinalMessageDurationMs; u != "" || d > 0 {
+			b := ui.ButtonBase(c.Key("turn-stats")).Row().Gap(4).AlignItems(ui.Center).Padding(1, 3).Radius(4).Shrink(0).
+				Label(m("stats_turn")).FocusRing(false)
+			hover := b.Hovered()
+			b.Children(func() {
+				col := p.metaText()
+				if hover {
+					col = p.textSecond
+				}
+				if u != "" {
+					ui.Text(c, u).FontSize(11).TextColor(col)
+				}
+				if d > 0 {
+					ui.Text(c, duration(d)).FontSize(11).TextColor(col)
+				}
+			})
+			if hover {
+				b.Background(p.hover)
+			}
+			if b.Clicked() {
+				if a.turnStatsFor == t.ID {
+					a.turnStatsFor = ""
+				} else {
+					a.turnStatsFor = t.ID
+				}
+			}
+			if a.turnStatsFor == t.ID {
+				a.turnStatsDialog(c, b, t)
+			}
 		}
 	}, at)
 }
@@ -334,9 +470,10 @@ func (a *app) processView(c *ui.Context, sessionID string, t *cohub.Turn, tl *se
 	if sum != nil {
 		steps, tools = sum.MessageCount, sum.ToolCallCount
 	}
+	st := tl.liveOf(t)
 	var live []cohub.Block
-	if running && (tl.liveTurn == "" || tl.liveTurn == t.ID) {
-		live = tl.liveSteps
+	if running && st != nil {
+		live = st.Current()
 	}
 	if steps == 0 && !running {
 		return
@@ -378,6 +515,11 @@ func (a *app) processView(c *ui.Context, sessionID string, t *cohub.Turn, tl *se
 			}
 			ui.Text(c, label).FontSize(13).TextColor(p.textTertiary).SingleLine()
 		})
+		if sum != nil && !open {
+			if tip := usageTitle(sum.Usage, sum.DurationMs); tip != "" {
+				head.Tooltip(tip)
+			}
+		}
 		if head.Hovered() {
 			head.Background(p.hover.Alpha(0.5))
 		}
@@ -393,9 +535,11 @@ func (a *app) processView(c *ui.Context, sessionID string, t *cohub.Turn, tl *se
 			a.stepEntries(c, t, msgs)
 		}
 	}
-	if running && !open && len(tl.liveDone) > 0 && (tl.liveTurn == "" || tl.liveTurn == t.ID) {
+	if running && !open && st != nil {
 		// The steps done so far, as the web shows the running turn's.
-		a.stepEntries(c, t, tl.liveDone)
+		if done := st.Done(); len(done) > 0 {
+			a.stepEntries(c, t, done)
+		}
 	}
 	if running {
 		if len(live) == 0 {
@@ -406,15 +550,10 @@ func (a *app) processView(c *ui.Context, sessionID string, t *cohub.Turn, tl *se
 			})
 			return
 		}
-		done := map[string]bool{}
-		for _, b := range live {
-			if b.Type == "tool_result" || b.Type == "toolResult" {
-				done[b.ToolUse] = true
-			}
-		}
+		results := toolResults(live)
 		ui.Column(c.Key("live")).Gap(8).Children(func() {
 			for i, b := range live {
-				if done[b.ID] && b.Meta == nil {
+				if results[b.ID] != nil && b.Meta == nil {
 					b.Meta = &cohub.BlockMeta{ToolStatus: "done"}
 				}
 				switch b.Type {
@@ -423,7 +562,7 @@ func (a *app) processView(c *ui.Context, sessionID string, t *cohub.Turn, tl *se
 						a.thinking(c, fmt.Sprint("live-think", i), b.Thinking, true)
 					}
 				case "tool_use", "toolCall":
-					a.toolRow(c.Key(i), b, true)
+					a.toolRow(c.Key(i), b, results[b.ID], true)
 				}
 			}
 		})
@@ -565,6 +704,7 @@ func (a *app) stepMessage(c *ui.Context, m *cohub.StepMessage) {
 
 func (a *app) stepBody(c *ui.Context, m *cohub.StepMessage) {
 	p := a.pal
+	results := toolResults(m.Content)
 	for i, b := range m.Content {
 		switch b.Type {
 		case "thinking":
@@ -578,7 +718,7 @@ func (a *app) stepBody(c *ui.Context, m *cohub.StepMessage) {
 				})
 			}
 		case "tool_use", "toolCall":
-			a.toolRow(c.Key(i), b, false)
+			a.toolRow(c.Key(i), b, results[b.ID], false)
 		}
 	}
 	if m.Error != "" {
@@ -586,8 +726,10 @@ func (a *app) stepBody(c *ui.Context, m *cohub.StepMessage) {
 	}
 }
 
-// toolRow is one tool call: its name, what it ran on, and how it went.
-func (a *app) toolRow(c *ui.Context, b cohub.Block, live bool) {
+// toolRow is one tool call: its name, what it ran on, and how it went. A
+// click opens what it got and gave back, as the web's; a call running
+// shows it open. result is the call's result, when it came.
+func (a *app) toolRow(c *ui.Context, b cohub.Block, result *cohub.Block, live bool) {
 	p := a.pal
 	status := "done"
 	if b.Meta != nil && b.Meta.ToolStatus != "" {
@@ -596,6 +738,7 @@ func (a *app) toolRow(c *ui.Context, b cohub.Block, live bool) {
 	if live && (b.Meta == nil || b.Meta.ToolStatus == "") {
 		status = "running"
 	}
+	running := status == "running" || status == "pending"
 	summary := ""
 	if b.Meta != nil {
 		summary = b.Meta.Summary
@@ -606,20 +749,149 @@ func (a *app) toolRow(c *ui.Context, b cohub.Block, live bool) {
 	if b.Name == "bash" && summary != "" && !strings.HasPrefix(summary, "$") {
 		summary = "$ " + summary
 	}
-	ui.Row(c).Gap(8).AlignItems(ui.Center).MinHeight(28).Padding(4, msgInset).Radius(6).Children(func() {
-		col, label := p.success.Alpha(0.75), m("tool_status_done")
-		switch status {
-		case "running", "pending":
-			col, label = p.brand, m("session_activity_running")
-		case "error", "failed":
-			col, label = p.errorC, m("tool_status_failed")
+	key := "tool:" + b.ID
+	open, chosen := a.foldOpen[key]
+	if !chosen {
+		open = running
+	}
+	ui.Column(c).Children(func() {
+		head := ui.ButtonBase(c.Key("head")).Row().Gap(8).AlignItems(ui.Center).Justify(ui.Start).MinHeight(28).Padding(4, msgInset).Radius(6).
+			Label(b.Name + " " + summary).FocusRing(false)
+		if head.Hovered() {
+			head.Background(p.hover.Alpha(0.5))
 		}
-		a.statusDot(c, col, status == "running")
-		ui.Text(c, b.Name).FontSize(13).Font(fontMono).TextColor(p.textSecond).Shrink(0).MinWidth(56)
-		ui.Text(c, oneLine(summary)).FontSize(13).Font(fontMono).TextColor(p.textTertiary).SingleLine().Grow(1).MinWidth(0)
-		ui.Text(c, label).FontSize(11).TextColor(p.placeholder).Shrink(0)
-		ui.Icon(c, icon("chevron-right")).Size(14, 14).TextColor(p.textTertiary)
+		head.Children(func() {
+			col, label := p.success.Alpha(0.75), m("tool_status_done")
+			switch {
+			case running:
+				col, label = p.brand, m("session_activity_running")
+			case status == "error" || status == "failed":
+				col, label = p.errorC, m("tool_status_failed")
+			}
+			a.statusDot(c, col, status == "running")
+			ui.Text(c, b.Name).FontSize(13).Font(fontMono).TextColor(p.textSecond).Shrink(0).MinWidth(56)
+			ui.Text(c, oneLine(summary)).FontSize(13).Font(fontMono).TextColor(p.textTertiary).SingleLine().Grow(1).MinWidth(0)
+			st := ui.Text(c, label).FontSize(11).TextColor(p.placeholder).Shrink(0)
+			if b.Meta != nil && b.Meta.Timing != nil && b.Meta.Timing.DurationMs > 0 {
+				ms := b.Meta.Timing.DurationMs
+				st.Tooltip(fmt.Sprintf("%s: %s (%s ms)", m("chat_duration"), duration(ms), groupThousands(strconv.FormatInt(ms, 10))))
+			}
+			chevron := "chevron-right"
+			if open {
+				chevron = "chevron-down"
+			}
+			ui.Icon(c, icon(chevron)).Size(14, 14).TextColor(p.textTertiary)
+		})
+		if head.Clicked() {
+			a.foldOpen[key] = !open
+		}
+		if open {
+			a.toolDetail(c, b, result, running)
+		}
 	})
+}
+
+// toolDetail is a tool call opened: its input, the main one first and the
+// others by name, then its output, or that it still runs.
+func (a *app) toolDetail(c *ui.Context, b cohub.Block, result *cohub.Block, running bool) {
+	p := a.pal
+	main, params := toolInputParts(b)
+	out, outLabel, outCol := "", m("tool_out"), p.textSecond
+	switch {
+	case result != nil:
+		out = strings.TrimRight(result.ResultText(), "\n")
+		if result.IsError {
+			outLabel, outCol = m("tool_err"), p.errorC
+		}
+	case running:
+		out = m("tool_running_verb", "verb", m("tool_verb_executing"))
+	}
+	ui.Column(c.Key("detail")).Gap(8).MarginStart(msgInset+3).Padding(4, 8, 4, 21).BorderStartWidth(1).BorderColor(p.borderSubtle.Alpha(0.7)).Children(func() {
+		part := func(label string, body func()) {
+			ui.Row(c.Key(label)).Gap(8).AlignItems(ui.Start).Children(func() {
+				ui.Text(c, label).Font(fontMono).FontSize(10).TextColor(p.placeholder).Width(28).Shrink(0).Margin(3, 0, 0, 0)
+				ui.Column(c).Grow(1).MinWidth(0).Gap(6).Children(body)
+			})
+		}
+		if main != "" || len(params) > 0 {
+			part(m("tool_in"), func() {
+				if main != "" {
+					ui.Scroll(c.Key("main")).MaxHeight(224).Children(func() {
+						ui.Text(c, main).Font(fontMono).FontSize(12).LineHeight(1.375).TextColor(p.textSecond).Selectable()
+					})
+				}
+				for _, kv := range params {
+					ui.Row(c.Key(kv.k)).Gap(8).AlignItems(ui.Start).Children(func() {
+						ui.Text(c, strings.ToUpper(kv.k)).Font(fontMono).FontSize(10).TextColor(p.placeholder).MinWidth(72).Shrink(0).Margin(1, 0, 0, 0)
+						ui.Text(c, kv.v).FontSize(12).TextColor(p.textSecond).Grow(1).MinWidth(0).Selectable()
+					})
+				}
+			})
+		}
+		if out != "" {
+			part(outLabel, func() {
+				ui.Scroll(c.Key("out")).MaxHeight(320).Children(func() {
+					ui.Text(c, out).Font(fontMono).FontSize(13).LineHeight(1.375).TextColor(outCol).Selectable()
+				})
+			})
+		}
+	})
+}
+
+// toolInputParts splits a call's input into its main value, as the
+// command a shell ran, and the others, by name.
+func toolInputParts(b cohub.Block) (string, []kv) {
+	raw := b.Input
+	if len(raw) == 0 {
+		raw = b.Args
+	}
+	var in map[string]any
+	if json.Unmarshal(raw, &in) != nil {
+		return "", nil
+	}
+	main, mainKey := "", ""
+	for _, k := range []string{"command", "path", "url", "query", "pattern"} {
+		if s, ok := in[k].(string); ok {
+			main, mainKey = s, k
+			break
+		}
+	}
+	keys := make([]string, 0, len(in))
+	for k := range in {
+		if k != mainKey {
+			keys = append(keys, k)
+		}
+	}
+	sort.Strings(keys)
+	var params []kv
+	for _, k := range keys {
+		var v string
+		switch x := in[k].(type) {
+		case string:
+			v = x
+		case float64:
+			v = strconv.FormatFloat(x, 'f', -1, 64)
+			if k == "timeout" {
+				v += "s"
+			}
+		default:
+			j, _ := json.Marshal(x)
+			v = string(j)
+		}
+		params = append(params, kv{k: k, v: v})
+	}
+	return main, params
+}
+
+// toolResults are the results among blocks, by the call they answer.
+func toolResults(blocks []cohub.Block) map[string]*cohub.Block {
+	out := map[string]*cohub.Block{}
+	for i := range blocks {
+		if b := &blocks[i]; (b.Type == "tool_result" || b.Type == "toolResult") && b.ToolUse != "" {
+			out[b.ToolUse] = b
+		}
+	}
+	return out
 }
 
 func toolInputSummary(b cohub.Block) string {
@@ -720,9 +992,12 @@ func (a *app) composer(c *ui.Context, running bool) {
 					a.toggleVoice()
 				}
 				empty := strings.TrimSpace(a.draft) == "" && len(a.attachments) == 0
+				// While a turn runs, a message is a follow-up it sends; with
+				// none, the button stops the turn.
+				stop := running && empty
 				send := ui.ButtonBase(c.Key("send")).Size(36, 36).Radius(18).Center().FocusRing(false).Children(func() {
 					switch {
-					case running:
+					case stop:
 						ui.Box(c).Size(12, 12).Radius(2).Background(p.bgPrimary)
 					case empty || a.sending:
 						ui.Icon(c, icon("arrow-up")).Size(16, 16).TextColor(p.placeholder.Alpha(0.6))
@@ -731,7 +1006,7 @@ func (a *app) composer(c *ui.Context, running bool) {
 					}
 				})
 				switch {
-				case running:
+				case stop:
 					send.Background(p.text).Label(m("board_session_stop"))
 				case empty || a.sending:
 					send.Background(p.hover).Label(m("feedback_send"))
@@ -739,7 +1014,7 @@ func (a *app) composer(c *ui.Context, running bool) {
 					send.Background(p.text).Label(m("feedback_send"))
 				}
 				if send.Clicked() {
-					if running {
+					if stop {
 						a.abort()
 					} else {
 						a.send()
@@ -1040,6 +1315,41 @@ func usageLabel(u *cohub.Usage) string {
 		parts = append(parts, "↓"+kilo(u.Output))
 	}
 	return strings.Join(parts, " ")
+}
+
+// usageTitle is the steps line's tooltip, as the web's: the tokens in and
+// out, the cache written, the total, the cost and how long they took.
+func usageTitle(u *cohub.Usage, ms int64) string {
+	var parts []string
+	if u != nil {
+		if in := u.Input + u.CacheRead + u.CacheWrite; in > 0 {
+			s := kilo(in)
+			if u.CacheRead > 0 {
+				s += " (" + m("chat_cached", "count", kilo(u.CacheRead)) + ")"
+			}
+			parts = append(parts, m("chat_input_label", "value", s))
+		}
+		if u.Output > 0 {
+			parts = append(parts, m("chat_output_label", "value", kilo(u.Output)))
+		}
+		if u.CacheWrite > 0 {
+			parts = append(parts, m("chat_cache_write_label", "value", kilo(u.CacheWrite)))
+		}
+		total := u.TotalTokens
+		if total == 0 {
+			total = u.Input + u.Output + u.CacheRead + u.CacheWrite
+		}
+		if total > 0 {
+			parts = append(parts, m("chat_total_label", "value", kilo(total)))
+		}
+		if cost := u.TotalCost(); cost > 0 {
+			parts = append(parts, m("chat_cost_label", "value", fmt.Sprintf("US$%.3f", cost)))
+		}
+	}
+	if ms > 0 {
+		parts = append(parts, fmt.Sprintf("%s: %s (%s ms)", m("chat_duration"), duration(ms), groupThousands(strconv.FormatInt(ms, 10))))
+	}
+	return strings.Join(parts, " · ")
 }
 
 // forkTurn starts a chat that goes on from a turn, and opens it.

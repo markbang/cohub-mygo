@@ -47,13 +47,19 @@ func (rt *realtime) handle(env cohub.Event) {
 		rt.a.update(func() { open = rt.a.route.sessionID(); close(done) })
 		<-done
 		if env.SessionID != "" && env.SessionID == open {
-			if env.Type == "session.turn.patch" {
+			switch {
+			case env.Type == "session.turn.patch":
 				rt.applyPatch(open, env.Payload)
-			} else {
+			case env.Type == "session.turn.lifecycle":
+				// A model call starting changes nothing shown: its patches do.
+			case env.Type == "session.message.persisted" && rt.persisted(open, env.Payload):
+			default:
 				rt.dueTurns(open, env.Type)
 			}
 		}
-		if env.Type != "session.turn.patch" {
+		switch env.Type {
+		case "session.turn.patch", "session.turn.lifecycle", "session.message.persisted":
+		default:
 			rt.dueLists()
 		}
 	case strings.HasPrefix(env.Type, "space."):
@@ -128,22 +134,42 @@ func (rt *realtime) applyPatch(sessionID string, payload json.RawMessage) {
 	}
 	rt.a.update(func() {
 		tl := rt.a.timelineOf(sessionID)
-		if tl.patch == nil && ev.BaseSeq == 0 {
-			tl.patch = &cohub.PatchState{}
+		if tl.stream == nil {
+			tl.stream = &cohub.Stream{}
 		}
-		if tl.patch == nil || !tl.patch.Apply(ev) {
+		if !tl.stream.Patch(ev) {
 			if debugPatch != nil {
-				debugPatch(fmt.Sprintf("reject seq=%d base=%d %v ops=%s", ev.Seq, ev.BaseSeq, tl.patch, string(payload)[:min(400, len(payload))]))
+				debugPatch(fmt.Sprintf("reject seq=%d base=%d message=%s ops=%s", ev.Seq, ev.BaseSeq, ev.Message(), string(payload)[:min(400, len(payload))]))
 			}
 			rt.resynced++
 			go rt.dueTurns(sessionID, "session.turn.snapshot")
 			return
 		}
 		rt.patched++
-		tl.liveSteps = tl.patch.Content()
-		tl.live = cohub.JoinText(tl.liveSteps)
-		if ev.TurnID != "" {
-			tl.liveTurn = ev.TurnID
-		}
 	})
+}
+
+// persisted takes a step of the running turn the API saved, and reports
+// whether it did: other messages, as the user's or the final reply, reload
+// the chat.
+func (rt *realtime) persisted(sessionID string, payload json.RawMessage) bool {
+	var p struct {
+		Message *struct {
+			cohub.StepMessage
+			Role string `json:"role"`
+		} `json:"message"`
+	}
+	if json.Unmarshal(payload, &p) != nil || p.Message == nil || p.Message.Role != "assistant" ||
+		p.Message.Meta.MessageKind != "assistant_intermediate" {
+		return false
+	}
+	m := p.Message.StepMessage
+	rt.a.update(func() {
+		tl := rt.a.timelineOf(sessionID)
+		if tl.stream == nil {
+			tl.stream = &cohub.Stream{}
+		}
+		tl.stream.Persisted(&m)
+	})
+	return true
 }

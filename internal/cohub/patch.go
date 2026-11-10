@@ -22,15 +22,48 @@ type PatchOp struct {
 }
 
 type PatchEvent struct {
-	TurnID  string    `json:"turnId"`
-	Seq     int       `json:"seq"`
-	BaseSeq int       `json:"baseSeq"`
-	Ops     []PatchOp `json:"ops"`
+	TurnID         string    `json:"turnId"`
+	MessageID      string    `json:"messageId"`
+	MessageOrdinal *int      `json:"messageOrdinal"`
+	Seq            int       `json:"seq"`
+	BaseSeq        int       `json:"baseSeq"`
+	Ops            []PatchOp `json:"ops"`
+}
+
+// Message is the key of the message the patch writes, as the SDK's.
+func (ev PatchEvent) Message() string { return messageKey(ev.MessageID, ev.TurnID, ev.MessageOrdinal) }
+
+// messageKey names a message of a turn: by its ID, or by the turn and its
+// place among the turn's model calls.
+func messageKey(id, turnID string, ordinal *int) string {
+	switch {
+	case strings.TrimSpace(id) != "":
+		return strings.TrimSpace(id)
+	case ordinal != nil && turnID != "":
+		return fmt.Sprintf("turn:%s:assistant:%d", turnID, *ordinal)
+	}
+	return ""
+}
+
+// ordinalOf is a message's place among its turn's model calls, from the
+// ordinal sent or the key's end; -1 when neither tells.
+func ordinalOf(key string, ordinal *int) int {
+	if ordinal != nil {
+		return *ordinal
+	}
+	if i := strings.LastIndexByte(key, ':'); i >= 0 {
+		if n, err := strconv.Atoi(key[i+1:]); err == nil {
+			return n
+		}
+	}
+	return -1
 }
 
 // PatchState is the running turn's current message, block by block.
 type PatchState struct {
 	turnID     string
+	message    string // the message's key, "" before the first patch that names it
+	ordinal    int
 	seq        int
 	blocks     []map[string]any
 	appendPath string
@@ -268,6 +301,9 @@ func (s *PatchState) Apply(ev PatchEvent) bool {
 	if ev.TurnID != "" {
 		s.turnID = ev.TurnID
 	}
+	if m := ev.Message(); m != "" {
+		s.message, s.ordinal = m, ordinalOf(m, ev.MessageOrdinal)
+	}
 	return true
 }
 
@@ -297,10 +333,26 @@ func (s *PatchState) Content() []Block {
 func (snap *StreamSnapshot) PatchState() *PatchState {
 	cur := snap.Snapshot.Current
 	ps := &PatchState{turnID: snap.Snapshot.TurnID, seq: snap.Snapshot.Seq, blocks: cur.Content}
+	ps.message = messageKey(cur.MessageID, snap.Snapshot.TurnID, cur.MessageOrdinal)
+	ps.ordinal = ordinalOf(ps.message, cur.MessageOrdinal)
 	if cur.AppendPath != nil {
 		ps.appendPath = *cur.AppendPath
 	}
 	return ps
+}
+
+// ahead tells whether the patches got further than a snapshot read before
+// them: a later message of the turn, or more of the same one.
+func (s *PatchState) ahead(snap *StreamSnapshot) bool {
+	sn := snap.Snapshot
+	if s.turnID == "" || s.turnID != sn.TurnID {
+		return false
+	}
+	key := messageKey(sn.Current.MessageID, sn.TurnID, sn.Current.MessageOrdinal)
+	if s.message != "" && key != "" && s.message != key {
+		return s.ordinal > ordinalOf(key, sn.Current.MessageOrdinal)
+	}
+	return sn.Seq < s.seq
 }
 
 // TurnID is the running turn's.

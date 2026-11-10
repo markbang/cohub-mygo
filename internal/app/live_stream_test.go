@@ -27,7 +27,7 @@ func TestLivePatchStream(t *testing.T) {
 	home := "0565aad4-5605-4ad0-a0fc-50be6dfce711"
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	sid, err := a.api.Prompt(ctx, home, "", []map[string]any{{"type": "text", "text": "用中文写一段 300 字的短文，介绍 GPU 自绘界面的好处。不要使用任何工具。"}}, cohub.ModelChoice{Provider: "cohub", ID: "deepseek-flash"})
+	sid, err := a.api.Prompt(ctx, home, "", []map[string]any{{"type": "text", "text": "用中文写一段 300 字的短文，介绍 GPU 自绘界面的好处。不要使用任何工具。"}}, cohub.ModelChoice{Provider: "cohub", ID: "deepseek-flash"}, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,8 +38,10 @@ func TestLivePatchStream(t *testing.T) {
 		time.Sleep(500 * time.Millisecond)
 		done := make(chan struct{})
 		a.update(func() {
-			if l := len(a.timelineOf(sid).live); l > maxLive {
-				maxLive = l
+			if st := a.timelineOf(sid).stream; st != nil {
+				if l := len(cohub.JoinText(st.Current())); l > maxLive {
+					maxLive = l
+				}
 			}
 			close(done)
 		})

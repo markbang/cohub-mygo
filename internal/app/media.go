@@ -283,7 +283,7 @@ func (a *app) mediaPanel(c *ui.Context, spaceID, sessionID string, filters bool)
 }
 
 // panelInner is the width inside the panel's 8px gutters.
-func (a *app) panelInner() float32 { return panelWidth - 1 - 16 }
+func (a *app) panelInner() float32 { return a.panelW - 1 - 16 }
 
 // genTile is GenerationTile.svelte: the media, or the task's state.
 func (a *app) genTile(c *ui.Context, r *genRun, o *genOutput, size float32) {

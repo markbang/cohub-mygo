@@ -14,6 +14,10 @@ type prefs struct {
 	Lang        string `json:"lang,omitempty"`
 	CustomTheme *bool  `json:"customTheme,omitempty"`
 	Danmaku     *bool  `json:"danmaku,omitempty"` // live messages over the Space
+	// The panes' widths, once the user dragged their edges.
+	SidebarWidth float32 `json:"sidebarWidth,omitempty"`
+	PanelWidth   float32 `json:"panelWidth,omitempty"`
+	MainWidth    float32 `json:"mainWidth,omitempty"`
 }
 
 func (p *prefs) danmaku() bool { return p.Danmaku == nil || *p.Danmaku }

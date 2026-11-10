@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -26,17 +25,15 @@ import (
 
 // sessionTurns is what the timeline of one session shows.
 type sessionTurns struct {
-	turns   []*cohub.Turn
-	hasMore bool
-	loaded  bool
-	fetched bool // loaded from the API, not only the startup cache
-	err     string
-	// live is the reply of the running turn so far, from the stream snapshot.
-	live      string
-	liveTurn  string
-	liveSteps []cohub.Block
-	liveDone  []*cohub.StepMessage // the running turn's messages done so far
-	patch     *cohub.PatchState    // the running turn's message, as patches build it
+	turns        []*cohub.Turn
+	hasMore      bool // turns before the first loaded
+	loadingOlder bool
+	loaded       bool
+	fetched      bool // loaded from the API, not only the startup cache
+	err          string
+	stream       *cohub.Stream // the running turn as it is written, nil when none runs
+	// pending are the messages sent that no loaded turn holds yet.
+	pending []*cohub.Turn
 	// steps are the loaded intermediate messages of turns, by turn ID.
 	steps    map[string][]*cohub.StepMessage
 	expanded map[string]bool
@@ -99,6 +96,7 @@ type app struct {
 	copiedAt                     time.Time
 	labelTarget                  *labelTarget
 	statsFor                     string               // the chat whose statistics are open
+	turnStatsFor                 string               // the turn whose statistics are open
 	editors                      map[string]*fileEdit // open files by space:path
 	fsPending                    *fsCreate
 	uploading                    int
@@ -175,6 +173,12 @@ type app struct {
 	webFontsCSS string // the theme whose web fonts loaded
 	homeSpace   string
 	compact     bool
+
+	sidebarW, panelW, mainW float32 // the panes' widths: the sidebar, the right panel, the main column beside a window
+	paneDrag                *paneDrag
+	turnNav                 turnNav
+	followupBusy            map[string]bool // follow-ups being steered or cancelled
+	flags                   map[string]*bool
 }
 
 func newApp() *app {
@@ -211,6 +215,11 @@ func newApp() *app {
 		spaceEdits:     map[string]*spaceEdit{},
 		walletForms:    map[string]*walletForm{},
 		panelOpen:      true,
+		sidebarW:       sidebarWidth,
+		panelW:         panelWidth,
+		mainW:          mainWidth,
+		followupBusy:   map[string]bool{},
+		flags:          map[string]*bool{},
 		pal:            lightPalette(),
 		route:          route{kind: -1},
 		theme:          "system",
@@ -231,6 +240,9 @@ func newApp() *app {
 		if a.prefs.Theme != "" {
 			a.theme = a.prefs.Theme
 		}
+		a.sidebarW = clampPane(a.prefs.SidebarWidth, sidebarWidth, sidebarMin, sidebarMax)
+		a.panelW = clampPane(a.prefs.PanelWidth, panelWidth, panelMin, panelMax)
+		a.mainW = clampPane(a.prefs.MainWidth, mainWidth, mainMin, 1<<20)
 		i18n.SetLocale(a.prefs.Lang)
 		if b, err := os.ReadFile(filepath.Join(dir, "cohub-mygo", "theme.css")); err == nil {
 			a.customCSS = string(b)
@@ -439,25 +451,29 @@ func (a *app) loadTurns(sessionID string) {
 			return
 		}
 		tl.err = ""
-		tl.turns, tl.hasMore = page.Turns, page.HasMore
-		switch {
-		case snap == nil || snap.Snapshot == nil || snap.Snapshot.Current == nil:
-			tl.live, tl.liveSteps, tl.patch, tl.liveDone = "", nil, nil, nil
-		case tl.patch != nil && tl.patch.TurnID() == snap.Snapshot.TurnID && snap.Snapshot.Seq < tl.patch.Seq():
-			// Patches got further than the snapshot, which was read
-			// before them: keep what they built.
-		default:
-			ps := snap.PatchState()
-			tl.patch = ps
-			tl.liveDone = nil
-			for i, im := range snap.Snapshot.IntermediateMessages {
-				if len(im.Content) > 0 {
-					tl.liveDone = append(tl.liveDone, &cohub.StepMessage{ID: firstNonEmpty(im.MessageID, fmt.Sprint("live", i)), Sequence: i, Content: im.Content})
+		// The latest turns take the place of those loaded, after the older
+		// ones scrolling up loaded.
+		var older []*cohub.Turn
+		if len(page.Turns) > 0 {
+			for _, t := range tl.turns {
+				if t.Sequence < page.Turns[0].Sequence {
+					older = append(older, t)
 				}
 			}
-			tl.liveSteps = ps.Content()
-			tl.live = cohub.JoinText(tl.liveSteps)
-			tl.liveTurn = snap.Snapshot.TurnID
+		}
+		if len(older) > 0 {
+			tl.turns = append(older, page.Turns...)
+		} else {
+			tl.turns, tl.hasMore = page.Turns, page.HasMore
+		}
+		tl.settlePending()
+		if snap == nil || snap.Snapshot == nil || snap.Snapshot.Current == nil {
+			tl.stream = nil
+		} else {
+			if tl.stream == nil {
+				tl.stream = &cohub.Stream{}
+			}
+			tl.stream.Seed(snap)
 		}
 		if s := a.session(sessionID); s != nil && len(page.Turns) > 0 {
 			if !page.Turns[len(page.Turns)-1].Running() {
@@ -469,6 +485,54 @@ func (a *app) loadTurns(sessionID string) {
 		if len(a.sessions) > 0 && a.sessions[0].ID == sessionID && (fresh || !lastRunning(tl)) {
 			a.saveStartupCache()
 		}
+	})
+}
+
+// switchOf is a switch kept by key, for a control that binds to it, as a menu
+// button's open state.
+func (a *app) switchOf(key string) *bool {
+	f := a.flags[key]
+	if f == nil {
+		f = new(bool)
+		a.flags[key] = f
+	}
+	return f
+}
+
+// loadOlderTurns loads the turns before the first loaded, as the timeline
+// scrolls up to it.
+func (a *app) loadOlderTurns(sessionID string) {
+	tl := a.timelineOf(sessionID)
+	if a.api == nil || tl.loadingOlder || !tl.hasMore || len(tl.turns) == 0 {
+		return
+	}
+	tl.loadingOlder = true
+	before := tl.turns[0].Sequence
+	a.spawn(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+		page, err := a.api.TurnsBefore(ctx, sessionID, before, 30)
+		a.update(func() {
+			tl.loadingOlder = false
+			if err != nil {
+				// No retry on every frame: the next reload of the chat tries
+				// again.
+				tl.hasMore = false
+				a.toast, a.toastAt, a.toastOK = err.Error(), time.Now(), false
+				return
+			}
+			if len(tl.turns) == 0 || tl.turns[0].Sequence != before {
+				return
+			}
+			var older []*cohub.Turn
+			for _, t := range page.Turns {
+				if t.Sequence < before {
+					older = append(older, t)
+				}
+			}
+			tl.turns = append(older, tl.turns...)
+			tl.hasMore = page.HasMore && len(older) > 0
+		})
 	})
 }
 
@@ -531,6 +595,7 @@ func (a *app) show(r route) {
 	a.route = r
 	a.sendErr = ""
 	a.userMenu = false
+	a.turnNav = turnNav{}
 	if r.kind == routeSessions && !a.compact && len(a.sessions) > 0 {
 		// /sessions opens the latest chat, as the web does.
 		a.route = route{kind: routeSession, session: a.sessions[0].ID}
@@ -850,6 +915,18 @@ func (a *app) send() {
 	}
 	viewport := a.viewport()
 	inSpace := a.route.area() == areaSpace
+	cid := cohub.NewID()
+	if sessionID != "" {
+		// The message shows at once: queued behind the turn running, or
+		// running, until its turn loads.
+		tl := a.timelineOf(sessionID)
+		busy := lastRunning(tl)
+		if s := a.session(sessionID); s != nil {
+			busy = busy || s.Running()
+		}
+		tl.pending = append(tl.pending, a.pendingTurn(tl, text, cid, busy))
+		a.timeline.ScrollToEnd()
+	}
 	a.spawn(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		defer cancel()
@@ -878,11 +955,14 @@ func (a *app) send() {
 			if viewport != nil {
 				content = append(content, viewport)
 			}
-			id, err = a.api.Prompt(ctx, spaceID, sessionID, content, model)
+			id, err = a.api.Prompt(ctx, spaceID, sessionID, content, model, cid)
 		}
 		a.update(func() {
 			a.sending = false
 			if err != nil {
+				if sessionID != "" {
+					a.timelineOf(sessionID).dropPending(cid)
+				}
 				a.sendErr = err.Error()
 				a.draft = text
 				for _, at := range ats {
@@ -1027,7 +1107,7 @@ func (ic *imageCache) wait(d time.Duration) {
 }
 
 func lastRunning(tl *sessionTurns) bool {
-	return tl != nil && len(tl.turns) > 0 && tl.turns[len(tl.turns)-1].Running()
+	return tl != nil && (len(tl.turns) > 0 && tl.turns[len(tl.turns)-1].Running() || len(tl.pending) > 0)
 }
 
 // loadCustomTheme reads the Home Space's .cohub/theme.css, the custom theme

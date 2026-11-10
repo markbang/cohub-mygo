@@ -33,6 +33,7 @@ func demoApp(t *testing.T) *app {
 	a.seen = map[string]time.Time{}
 	// The user's own preferences and custom theme stay out of the tests.
 	a.prefs.path, a.theme, a.customCSS = "", "system", ""
+	a.sidebarW, a.panelW, a.mainW = sidebarWidth, panelWidth, mainWidth
 	i18n.SetLocale("zh-CN")
 	fixed := time.Date(2026, 11, 9, 8, 0, 0, 0, time.Local)
 	a.now = func() time.Time { return fixed }
@@ -476,6 +477,263 @@ func TestTurnNoticeStacks(t *testing.T) {
 		t.Fatal(err)
 	}
 	snapshot(t, tt, "desktop-notice")
+}
+
+// drag presses at x, halfway across the window, and lets go dx further.
+func drag(tt *ui.Tester, x, dx float32) {
+	tt.Press(x, 450)
+	tt.Move(x+dx/2, 450)
+	tt.Move(x+dx, 450)
+	tt.Release(x+dx, 450)
+	tt.Frame()
+}
+
+// Dragging the edges of the sidebar and the right panel resizes them, as
+// far as the web's limits, and keeps the widths for the next start.
+func TestDraggingPaneEdges(t *testing.T) {
+	a := demoApp(t)
+	tt := ui.NewTester(a.view, 1440, 900)
+	drag(tt, sidebarWidth, 100)
+	if a.sidebarW != sidebarWidth+100 || a.prefs.SidebarWidth != a.sidebarW {
+		t.Fatalf("sidebar %v, kept %v", a.sidebarW, a.prefs.SidebarWidth)
+	}
+	drag(tt, a.sidebarW, 400)
+	if a.sidebarW != sidebarMax {
+		t.Fatalf("sidebar %v past its widest", a.sidebarW)
+	}
+	drag(tt, 1440-panelWidth, -100)
+	if a.panelW != panelWidth+100 || a.prefs.PanelWidth != a.panelW {
+		t.Fatalf("panel %v, kept %v", a.panelW, a.prefs.PanelWidth)
+	}
+	snapshot(t, tt, "desktop-panes-resized")
+}
+
+// Beside a window, dragging the main column's edge resizes it, and letting
+// go far past its narrowest gives the window its room.
+func TestWindowEdgeResizesMainColumn(t *testing.T) {
+	a := demoApp(t)
+	tt := ui.NewTester(a.view, 1440, 900)
+	a.navigate("/spaces/s1/checkpoints/new")
+	tt.Frame()
+	drag(tt, sidebarWidth+mainWidth, 100)
+	if a.mainW != mainWidth+100 || a.windowWide {
+		t.Fatalf("main column %v, wide %v", a.mainW, a.windowWide)
+	}
+	drag(tt, sidebarWidth+a.mainW, -400)
+	if !a.windowWide || a.mainW != mainWidth+100 {
+		t.Fatalf("main column %v, wide %v", a.mainW, a.windowWide)
+	}
+}
+
+// While a turn runs, a message sent waits in the queue above the composer
+// rather than in the timeline, and steering it asks the API to run it now.
+func TestFollowupQueuesAndSteers(t *testing.T) {
+	var mu sync.Mutex
+	var prompt map[string]any
+	steered := ""
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		switch {
+		case r.Method == "POST" && r.URL.Path == "/api/spaces/s1/prompt":
+			json.NewDecoder(r.Body).Decode(&prompt)
+			io.WriteString(w, `{"sessionId":"demo-0"}`)
+		case r.URL.Path == "/api/sessions/demo-0/turns":
+			cid, _ := prompt["clientMessageId"].(string)
+			status, intent := "queued", "followup"
+			if steered != "" {
+				status, intent = "running", "steer"
+			}
+			fmt.Fprintf(w, `{"turns":[{"id":"t2","sequence":2,"status":"running"},`+
+				`{"id":"t3","sequence":3,"status":%q,"intent":%q,"userText":"接着做","meta":{"clientMessageId":%q}}]}`, status, intent, cid)
+		case r.Method == "POST" && r.URL.Path == "/api/spaces/s1/sessions/demo-0/turns/t3/steer":
+			steered = "t3"
+			io.WriteString(w, `{"ok":true}`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	a := demoApp(t)
+	a.sync = true
+	a.api = cohub.NewWithToken(srv.URL, "x", "", srv.Client())
+	tt := ui.NewTester(a.view, 1440, 900)
+	if _, ok := tt.Find(m("board_session_stop")); !ok {
+		t.Fatal("an empty composer does not stop the running turn")
+	}
+	tt.Type("接着做")
+	tt.Frame()
+	if err := tt.Click(m("feedback_send")); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	if !tt.HasText(m("chat_queued", "count", 1)) {
+		t.Fatalf("the message waits nowhere: %q", tt.Texts())
+	}
+	for i := 0; i < 3 && a.flush(); i++ {
+		tt.Frame()
+	}
+	tt.Frame()
+	mu.Lock()
+	if prompt["sessionId"] != "demo-0" || prompt["intent"] != "followup" {
+		t.Fatalf("prompt %v", prompt)
+	}
+	mu.Unlock()
+	tl := a.timelineOf("demo-0")
+	shown := tl.shown()
+	if len(tl.pending) != 0 || len(tl.queued()) != 1 || shown[len(shown)-1].ID != "t2" {
+		t.Fatalf("pending %d, queued %d, last shown %s", len(tl.pending), len(tl.queued()), shown[len(shown)-1].ID)
+	}
+	snapshot(t, tt, "desktop-followup-queue")
+	if err := tt.Click(m("chat_steer_now")); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 3 && a.flush(); i++ {
+		tt.Frame()
+	}
+	tt.Frame()
+	mu.Lock()
+	defer mu.Unlock()
+	if steered != "t3" || tt.HasText(m("chat_steer_now")) {
+		t.Fatalf("steered %q, queue %v", steered, tt.HasText(m("chat_steer_now")))
+	}
+}
+
+// A chat scrolled up to its first loaded turn loads the turns before it;
+// they only ever loaded the latest 30.
+func TestScrollingUpLoadsOlderTurns(t *testing.T) {
+	var mu sync.Mutex
+	cursor := ""
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		if r.URL.Path == "/api/sessions/demo-0/turns" && r.URL.Query().Get("cursor") != "" {
+			cursor = r.URL.Query().Get("cursor")
+			io.WriteString(w, `{"turns":[{"id":"t0","sequence":0,"status":"completed","userText":"最早的一句"}],"hasMore":false}`)
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer srv.Close()
+	a := demoApp(t)
+	a.sync = true
+	a.api = cohub.NewWithToken(srv.URL, "x", "", srv.Client())
+	tl := a.timelineOf("demo-0")
+	tl.hasMore = true
+	tt := ui.NewTester(a.view, 1440, 900)
+	a.timeline.ScrollTo(0, ui.Start)
+	for i := 0; i < 3; i++ {
+		tt.Frame()
+		a.flush()
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if cursor != "1" || tl.turns[0].ID != "t0" || tl.hasMore {
+		t.Fatalf("cursor %q, first turn %s, more %v", cursor, tl.turns[0].ID, tl.hasMore)
+	}
+}
+
+// The tokens and time under a reply open the turn's statistics.
+func TestReplyFiguresOpenTurnStats(t *testing.T) {
+	a := demoApp(t)
+	tt := ui.NewTester(a.view, 1440, 900)
+	if err := tt.Click(m("stats_turn")); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	if a.turnStatsFor != "t1" || !tt.HasText(m("stats_final_response")) {
+		t.Fatalf("stats for %q", a.turnStatsFor)
+	}
+	snapshot(t, tt, "desktop-turn-stats")
+}
+
+// An archived chat says so above the composer, and its button restores it.
+func TestArchivedChatUnarchives(t *testing.T) {
+	a := demoApp(t)
+	s := a.session("demo-0")
+	at := a.now()
+	s.ArchivedAt = &at
+	tt := ui.NewTester(a.view, 1440, 900)
+	if err := tt.Click(m("session_unarchive")); err != nil {
+		t.Fatal(err)
+	}
+	if s.ArchivedAt != nil {
+		t.Fatal("still archived")
+	}
+}
+
+// A tool call opens on a click into what it ran and what came back; its
+// row had a chevron that did nothing.
+func TestToolCallOpens(t *testing.T) {
+	a := demoApp(t)
+	tl := a.timelineOf("demo-0")
+	step := &cohub.StepMessage{ID: "m1", Content: []cohub.Block{
+		{Type: "tool_use", ID: "c1", Name: "bash", Input: json.RawMessage(`{"command":"ls","timeout":20}`)},
+		{Type: "tool_result", ToolUse: "c1", Content: json.RawMessage(`"a.txt"`)},
+	}}
+	tl.steps["t1"] = []*cohub.StepMessage{step}
+	tl.expanded["t1"], a.foldOpen["m1"] = true, true
+	tt := ui.NewTester(a.view, 1440, 900)
+	a.timeline.ScrollTo(0, ui.Start)
+	tt.Frame()
+	if tt.HasText("a.txt") {
+		t.Fatal("a finished call shows open")
+	}
+	if err := tt.Click("bash $ ls"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	if !a.foldOpen["tool:c1"] || !tt.HasText("a.txt") || !tt.HasText("20s") {
+		t.Fatalf("open %v, texts %q", a.foldOpen["tool:c1"], tt.Texts())
+	}
+	snapshot(t, tt, "desktop-tool-open")
+}
+
+// Hovering a turn's mark opens the turn navigator: its search filters the
+// turns, a turn in it closes it, and it closes a moment after the pointer
+// leaves.
+func TestTurnRailNavigator(t *testing.T) {
+	a := demoApp(t)
+	tt := ui.NewTester(a.view, 1440, 900)
+	r, ok := tt.Find(m("turnrail_jump_turn", "n", 1))
+	if !ok {
+		t.Fatal("no mark")
+	}
+	hover := func() {
+		tt.Move(r.X+r.W/2, r.Y+r.H/2)
+		tt.Frame()
+		if !a.turnNav.open || a.turnNav.turn != "t1" {
+			t.Fatalf("navigator %+v", a.turnNav)
+		}
+	}
+	hover()
+	tt.Move(400, 400)
+	tt.Frame()
+	if !a.turnNav.open {
+		t.Fatal("closed as the pointer left")
+	}
+	tt.Advance(turnNavGrace)
+	tt.Frame()
+	if a.turnNav.open {
+		t.Fatal("stayed open")
+	}
+
+	hover()
+	if err := tt.Click(m("navigator_search")); err != nil {
+		t.Fatal(err)
+	}
+	tt.Type("mygo")
+	tt.Frame()
+	if _, ok := tt.Find("#1"); ok || !a.turnNav.open {
+		t.Fatalf("search %q kept turn 1, open %v", a.turnNav.query, a.turnNav.open)
+	}
+	snapshot(t, tt, "desktop-turn-navigator")
+	if err := tt.Click("#2"); err != nil {
+		t.Fatal(err)
+	}
+	if a.turnNav.open {
+		t.Fatal("stayed open after the jump")
+	}
 }
 
 func TestSessionRowActions(t *testing.T) {

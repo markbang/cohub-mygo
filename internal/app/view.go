@@ -6,12 +6,27 @@ import (
 	"github.com/egoist/mygo/ui"
 )
 
+// The panes' widths and the room they keep, as the web's layout store.
 const (
 	sidebarWidth = 240
+	sidebarMin   = 220
+	sidebarMax   = 420
 	panelWidth   = 320
+	panelMin     = 260
+	panelMax     = 520
+	mainWidth    = 400 // beside a window
+	mainMin      = 320
+	windowMin    = 280
 	headerHeight = 40
 	compactWidth = 768
 )
+
+func clampPane(v, def, lo, hi float32) float32 {
+	if v <= 0 {
+		return def
+	}
+	return min(max(v, lo), hi)
+}
 
 // view builds the window: the sidebar, the main column and the right
 // panel on desktops, as the web app's (app) layout; one column with a tab
@@ -63,9 +78,30 @@ func (a *app) view(c *ui.Context) {
 		return
 	}
 	p := a.pal
+	win, wide := a.hasWindow(), a.windowWide && a.hasWindow()
+	panel := a.panelOpen && a.showsPanel() && w >= 1100
+	// body is the room right of the sidebar, as the web's workspace body.
+	body := w - 52
+	if a.sidebarOpen {
+		body = w - a.sidebarW
+	}
+	right := float32(0)
+	if panel {
+		right = a.panelW
+	}
+	main := min(a.mainW, max(mainMin, body-right-windowMin))
 	ui.Row(c).Fill().AlignItems(ui.Stretch).Children(func() {
 		if a.sidebarOpen {
 			a.sidebar(c)
+			if w >= 960 {
+				a.gutter(c, m("nav_resize_sidebar"), a.sidebarW, -1, func(start, off float32, done bool) {
+					a.sidebarW = min(max(min(start+off, w-640), sidebarMin), sidebarMax)
+					if done {
+						a.prefs.SidebarWidth = a.sidebarW
+						a.prefs.save()
+					}
+				})
+			}
 		} else {
 			a.collapsedRail(c)
 		}
@@ -75,18 +111,55 @@ func (a *app) view(c *ui.Context) {
 			routeSpaceCheckpoint, routeSpaceTask, routeSpaceCron, routeSpaceApp:
 			bg = p.chatBg.Over(p.bgPrimary)
 		}
-		if !(a.windowWide && a.hasWindow()) {
-			ui.Column(c).Grow(1).MinWidth(0).Background(bg).Children(func() {
+		if !wide {
+			// Beside a window, the main column keeps its width and the
+			// window takes the rest, as the web's.
+			col := ui.Column(c).MinWidth(0).Background(bg)
+			if win {
+				col.Width(main).Shrink(0)
+			} else {
+				col.Grow(1)
+			}
+			col.Children(func() {
 				a.page(c)
 				if a.route.area() == areaSpace {
 					a.danmakuLayer(c)
 				}
 			})
 		}
-		if a.hasWindow() {
+		if win {
+			if !wide {
+				a.gutter(c, m("window_resize_panel"), main, 0, func(start, off float32, done bool) {
+					// Let go 120 DIPs past the narrowest, the main column
+					// gives the window its room.
+					if done && start+off < min(start, mainMin)-120 {
+						a.mainW, a.windowWide = start, true
+						return
+					}
+					a.mainW = min(max(start+off, mainMin), max(mainMin, body-right-windowMin))
+					if done {
+						a.prefs.MainWidth = a.mainW
+						a.prefs.save()
+					}
+				})
+			}
 			a.windowPane(c)
 		}
-		if a.panelOpen && a.showsPanel() && w >= 1100 {
+		if panel {
+			a.gutter(c, m("side_panel_resize"), a.panelW, 0, func(start, off float32, done bool) {
+				room := body
+				if !wide {
+					room -= mainMin
+				}
+				if win {
+					room -= windowMin
+				}
+				a.panelW = min(max(min(start-off, room), panelMin), panelMax)
+				if done {
+					a.prefs.PanelWidth = a.panelW
+					a.prefs.save()
+				}
+			})
 			a.rightPanel(c)
 		}
 	})
@@ -99,6 +172,68 @@ func (a *app) view(c *ui.Context) {
 	a.portToastView(c)
 	a.publishDialog(c)
 	a.openWithDialog(c)
+}
+
+// paneDrag is a drag of the edge between two panes: the edge, the pane's
+// width as it began and how far the pointer has gone since.
+type paneDrag struct {
+	edge       string
+	start, off float32
+}
+
+// gutter is ResizeHandle.svelte, the edge between two panes: a strip 12
+// DIPs wide over it that the pointer drags, or the arrows move by 16 DIPs
+// (64 with Shift), showing its line and grip while hovered or dragged.
+// resize gets the pane's width as the drag began, how far it went since
+// along the pointer's way, and whether it ended. line is where the panes'
+// border is from the edge.
+func (a *app) gutter(c *ui.Context, label string, width, line float32, resize func(start, off float32, done bool)) {
+	p := a.pal
+	ui.Box(c.Key("gutter:" + label)).Width(0).Shrink(0).ZIndex(1).Children(func() {
+		h := ui.ButtonBase(c.Key("handle")).Absolute().Top(0).Bottom(0).Left(-6).Width(12).
+			Cursor(ui.CursorResizeEW).Label(label).FocusRing(false)
+		d := a.paneDrag
+		mine := d != nil && d.edge == label
+		dx, _, held := h.Dragged()
+		switch {
+		case held:
+			if !mine {
+				d, mine = &paneDrag{edge: label, start: width}, true
+				a.paneDrag = d
+			}
+			if dx != 0 {
+				d.off += dx
+				resize(d.start, d.off, false)
+			}
+		case mine:
+			a.paneDrag, mine = nil, false
+			resize(d.start, d.off, true)
+		}
+		for _, k := range []struct {
+			mods ui.Modifiers
+			key  ui.Key
+			off  float32
+		}{{0, ui.KeyLeft, -16}, {0, ui.KeyRight, 16}, {ui.Shift, ui.KeyLeft, -64}, {ui.Shift, ui.KeyRight, 64}} {
+			h.OnShortcut(k.mods, k.key, func() { resize(width, k.off, true) })
+		}
+		lit := mine || h.FocusVisible()
+		if !lit && !h.Hovered() {
+			return
+		}
+		grip, alpha := p.textTertiary, float32(0.6)
+		if lit {
+			grip, alpha = p.textSecond, 1
+		}
+		fade := min(64/max(a.height, 1), 0.5)
+		h.Children(func() {
+			ui.Box(c).Absolute().Top(0).Bottom(0).Left(6 + line).Width(1).Opacity(alpha).
+				LinearGradient(ui.LinearGradient{Angle: 180, Stops: []ui.GradientStop{
+					{Color: p.borderStrong.Alpha(0), At: 0}, {Color: p.borderStrong, At: fade},
+					{Color: p.borderStrong, At: 1 - fade}, {Color: p.borderStrong.Alpha(0), At: 1},
+				}})
+			ui.Box(c).Attach(ui.AnchorCenter, ui.AnchorCenter).Size(4, 32).Radius(2).Background(grip).Opacity(alpha)
+		})
+	})
 }
 
 // toastView is .toast-surface: what went wrong, for five seconds.
@@ -222,7 +357,7 @@ func (a *app) emptyView(c *ui.Context) {
 func (a *app) rightPanel(c *ui.Context) {
 	p := a.pal
 	bar := c.TitleBar()
-	width := float32(panelWidth)
+	width := a.panelW
 	if a.compact {
 		width = 0
 	}

@@ -16,7 +16,7 @@ import (
 // route's area lists, and the account at the bottom.
 func (a *app) sidebar(c *ui.Context) {
 	p := a.pal
-	ui.Column(c).Width(sidebarWidth).Shrink(0).Background(p.bgPrimary).BorderWidth(0, 1, 0, 0).BorderColor(p.borderSubtle).Children(func() {
+	ui.Column(c).Width(a.sidebarW).Shrink(0).Background(p.bgPrimary).BorderWidth(0, 1, 0, 0).BorderColor(p.borderSubtle).Children(func() {
 		a.sidebarTop(c)
 		switch a.route.area() {
 		case areaSpace:
@@ -722,7 +722,7 @@ func (a *app) accountRow(c *ui.Context) {
 			menuItem{icon: "message-square-text", label: m("sidebar_feedback"), run: func() { a.feedback = feedbackForm{open: true} }},
 			menuItem{icon: "log-out", label: m("sidebar_sign_out"), run: a.signOut},
 		)
-		a.menuWidth(c, who, &a.userMenu, sidebarWidth-12, items)
+		a.menuWidth(c, who, &a.userMenu, a.sidebarW-12, items)
 		if a.iconButton(c.Key("help"), "circle-help", m("sidebar_help"), false).Clicked() {
 			a.helpOpen = true
 		}

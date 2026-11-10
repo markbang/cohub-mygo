@@ -558,6 +558,174 @@ type execStats struct {
 	ModelCostUSD *float64 `json:"modelCostUsd"`
 }
 
+type kv struct{ v, k string }
+
+// statsBody is StatsGrid.svelte: the headline numbers, bars of time and
+// tokens, and the figures in sections, of a chat or of a turn. lead is the
+// turn's final reply, above them.
+func (a *app) statsBody(c *ui.Context, x execStats, turn bool, lead []kv) {
+	p := a.pal
+	if len(lead) > 0 {
+		a.statsCells(c, "lead", m("stats_final_response"), lead, false)
+	}
+	// A turn leads with its time and model requests, a chat with its
+	// turns, as the web's StatsGrid scopes.
+	var hero []kv
+	if !turn {
+		hero = append(hero, kv{fmt.Sprint(x.Turns), m("stats_turns")})
+	}
+	if x.ElapsedMs != nil {
+		hero = append(hero, kv{duration(int64(*x.ElapsedMs)), m("stats_elapsed")})
+	}
+	if turn && x.Calls != nil {
+		hero = append(hero, kv{fmt.Sprint(*x.Calls), m("stats_calls")})
+	}
+	if x.Usage != nil {
+		hero = append(hero, kv{kilo(x.Usage.TotalTokens), m("stats_tokens")})
+	}
+	ui.Row(c.Key("hero")).Gap(12).Children(func() {
+		for _, h := range hero {
+			ui.Column(c.Key(h.k)).Grow(1).Basis(0).Gap(6).Children(func() {
+				ui.Text(c, h.v).FontSize(19).Font(fontMono)
+				ui.Text(c, h.k).FontSize(10).TextColor(p.placeholder)
+			})
+		}
+	})
+	bar := func(key, title, total string, segs []struct {
+		label string
+		v     float64
+		shown string
+		col   ui.Color
+	}) {
+		sum := 0.0
+		for _, s := range segs {
+			sum += s.v
+		}
+		if sum <= 0 {
+			return
+		}
+		ui.Column(c.Key(key)).Gap(6).Children(func() {
+			ui.Row(c).Children(func() {
+				ui.Text(c, title).FontSize(10).TextColor(p.placeholder).Grow(1)
+				ui.Text(c, total).FontSize(10).TextColor(p.placeholder)
+			})
+			ui.Row(c).Height(6).Radius(3).Clip().Background(p.borderSubtle).Children(func() {
+				for i, s := range segs {
+					if s.v > 0 {
+						ui.Box(c.Key(i)).Grow(float32(s.v / sum)).Basis(0).Background(s.col)
+					}
+				}
+			})
+			ui.Row(c).Gap(12).Wrap().Children(func() {
+				for i, s := range segs {
+					if s.v <= 0 {
+						continue
+					}
+					ui.Row(c.Key(i)).Gap(4).AlignItems(ui.Center).Children(func() {
+						ui.Box(c).Size(6, 6).Radius(3).Background(s.col)
+						ui.Text(c, s.label+" "+s.shown).FontSize(10).TextColor(p.placeholder)
+					})
+				}
+			})
+		})
+	}
+	type seg = struct {
+		label string
+		v     float64
+		shown string
+		col   ui.Color
+	}
+	f := func(v *float64) float64 {
+		if v == nil {
+			return 0
+		}
+		return *v
+	}
+	el := ""
+	if x.ElapsedMs != nil {
+		el = duration(int64(*x.ElapsedMs))
+	}
+	bar("timing", m("stats_timing"), el, []seg{
+		{m("stats_queue"), f(x.QueueMs), duration(int64(f(x.QueueMs))), p.placeholder.Alpha(0.5)},
+		{m("stats_model_time"), f(x.ModelMs), duration(int64(f(x.ModelMs))), p.brand},
+		{m("stats_tool_time"), f(x.ToolMs), duration(int64(f(x.ToolMs))), p.placeholder},
+	})
+	if u := x.Usage; u != nil {
+		in := u.Input + u.CacheRead + u.CacheWrite
+		bar("usage", m("stats_usage"), groupThousands(fmt.Sprint(u.TotalTokens)), []seg{
+			{m("stats_input"), float64(in), kilo(in), p.placeholder},
+			{m("stats_output"), float64(u.Output), kilo(u.Output), p.brand},
+		})
+	}
+	var summary, timing, usage []kv
+	switch {
+	case turn:
+		summary = append(summary, kv{fmt.Sprint(x.Turns), m("stats_turns")})
+	case x.Calls != nil:
+		summary = append(summary, kv{fmt.Sprint(*x.Calls), m("stats_calls")})
+	}
+	if x.ToolCalls != nil {
+		summary = append(summary, kv{fmt.Sprint(*x.ToolCalls), m("stats_tools")})
+	}
+	if x.QueueMs != nil {
+		timing = append(timing, kv{duration(int64(*x.QueueMs)), m("stats_queue")})
+	}
+	if x.ModelMs != nil {
+		timing = append(timing, kv{duration(int64(*x.ModelMs)), m("stats_model_time")})
+	}
+	if x.ToolMs != nil {
+		timing = append(timing, kv{duration(int64(*x.ToolMs)), m("stats_tool_time")})
+	}
+	if x.TTFTSamples > 0 {
+		timing = append(timing, kv{duration(int64(x.TTFTMs / float64(x.TTFTSamples))), m("stats_ttft")})
+	}
+	if x.OutputMs > 0 {
+		timing = append(timing, kv{fmt.Sprintf("%.1f tok/s", x.TimedOutputTokens/x.OutputMs*1000), m("stats_tps")})
+	}
+	if u := x.Usage; u != nil {
+		in := u.Input + u.CacheRead + u.CacheWrite
+		usage = append(usage, kv{kilo(in), m("stats_input")}, kv{kilo(u.TotalTokens), m("stats_tokens")},
+			kv{kilo(u.Output), m("stats_output")}, kv{kilo(u.CacheRead), m("stats_cache_tokens")})
+		if in > 0 && x.UnknownUsageCalls == 0 {
+			usage = append(usage, kv{fmt.Sprintf("%.1f%%", float64(u.CacheRead)/float64(in)*100), m("stats_cache")})
+		}
+	}
+	if x.ModelCostUSD != nil {
+		usage = append(usage, kv{formatMoney(*x.ModelCostUSD), m("stats_model_cost")})
+	}
+	a.statsCells(c, "cells-summary", m("stats_summary"), summary, true)
+	a.statsCells(c, "cells-timing", m("stats_timing"), timing, true)
+	a.statsCells(c, "cells-usage", m("stats_usage"), usage, true)
+}
+
+// statsCells are figures in a section of two columns, as StatsGrid.svelte,
+// under a rule but the first.
+func (a *app) statsCells(c *ui.Context, key, title string, cells []kv, rule bool) {
+	if len(cells) == 0 {
+		return
+	}
+	p := a.pal
+	col := ui.Column(c.Key(key)).Gap(8)
+	if rule {
+		col.Padding(12, 0, 0, 0).BorderWidth(1, 0, 0, 0).BorderColor(p.borderSubtle)
+	}
+	col.Children(func() {
+		ui.Text(c, title).FontSize(10).TextColor(p.placeholder)
+		for i := 0; i < len(cells); i += 2 {
+			ui.Row(c.Key(i)).Gap(24).Children(func() {
+				for j := i; j < i+2; j++ {
+					ui.Row(c.Key(j)).Grow(1).Basis(0).Gap(8).Children(func() {
+						if j < len(cells) {
+							ui.Text(c, cells[j].k).FontSize(12).TextColor(p.textTertiary).Grow(1).SingleLine()
+							ui.Text(c, cells[j].v).FontSize(12).Font(fontMono).TextColor(p.textSecond).Shrink(0)
+						}
+					})
+				}
+			})
+		}
+	})
+}
+
 // statsDialog is the chat's statistics: the headline numbers, where the
 // time went, what the tokens were.
 func (a *app) statsDialog(c *ui.Context, anchor ui.Element, s *cohub.Session) {
@@ -583,149 +751,99 @@ func (a *app) statsDialog(c *ui.Context, anchor ui.Element, s *cohub.Session) {
 				}
 				return
 			}
-			x := st.Stats.Own
-			type kv struct{ v, k string }
-			hero := []kv{{fmt.Sprint(x.Turns), m("stats_turns")}}
-			if x.ElapsedMs != nil {
-				hero = append(hero, kv{duration(int64(*x.ElapsedMs)), m("stats_elapsed")})
-			}
-			if x.Usage != nil {
-				hero = append(hero, kv{kilo(x.Usage.TotalTokens), m("stats_tokens")})
-			}
-			ui.Row(c.Key("hero")).Gap(12).Children(func() {
-				for _, h := range hero {
-					ui.Column(c.Key(h.k)).Grow(1).Basis(0).Gap(6).Children(func() {
-						ui.Text(c, h.v).FontSize(19).Font(fontMono)
-						ui.Text(c, h.k).FontSize(10).TextColor(p.placeholder)
-					})
-				}
-			})
-			bar := func(key, title, total string, segs []struct {
-				label string
-				v     float64
-				shown string
-				col   ui.Color
-			}) {
-				sum := 0.0
-				for _, s := range segs {
-					sum += s.v
-				}
-				if sum <= 0 {
-					return
-				}
-				ui.Column(c.Key(key)).Gap(6).Children(func() {
-					ui.Row(c).Children(func() {
-						ui.Text(c, title).FontSize(10).TextColor(p.placeholder).Grow(1)
-						ui.Text(c, total).FontSize(10).TextColor(p.placeholder)
-					})
-					ui.Row(c).Height(6).Radius(3).Clip().Background(p.borderSubtle).Children(func() {
-						for i, s := range segs {
-							if s.v > 0 {
-								ui.Box(c.Key(i)).Grow(float32(s.v / sum)).Basis(0).Background(s.col)
-							}
-						}
-					})
-					ui.Row(c).Gap(12).Wrap().Children(func() {
-						for i, s := range segs {
-							if s.v <= 0 {
-								continue
-							}
-							ui.Row(c.Key(i)).Gap(4).AlignItems(ui.Center).Children(func() {
-								ui.Box(c).Size(6, 6).Radius(3).Background(s.col)
-								ui.Text(c, s.label+" "+s.shown).FontSize(10).TextColor(p.placeholder)
-							})
-						}
-					})
-				})
-			}
-			type seg = struct {
-				label string
-				v     float64
-				shown string
-				col   ui.Color
-			}
-			f := func(v *float64) float64 {
-				if v == nil {
-					return 0
-				}
-				return *v
-			}
-			el := ""
-			if x.ElapsedMs != nil {
-				el = duration(int64(*x.ElapsedMs))
-			}
-			bar("timing", m("stats_timing"), el, []seg{
-				{m("stats_queue"), f(x.QueueMs), duration(int64(f(x.QueueMs))), p.placeholder.Alpha(0.5)},
-				{m("stats_model_time"), f(x.ModelMs), duration(int64(f(x.ModelMs))), p.brand},
-				{m("stats_tool_time"), f(x.ToolMs), duration(int64(f(x.ToolMs))), p.placeholder},
-			})
-			if u := x.Usage; u != nil {
-				in := u.Input + u.CacheRead + u.CacheWrite
-				bar("usage", m("stats_usage"), groupThousands(fmt.Sprint(u.TotalTokens)), []seg{
-					{m("stats_input"), float64(in), kilo(in), p.placeholder},
-					{m("stats_output"), float64(u.Output), kilo(u.Output), p.brand},
-				})
-			}
-			// The figures in sections of two columns, as StatsGrid.svelte.
-			section := func(title string, cells []kv) {
-				if len(cells) == 0 {
-					return
-				}
-				ui.Column(c.Key(title)).Gap(8).Padding(12, 0, 0, 0).BorderWidth(1, 0, 0, 0).BorderColor(p.borderSubtle).Children(func() {
-					ui.Text(c, title).FontSize(10).TextColor(p.placeholder)
-					for i := 0; i < len(cells); i += 2 {
-						ui.Row(c.Key(i)).Gap(24).Children(func() {
-							for j := i; j < i+2; j++ {
-								ui.Row(c.Key(j)).Grow(1).Basis(0).Gap(8).Children(func() {
-									if j < len(cells) {
-										ui.Text(c, cells[j].k).FontSize(12).TextColor(p.textTertiary).Grow(1).SingleLine()
-										ui.Text(c, cells[j].v).FontSize(12).Font(fontMono).TextColor(p.textSecond).Shrink(0)
-									}
-								})
-							}
-						})
-					}
-				})
-			}
-			var summary, timing, usage []kv
-			if x.Calls != nil {
-				summary = append(summary, kv{fmt.Sprint(*x.Calls), m("stats_calls")})
-			}
-			if x.ToolCalls != nil {
-				summary = append(summary, kv{fmt.Sprint(*x.ToolCalls), m("stats_tools")})
-			}
-			if x.QueueMs != nil {
-				timing = append(timing, kv{duration(int64(*x.QueueMs)), m("stats_queue")})
-			}
-			if x.ModelMs != nil {
-				timing = append(timing, kv{duration(int64(*x.ModelMs)), m("stats_model_time")})
-			}
-			if x.ToolMs != nil {
-				timing = append(timing, kv{duration(int64(*x.ToolMs)), m("stats_tool_time")})
-			}
-			if x.TTFTSamples > 0 {
-				timing = append(timing, kv{duration(int64(x.TTFTMs / float64(x.TTFTSamples))), m("stats_ttft")})
-			}
-			if x.OutputMs > 0 {
-				timing = append(timing, kv{fmt.Sprintf("%.1f tok/s", x.TimedOutputTokens/x.OutputMs*1000), m("stats_tps")})
-			}
-			if u := x.Usage; u != nil {
-				in := u.Input + u.CacheRead + u.CacheWrite
-				usage = append(usage, kv{kilo(in), m("stats_input")}, kv{kilo(u.TotalTokens), m("stats_tokens")},
-					kv{kilo(u.Output), m("stats_output")}, kv{kilo(u.CacheRead), m("stats_cache_tokens")})
-				if in > 0 && x.UnknownUsageCalls == 0 {
-					usage = append(usage, kv{fmt.Sprintf("%.1f%%", float64(u.CacheRead)/float64(in)*100), m("stats_cache")})
-				}
-			}
-			if x.ModelCostUSD != nil {
-				usage = append(usage, kv{formatMoney(*x.ModelCostUSD), m("stats_model_cost")})
-			}
-			section(m("stats_summary"), summary)
-			section(m("stats_timing"), timing)
-			section(m("stats_usage"), usage)
+			a.statsBody(c, st.Stats.Own, false, nil)
 		})
 	})
 	if !open {
 		a.statsFor = ""
 	}
+}
+
+// turnStatsDialog is a reply's statistics, from the figures under it: its
+// final message, then the turn's numbers as the chat's.
+func (a *app) turnStatsDialog(c *ui.Context, anchor ui.Element, t *cohub.Turn) {
+	p := a.pal
+	open := true
+	ui.PopoverBase(c, anchor, &open, func(panel ui.Element) {
+		panel.AttachTo(anchor, ui.AnchorTopStart, ui.AnchorBottomStart).
+			Width(360).Margin(0, 0, 6, 0).Radius(8).Background(p.bgPrimary).Border(1, p.borderSubtle).
+			Shadow(0, 10, 30, 0, ui.RGBA(0, 0, 0, 0.15)).Clip()
+		ui.Row(c.Key("stats-head")).Gap(12).AlignItems(ui.Center).Padding(4, 4, 4, 12).BorderWidth(0, 0, 1, 0).BorderColor(p.borderSubtle).Children(func() {
+			ui.Text(c, m("stats_turn")).FontSize(12).FontWeight(500).Grow(1)
+			if a.iconButton(c.Key("close"), "x", m("common_close"), false).Clicked() {
+				open = false
+			}
+		})
+		ui.Scroll(c.Key("stats")).MaxHeight(a.height * 0.55).Children(func() {
+			ui.Column(c).Padding(12).Gap(16).Children(func() {
+				x, lead := turnStats(t)
+				a.statsBody(c, x, true, lead)
+			})
+		})
+	})
+	if !open {
+		a.turnStatsFor = ""
+	}
+}
+
+// turnStats are a turn's figures as the chat's statistics count them, from
+// its metrics, and its final message's.
+func turnStats(t *cohub.Turn) (execStats, []kv) {
+	var x execStats
+	x.Turns = 1
+	if t.DurationMs > 0 {
+		v := float64(t.DurationMs)
+		x.ElapsedMs = &v
+	}
+	if u := t.TotalUsage; u != nil {
+		x.Usage = &struct {
+			Input       int64 `json:"input"`
+			Output      int64 `json:"output"`
+			CacheRead   int64 `json:"cacheRead"`
+			CacheWrite  int64 `json:"cacheWrite"`
+			TotalTokens int64 `json:"totalTokens"`
+		}{u.Input, u.Output, u.CacheRead, u.CacheWrite, u.TotalTokens}
+		if x.Usage.TotalTokens == 0 {
+			x.Usage.TotalTokens = u.Input + u.Output + u.CacheRead + u.CacheWrite
+		}
+		if cost := u.TotalCost(); cost > 0 {
+			x.ModelCostUSD = &cost
+		}
+	}
+	if mt := t.Meta.Metrics; mt != nil {
+		calls, model := len(mt.Requests), 0.0
+		x.Calls = &calls
+		for _, r := range mt.Requests {
+			model += r.DurationMs
+			if r.FirstTokenMs != nil {
+				x.TTFTMs += *r.FirstTokenMs
+				x.TTFTSamples++
+			}
+			if r.OutputDurationMs != nil && r.Usage != nil {
+				x.OutputMs += *r.OutputDurationMs
+				x.TimedOutputTokens += float64(r.Usage.Output)
+			}
+		}
+		x.ModelMs = &model
+		if mt.Tools != nil {
+			calls, ms := mt.Tools.Calls, mt.Tools.ActiveMs
+			x.ToolCalls, x.ToolMs = &calls, &ms
+		}
+		if mt.ExecutionStartedAt > 0 && !t.StartedAt.IsZero() {
+			q := max(float64(mt.ExecutionStartedAt-t.StartedAt.UnixMilli()), 0)
+			x.QueueMs = &q
+		}
+	}
+	var lead []kv
+	if u := t.FinalUsage; u != nil {
+		in := u.Input + u.CacheRead + u.CacheWrite
+		lead = append(lead, kv{kilo(in), m("stats_input")}, kv{kilo(u.CacheRead), m("stats_cache_tokens")}, kv{kilo(u.Output), m("stats_output")})
+		if w := t.Meta.ContextWindow; w > 0 {
+			lead = append(lead, kv{fmt.Sprintf("%d%%", int(float64(in)/float64(w)*100+0.5)), m("stats_context_usage")})
+		}
+	}
+	if d := t.Meta.FinalMessageDurationMs; d > 0 {
+		lead = append(lead, kv{duration(d), m("stats_response_time")})
+	}
+	return x, lead
 }

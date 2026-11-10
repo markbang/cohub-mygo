@@ -413,20 +413,15 @@ func (a *app) treeDir(c *ui.Context, spaceID, dir string, depth int) {
 				{icon: "upload", label: m("files_upload_files"), run: func() { a.uploadFiles(spaceID, entry.Path) }, divider: true},
 			}, actions...)
 		}
-		row.PopoverMenu(func(mn *ui.Menu) {
-			for _, it := range actions {
-				item := mn.Item(it.label)
-				if it.danger {
-					item.Danger()
-				}
-				if item.Chosen() && it.run != nil {
-					it.run()
-				}
-				if it.divider {
-					mn.Separator()
-				}
+		row.PopoverMenu(func(mn *ui.Menu) { fillMenu(mn, actions) })
+		more := a.switchOf("fs-more:" + spaceID + ":" + e.Path)
+		if row.Hovered() || *more {
+			bg := p.hover.Over(p.bgPrimary)
+			if on {
+				bg = p.active.Over(p.bgPrimary)
 			}
-		})
+			row.Children(func() { a.treeRowActions(c, spaceID, entry.Path, isDir, actions, more, bg) })
+		}
 		if f := a.fsPending; f != nil && f.kind == "rename" && f.from == e.Path {
 			continue
 		}
@@ -435,6 +430,51 @@ func (a *app) treeDir(c *ui.Context, spaceID, dir string, depth int) {
 			a.treeDir(c, spaceID, e.Path, depth+1)
 		}
 	}
+}
+
+func fillMenu(mn *ui.Menu, items []menuItem) {
+	for _, it := range items {
+		item := mn.Item(it.label)
+		if it.danger {
+			item.Danger()
+		}
+		if item.Chosen() && it.run != nil {
+			it.run()
+		}
+		if it.divider {
+			mn.Separator()
+		}
+	}
+}
+
+// treeRowActions are a file row's buttons on hover, as the web's file tree:
+// insert its path in the message, rename it, upload into a folder, and the
+// rest in a menu. They cover the row's end on its background.
+func (a *app) treeRowActions(c *ui.Context, spaceID, p string, dir bool, items []menuItem, more *bool, bg ui.Color) {
+	pal := a.pal
+	edit := a.can(spaceID, "file.edit")
+	ui.Row(c.Key("actions")).Absolute().Top(0).Bottom(0).Right(0).Gap(2).Padding(0, 4, 0, 8).AlignItems(ui.Center).Radius(5).Background(bg).Children(func() {
+		btn := func(key, ic, label string) ui.Element {
+			b := ui.ButtonBase(c.Key(key)).Size(22, 22).Center().Radius(4).Label(label).Tooltip(label).FocusRing(false).Children(func() {
+				ui.Icon(c, icon(ic)).Size(13, 13).TextColor(pal.textTertiary)
+			})
+			if b.Hovered() {
+				b.Background(pal.hoverStrong)
+			}
+			return b
+		}
+		if btn("insert", "text-cursor-input", m("file_insert")).Clicked() {
+			a.insertReference(p)
+		}
+		if edit && btn("rename", "pencil", m("file_rename")).Clicked() {
+			a.fsPending = &fsCreate{space: spaceID, dir: path.Dir(p), kind: "rename", from: p, name: path.Base(p)}
+		}
+		if edit && dir && btn("upload", "upload", m("files_upload_files")).Clicked() {
+			a.uploadFiles(spaceID, p)
+		}
+		btn("more", "ellipsis", m("file_more")).PopoverMenuButton(func(mn *ui.Menu) { fillMenu(mn, items) },
+			ui.PopoverMenuButtonOptions{At: ui.AnchorBottomEnd, Self: ui.AnchorTopEnd, Open: more})
+	})
 }
 
 // windowPane is the Space's window beside the main column, as the web's
@@ -480,12 +520,7 @@ func (a *app) windowPane(c *ui.Context) {
 			title = j.Job.Title
 		}
 	}
-	pane := ui.Column(c.Key("pane"))
-	if a.windowWide {
-		pane.Grow(1)
-	} else {
-		pane.Width(480).Shrink(0)
-	}
+	pane := ui.Column(c.Key("pane")).Grow(1).MinWidth(0)
 	pane.Background(p.bgPrimary).BorderWidth(0, 0, 0, 1).BorderColor(p.borderSubtle).Children(func() {
 		ui.Row(c).Height(headerHeight).Shrink(0).Gap(4).AlignItems(ui.Center).Padding(0, 8).BorderWidth(0, 0, 1, 0).BorderColor(p.borderSubtle).DragWindow().Children(func() {
 			a.iconButton(c.Key("pane-side"), "panel-left", m("resource_app_files"), false)
