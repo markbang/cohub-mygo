@@ -20,5 +20,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-Bundled fonts and icons retain their own licenses; see fonts/OFL.txt and the
-resource credits in README.md.
+Bundled resources retain their own licenses:
+- Fonts (Geist, Geist Mono, Figtree): SIL Open Font License 1.1; see fonts/OFL.txt.
+- Lucide icons: ISC License.
+- Themes and translations are copied from the Cohub web app.
