@@ -18,9 +18,16 @@ macOS / Linux 也可一行安装：
 curl -fsSL https://github.com/markbang/cohub-mygo/releases/latest/download/install.sh | sh
 ```
 
+Windows 在 PowerShell 里：
+
+```powershell
+irm https://github.com/markbang/cohub-mygo/releases/latest/download/install.ps1 | iex
+```
+
+应用没有签名。从浏览器下载的话，第一次打开时放行一次即可：Windows 点 **更多信息 → 仍要运行**；macOS 到 **系统设置 → 隐私与安全性 → 仍要打开**。
+
 ## TODO
 
 - [x] 缓存数据，加快启动。
 - [x] 用 WebRTC 显示实时画面。
 - [x] 在 macOS 和 Windows 上验证 GPU 渲染。
-- [ ] 添加 macOS 公证和 Windows 代码签名。

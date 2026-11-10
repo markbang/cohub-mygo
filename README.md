@@ -18,9 +18,16 @@ Or install on macOS / Linux:
 curl -fsSL https://github.com/markbang/cohub-mygo/releases/latest/download/install.sh | sh
 ```
 
+On Windows, in PowerShell:
+
+```powershell
+irm https://github.com/markbang/cohub-mygo/releases/latest/download/install.ps1 | iex
+```
+
+The apps aren't signed. If you download from the browser, allow the app the first time you open it: on Windows, **More info → Run anyway**; on macOS, **System Settings → Privacy & Security → Open Anyway**.
+
 ## TODO
 
 - [x] Cache data for faster startup.
 - [x] Use WebRTC for live displays.
 - [x] Test GPU rendering on macOS and Windows.
-- [ ] Add macOS notarization and Windows code signing.
