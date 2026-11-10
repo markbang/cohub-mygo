@@ -18,20 +18,29 @@ jobs:
 
   version:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # a manual run tags the version
     outputs:
       tag: ${{ steps.version.outputs.tag }}
     steps:
       - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-      - name: Match the tag to mygo.json
+      # A pushed tag must match mygo.json. A manual run (gh workflow run
+      # release.yml) tags mygo.json's version on its branch, or builds the
+      # tag when it's already there. A tag pushed with the workflow's own
+      # token starts no other run.
+      - name: Find the tag
         id: version
         shell: bash
         run: |
           tag="v$(jq -r .version mygo.json)"
-          if [[ "$GITHUB_REF" != "refs/tags/$tag" ]]; then
-            echo "Run Release on tag $tag (which must match mygo.json)." >&2
-            exit 1
+          if [[ "$GITHUB_EVENT_NAME" == push ]]; then
+            if [[ "$GITHUB_REF_NAME" != "$tag" ]]; then
+              echo "::error::$GITHUB_REF_NAME doesn't match mygo.json's version, $tag"
+              exit 1
+            fi
+          elif [[ -z "$(git ls-remote --tags origin "refs/tags/$tag")" ]]; then
+            git tag "$tag"
+            git push origin "refs/tags/$tag"
           fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
@@ -57,9 +66,26 @@ jobs:
       CGO_ENABLED: "0"
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: refs/tags/${{ needs.version.outputs.tag }}
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+          cache: false
+      # Per job, as in CI: the Windows and Linux jobs share a runner OS and
+      # would otherwise race for one cache key.
+      - name: Find Go's caches
+        id: go-env
+        run: |
+          echo "build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+          echo "mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ${{ steps.go-env.outputs.build }}
+            ${{ steps.go-env.outputs.mod }}
+          key: release-go-${{ matrix.name }}-${{ hashFiles('go.mod', 'go.sum') }}
+          restore-keys: release-go-${{ matrix.name }}-
       - name: Install NSIS for Windows installers
         if: matrix.name == 'Windows'
         run: sudo apt-get update && sudo apt-get install -y nsis
@@ -97,6 +123,8 @@ jobs:
       TAG: ${{ needs.version.outputs.tag }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: refs/tags/${{ needs.version.outputs.tag }}
       - uses: actions/download-artifact@v8
         with:
           pattern: packages-*
@@ -112,8 +140,19 @@ jobs:
               exit 1
             fi
           else
+            # The notes are the version's section of CHANGELOG.md, or
+            # GitHub's own when it has none.
+            awk -v v="${TAG#v}" '
+              /^## / { if (found) exit; found = ($2 == v || $2 == "[" v "]"); next }
+              found
+            ' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+            if [[ -s "$RUNNER_TEMP/notes.md" ]]; then
+              notes=(--notes-file "$RUNNER_TEMP/notes.md")
+            else
+              notes=(--generate-notes)
+            fi
             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
-              --verify-tag --draft --title "$TAG" --notes-file CHANGELOG.md
+              --verify-tag --draft --title "$TAG" "${notes[@]}"
           fi
           gh release upload "$TAG" release/* --repo "$GITHUB_REPOSITORY" --clobber
           gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest

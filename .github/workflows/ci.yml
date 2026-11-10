@@ -1,3 +1,5 @@
+# Runs on pushes to main, pull requests, and before every release. Linux and
+# macOS both run, since some platform code only builds or runs on one of them.
 name: CI
 
 on:
@@ -9,15 +11,22 @@ on:
 permissions:
   contents: read
 
+# A newer push to a pull request cancels the older run; runs on main finish.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test:
-    name: Go tests
-    runs-on: ubuntu-latest
+    name: Test ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: Linux, os: ubuntu-latest }
+          - { name: macOS, os: macos-latest }
     env:
       CGO_ENABLED: "0"
     steps:
@@ -25,9 +34,27 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+          cache: false
+      # setup-go's cache is keyed on the runner and go.sum alone, so jobs on
+      # one OS race for a key and a go.sum change starts every job cold. This
+      # one is per job and falls back to the job's last cache.
+      - name: Find Go's caches
+        id: go-env
+        run: |
+          echo "build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+          echo "mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ${{ steps.go-env.outputs.build }}
+            ${{ steps.go-env.outputs.mod }}
+          key: test-go-${{ matrix.name }}-${{ hashFiles('go.mod', 'go.sum') }}
+          restore-keys: test-go-${{ matrix.name }}-
       - name: Check formatting
-        run: test -z "$(gofmt -l *.go)"
-      - run: go vet ./...
+        run: test -z "$(gofmt -l .)"
+      # go vet ./..., plus MyGo's checks of stored UI values.
+      - run: go tool mygo vet .
+      - run: go build -o /dev/null .
       - run: go test ./...
       - name: Check install script syntax
         run: sh -n install.sh
