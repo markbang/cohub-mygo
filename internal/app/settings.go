@@ -262,6 +262,9 @@ func (a *app) setLang(v string) {
 	a.prefs.Lang = v
 	a.prefs.save()
 	i18n.SetLocale(v)
+	if a.langChanged != nil {
+		a.langChanged()
+	}
 }
 
 // loadJSON loads a page's JSON once into pages.json[key].

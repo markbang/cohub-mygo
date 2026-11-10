@@ -64,6 +64,7 @@ var extraMessages = map[string][2]string{
 	"x_error":             {"出错了", "Something went wrong"},
 	"x_loading_chats":     {"加载对话…", "Loading chats…"},
 	"x_toggle_sidebar":    {"切换侧栏", "Toggle sidebar"},
+	"x_check_updates":     {"检查更新…", "Check for Updates…"},
 	"x_message":           {"消息", "Message"},
 	"x_untitled":          {"新对话", "New chat"},
 	"x_provider":          {"提供方", "Provider"},

@@ -181,7 +181,10 @@ type app struct {
 	railDrag                railDrag
 	turnSheetOpen           bool            // the compact shell's turn list
 	followupBusy            map[string]bool // follow-ups being steered or cancelled
-	flags                   map[string]*bool
+	// checkUpdates opens the update window, and langChanged tells MyGo the
+	// language chosen; Run sets them, tests leave them nil.
+	checkUpdates, langChanged func()
+	flags                     map[string]*bool
 }
 
 func newApp() *app {

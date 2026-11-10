@@ -769,6 +769,25 @@ func TestCompactTurnList(t *testing.T) {
 	}
 }
 
+// The account menu checks for updates, as Windows and Linux show no menu
+// bar to do it from.
+func TestAccountMenuChecksUpdates(t *testing.T) {
+	a := demoApp(t)
+	checked := 0
+	a.checkUpdates = func() { checked++ }
+	tt := ui.NewTester(a.view, 1440, 900)
+	if err := tt.Click(m("x_account")); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	if err := tt.Click(m("x_check_updates")); err != nil {
+		t.Fatalf("%v: %q", err, tt.Texts())
+	}
+	if checked != 1 {
+		t.Fatalf("checked %d times", checked)
+	}
+}
+
 // Hovering a turn's mark opens the turn navigator: its search filters the
 // turns, a turn in it closes it, and it closes a moment after the pointer
 // leaves.

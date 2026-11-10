@@ -24,6 +24,8 @@ Windows 在 PowerShell 里：
 irm https://github.com/markbang/cohub-mygo/releases/latest/download/install.ps1 | iex
 ```
 
+应用会在后台检查更新并提示安装；账户菜单里有 **检查更新…**，macOS 的应用菜单里也有。`.deb` 包由包管理器更新。0.0.2 及之前的版本不会自动更新，需要手动装一次下一个版本。
+
 应用没有签名。从浏览器下载的话，第一次打开时放行一次即可：Windows 点 **更多信息 → 仍要运行**；macOS 到 **系统设置 → 隐私与安全性 → 仍要打开**。
 
 ## TODO

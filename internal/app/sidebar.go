@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 
 	"cohub-mygo/internal/cohub"
@@ -720,8 +721,16 @@ func (a *app) accountRow(c *ui.Context) {
 		items = append(items,
 			menuItem{icon: "chart-column", label: m("sidebar_trending"), run: func() { a.openURL("https://cohub.live/trending") }},
 			menuItem{icon: "message-square-text", label: m("sidebar_feedback"), run: func() { a.feedback = feedbackForm{open: true} }},
-			menuItem{icon: "log-out", label: m("sidebar_sign_out"), run: a.signOut},
 		)
+		// Windows and Linux show no menu bar: updates are checked from here.
+		if a.checkUpdates != nil {
+			hint := ""
+			if v := mygo.App.Version(); v != "" {
+				hint = "v" + v
+			}
+			items = append(items, menuItem{icon: "refresh-cw", label: m("x_check_updates"), hint: hint, run: a.checkUpdates})
+		}
+		items = append(items, menuItem{icon: "log-out", label: m("sidebar_sign_out"), run: a.signOut})
 		a.menuWidth(c, who, &a.userMenu, a.sidebarW-12, items)
 		if a.iconButton(c.Key("help"), "circle-help", m("sidebar_help"), false).Clicked() {
 			a.helpOpen = true

@@ -24,6 +24,8 @@ On Windows, in PowerShell:
 irm https://github.com/markbang/cohub-mygo/releases/latest/download/install.ps1 | iex
 ```
 
+The app checks for updates in the background and offers to install them; **Check for Updates…** is in the account menu, and on macOS in the app menu. The `.deb` package is updated by the package manager instead. Versions up to 0.0.2 don't update themselves: install the next one by hand once.
+
 The apps aren't signed. If you download from the browser, allow the app the first time you open it: on Windows, **More info → Run anyway**; on macOS, **System Settings → Privacy & Security → Open Anyway**.
 
 ## TODO

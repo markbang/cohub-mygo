@@ -58,12 +58,9 @@ func probeWebRTC(w *mygo.Window) {
 // Run starts the app and returns when it quits.
 func Run() error {
 	a := newApp()
+	useUpdates(a)
 	mygo.App.WhenReady(func() {
-		mygo.App.SetMenu(mygo.NewMenu([]*mygo.MenuItem{
-			{Role: mygo.RoleAppMenu},
-			{Role: mygo.RoleEditMenu},
-			{Role: mygo.RoleWindowMenu},
-		}))
+		setMenu()
 		a.win = mygo.NewWindow(mygo.WindowOptions{
 			Title:         "Cohub",
 			Width:         1440,
