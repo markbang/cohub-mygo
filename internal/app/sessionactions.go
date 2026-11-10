@@ -245,7 +245,7 @@ func (a *app) moreMenu(c *ui.Context, s *cohub.Session) {
 			a.setSessionArchived(s, !archived)
 		}})
 	}
-	a.menuWidth(c, b, &open, 176, items)
+	a.menuEnd(c, b, &open, 176, items)
 	a.menus["more"] = open
 	if a.labelTarget != nil {
 		a.labelPicker(c, b)
@@ -371,7 +371,9 @@ func (a *app) labelPicker(c *ui.Context, anchor ui.Element) {
 	}
 	open := true
 	ui.PopoverBase(c, anchor, &open, func(panel ui.Element) {
-		panel.Width(360).Margin(6, 0, 0, 0).Radius(10).Background(p.bgPrimary).Border(1, p.borderSubtle).
+		// Its end lines up with the button's, as the web's.
+		panel.AttachTo(anchor, ui.AnchorBottomEnd, ui.AnchorTopEnd).
+			Width(360).Margin(6, 0, 0, 0).Radius(10).Background(p.bgPrimary).Border(1, p.borderSubtle).
 			Shadow(0, 10, 30, 0, ui.RGBA(0, 0, 0, 0.15)).Clip()
 		ui.Column(c.Key("labels")).Padding(12).Gap(10).Children(func() {
 			ui.Row(c).AlignItems(ui.Start).Children(func() {
@@ -563,7 +565,8 @@ func (a *app) statsDialog(c *ui.Context, anchor ui.Element, s *cohub.Session) {
 	st, err, _ := loadJSON[sessionStats](a, "stats:"+s.ID, "/api/sessions/"+url.PathEscape(s.ID)+"/stats")
 	open := true
 	ui.PopoverBase(c, anchor, &open, func(panel ui.Element) {
-		panel.Width(360).Margin(6, 0, 0, 0).Radius(8).Background(p.bgPrimary).Border(1, p.borderSubtle).
+		panel.AttachTo(anchor, ui.AnchorBottomEnd, ui.AnchorTopEnd).
+			Width(360).Margin(6, 0, 0, 0).Radius(8).Background(p.bgPrimary).Border(1, p.borderSubtle).
 			Shadow(0, 10, 30, 0, ui.RGBA(0, 0, 0, 0.15)).Clip()
 		ui.Row(c.Key("stats-head")).Gap(12).AlignItems(ui.Center).Padding(4, 4, 4, 12).BorderWidth(0, 0, 1, 0).BorderColor(p.borderSubtle).Children(func() {
 			ui.Text(c, m("stats_session")).FontSize(12).FontWeight(500).Grow(1)
@@ -663,34 +666,63 @@ func (a *app) statsDialog(c *ui.Context, anchor ui.Element, s *cohub.Session) {
 					{m("stats_output"), float64(u.Output), kilo(u.Output), p.brand},
 				})
 			}
-			ui.Column(c.Key("rows")).Gap(6).Padding(12, 0, 0, 0).BorderWidth(1, 0, 0, 0).BorderColor(p.borderSubtle).Children(func() {
-				row := func(k, v string) {
-					ui.Row(c.Key(k)).Children(func() {
-						ui.Text(c, k).FontSize(12).TextColor(p.textTertiary).Grow(1)
-						ui.Text(c, v).FontSize(12).Font(fontMono).TextColor(p.textSecond)
-					})
+			// The figures in sections of two columns, as StatsGrid.svelte.
+			section := func(title string, cells []kv) {
+				if len(cells) == 0 {
+					return
 				}
-				if x.Calls != nil {
-					row(m("stats_calls"), fmt.Sprint(*x.Calls))
-				}
-				if x.ToolCalls != nil {
-					row(m("stats_tools"), fmt.Sprint(*x.ToolCalls))
-				}
-				if x.TTFTSamples > 0 {
-					row(m("stats_ttft"), duration(int64(x.TTFTMs/float64(x.TTFTSamples))))
-				}
-				if x.OutputMs > 0 {
-					row(m("stats_tps"), fmt.Sprintf("%.1f tok/s", x.TimedOutputTokens/x.OutputMs*1000))
-				}
-				if u := x.Usage; u != nil && x.UnknownUsageCalls == 0 {
-					if in := u.Input + u.CacheRead + u.CacheWrite; in > 0 {
-						row(m("stats_cache"), fmt.Sprintf("%.0f%%", float64(u.CacheRead)/float64(in)*100))
+				ui.Column(c.Key(title)).Gap(8).Padding(12, 0, 0, 0).BorderWidth(1, 0, 0, 0).BorderColor(p.borderSubtle).Children(func() {
+					ui.Text(c, title).FontSize(10).TextColor(p.placeholder)
+					for i := 0; i < len(cells); i += 2 {
+						ui.Row(c.Key(i)).Gap(24).Children(func() {
+							for j := i; j < i+2; j++ {
+								ui.Row(c.Key(j)).Grow(1).Basis(0).Gap(8).Children(func() {
+									if j < len(cells) {
+										ui.Text(c, cells[j].k).FontSize(12).TextColor(p.textTertiary).Grow(1).SingleLine()
+										ui.Text(c, cells[j].v).FontSize(12).Font(fontMono).TextColor(p.textSecond).Shrink(0)
+									}
+								})
+							}
+						})
 					}
+				})
+			}
+			var summary, timing, usage []kv
+			if x.Calls != nil {
+				summary = append(summary, kv{fmt.Sprint(*x.Calls), m("stats_calls")})
+			}
+			if x.ToolCalls != nil {
+				summary = append(summary, kv{fmt.Sprint(*x.ToolCalls), m("stats_tools")})
+			}
+			if x.QueueMs != nil {
+				timing = append(timing, kv{duration(int64(*x.QueueMs)), m("stats_queue")})
+			}
+			if x.ModelMs != nil {
+				timing = append(timing, kv{duration(int64(*x.ModelMs)), m("stats_model_time")})
+			}
+			if x.ToolMs != nil {
+				timing = append(timing, kv{duration(int64(*x.ToolMs)), m("stats_tool_time")})
+			}
+			if x.TTFTSamples > 0 {
+				timing = append(timing, kv{duration(int64(x.TTFTMs / float64(x.TTFTSamples))), m("stats_ttft")})
+			}
+			if x.OutputMs > 0 {
+				timing = append(timing, kv{fmt.Sprintf("%.1f tok/s", x.TimedOutputTokens/x.OutputMs*1000), m("stats_tps")})
+			}
+			if u := x.Usage; u != nil {
+				in := u.Input + u.CacheRead + u.CacheWrite
+				usage = append(usage, kv{kilo(in), m("stats_input")}, kv{kilo(u.TotalTokens), m("stats_tokens")},
+					kv{kilo(u.Output), m("stats_output")}, kv{kilo(u.CacheRead), m("stats_cache_tokens")})
+				if in > 0 && x.UnknownUsageCalls == 0 {
+					usage = append(usage, kv{fmt.Sprintf("%.1f%%", float64(u.CacheRead)/float64(in)*100), m("stats_cache")})
 				}
-				if x.ModelCostUSD != nil {
-					row(m("stats_model_cost"), formatMoney(*x.ModelCostUSD))
-				}
-			})
+			}
+			if x.ModelCostUSD != nil {
+				usage = append(usage, kv{formatMoney(*x.ModelCostUSD), m("stats_model_cost")})
+			}
+			section(m("stats_summary"), summary)
+			section(m("stats_timing"), timing)
+			section(m("stats_usage"), usage)
 		})
 	})
 	if !open {

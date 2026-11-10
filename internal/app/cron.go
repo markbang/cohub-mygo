@@ -399,6 +399,9 @@ func (a *app) cronEditor(c *ui.Context, spaceID string, j *cronRecord) {
 				items := []menuItem{{label: m("cron_use_default_model"), checked: f.model.ID == "", run: func() { f.model = cohub.ModelChoice{} }}}
 				for _, md := range a.models {
 					md := md
+					if md.Model.Hidden && md.ID != f.model.ID {
+						continue
+					}
 					name := md.Model.Name
 					if name == "" {
 						name = md.ID

@@ -17,7 +17,7 @@ const token = execFileSync("cohub", ["auth", "token"], { encoding: "utf8" }).tri
 const who = JSON.parse(execFileSync("cohub", ["auth", "whoami", "--json"], { encoding: "utf8" }));
 mkdirSync(join(root, "web"), { recursive: true });
 
-const browser = await chromium.launch({ executablePath: "/usr/bin/google-chrome", headless: true });
+const browser = await chromium.launch({ executablePath: process.env.CHROME ?? "/usr/bin/google-chrome", headless: true });
 for (const s of states) {
   if (only && !only.test(s.name)) continue;
   const [w, h] = s.size ?? [1440, 900];

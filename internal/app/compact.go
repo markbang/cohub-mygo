@@ -71,17 +71,23 @@ func (a *app) compactChats(c *ui.Context) {
 			}
 		})
 		a.chipBar(c)
-		list := a.visibleSessions()
+		list := a.visibleRows()
 		now := a.now()
-		a.sessionList.Key = func(i int) any { return list[i].ID }
+		a.sessionList.Key = func(i int) any { return list[i].s.ID }
 		ui.List(c.Key("compact-sessions"), &a.sessionList, len(list), func(i int) {
-			s := list[i]
+			tr := list[i]
+			s := tr.s
 			row := ui.Row(c.Key(s.ID)).Gap(12).AlignItems(ui.Center).Height(60).Padding(0, 16).Radius(8).Children(func() {
-				name, av := a.spaceName(s.SpaceID)
-				a.avatarSeed(c, av, name, s.SpaceID, 40, 10)
+				a.inboxGuides(c, tr, 16, 40, 12, 19)
+				if tr.depth > 0 {
+					ui.Box(c).Width(40 + float32(tr.depth-1)*16).Shrink(0)
+				} else {
+					name, av := a.spaceName(s.SpaceID)
+					a.avatarSeed(c, av, name, s.SpaceID, 40, 10)
+				}
 				ui.Column(c).Grow(1).MinWidth(0).Gap(3).Children(func() {
 					ui.Row(c).Gap(8).AlignItems(ui.Center).Height(20).Children(func() {
-						ui.Text(c, chatTitle(s)).FontSize(16).FontWeight(500).SingleLine().Grow(1).MinWidth(0)
+						ui.Text(c, tr.title()).FontSize(16).FontWeight(500).SingleLine().Grow(1).MinWidth(0)
 						ui.Text(c, relTime(s.When(), now)).FontSize(12).TextColor(p.placeholder).Shrink(0)
 					})
 					ui.Row(c).Gap(8).AlignItems(ui.Center).Height(18).Children(func() {

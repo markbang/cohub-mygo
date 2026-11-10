@@ -125,20 +125,26 @@ func forkTree(list []*cohub.Session, forks []cohub.SessionFork) []treeRow {
 	return out
 }
 
-// treeTitle is a fork's title: what was asked after forking, while the
-// fork has the parent's title.
+// treeTitle is a fork's title, while it has none of its own or the
+// parent's: what was asked after forking, or else its latest message.
 func (r treeRow) title() string {
-	if f := r.fork; f != nil && f.FirstUserTextAfterFork != nil {
+	if f := r.fork; f != nil {
 		own := strings.TrimSpace(r.s.Title)
 		parent := ""
 		if f.ParentTitle != nil {
 			parent = strings.TrimSpace(*f.ParentTitle)
 		}
-		if t := strings.Join(strings.Fields(*f.FirstUserTextAfterFork), " "); t != "" && (own == "" || own == parent) {
-			if r := []rune(t); len(r) > 48 {
-				t = string(r[:48])
+		if own == "" || own == parent {
+			asked := r.s.LatestMessageText
+			if f.FirstUserTextAfterFork != nil {
+				asked = *f.FirstUserTextAfterFork
 			}
-			return t
+			if t := strings.Join(strings.Fields(asked), " "); t != "" {
+				if r := []rune(t); len(r) > 48 {
+					t = string(r[:48])
+				}
+				return t
+			}
 		}
 	}
 	return chatTitle(r.s)
@@ -174,6 +180,45 @@ func (a *app) treeGuides(c *ui.Context, r treeRow) {
 		}
 		if r.hasChildren {
 			line(railX(r.depth+1), b.H-4, b.H)
+		}
+	})
+}
+
+// inboxGuides draws a row's guides in the chats inbox, whose rows have an
+// avatar: a fork's elbow comes down from under its parent's avatar to its
+// title, which lines up with its parent's, and each level further in
+// steps right. pad, avatar and gap lay out the row; titleY is the title's
+// middle.
+func (a *app) inboxGuides(c *ui.Context, r treeRow, pad, avatar, gap, titleY float32) {
+	if r.depth == 0 && !r.hasChildren {
+		return
+	}
+	col := a.pal.border
+	const step, lw, rad = 16, 1.5, 4
+	railX := func(level int) float32 { return pad + avatar/2 + float32(level-1)*step }
+	textX := pad + avatar + gap + float32(max(r.depth-1, 0))*step
+	ui.Box(c.Key("tree")).Attach(ui.AnchorTopLeft, ui.AnchorTopLeft).FillWidth().HeightPercent(100).PassThrough().Draw(func(pt *ui.Painter, b ui.Rect) {
+		line := func(x, y0, y1 float32) { pt.Fill(ui.Rect{X: b.X + x, Y: b.Y + y0, W: lw, H: y1 - y0}, col, 0) }
+		for _, l := range r.rails {
+			line(railX(l), 0, b.H)
+		}
+		if r.depth > 0 {
+			x := railX(r.depth)
+			if r.last {
+				x += lw / 2
+				p := &ui.Path{}
+				p.MoveTo(b.X+x, b.Y).LineTo(b.X+x, b.Y+titleY-rad).QuadTo(b.X+x, b.Y+titleY, b.X+x+rad, b.Y+titleY).LineTo(b.X+textX-6, b.Y+titleY)
+				pt.StrokePath(p, lw, col)
+			} else {
+				line(x, 0, b.H)
+			}
+		}
+		if r.hasChildren {
+			top := b.H/2 + avatar/2 + 2
+			if r.depth > 0 {
+				top = titleY + 10
+			}
+			line(railX(r.depth+1), top, b.H)
 		}
 	})
 }

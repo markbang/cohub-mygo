@@ -1,8 +1,11 @@
 package app
 
 import (
+	"context"
 	"fmt"
+	"io"
 	"math"
+	"net/http"
 	"net/url"
 	"strings"
 	"time"
@@ -10,6 +13,7 @@ import (
 	"github.com/egoist/mygo/ui"
 
 	"cohub-mygo/internal/i18n"
+	"cohub-mygo/internal/mp4"
 )
 
 // The side panel's media: a Space's (or a chat's) generation tasks as a
@@ -47,6 +51,13 @@ type genBlock struct {
 	} `json:"source"`
 	PreviewURL string `json:"previewUrl"`
 	DurationMs *int64 `json:"durationMs"`
+	Meta       *struct {
+		Role string `json:"role"` // first_frame: the frame a video starts on
+	} `json:"meta"`
+}
+
+func (b genBlock) firstFrame() bool {
+	return b.Type == "image" && b.Meta != nil && b.Meta.Role == "first_frame"
 }
 
 func (b genBlock) url() string {
@@ -69,11 +80,26 @@ func (r *genRun) outputs() []genOutput {
 	if r.Status != "completed" || r.Result == nil {
 		return nil
 	}
+	// A video's first frame is its poster, as the web shows it, not a
+	// picture of its own.
+	frame, video := "", false
+	for _, b := range r.Result.Output {
+		if b.firstFrame() {
+			frame = b.url()
+		}
+		video = video || b.Type == "video"
+	}
 	var out []genOutput
 	for _, b := range r.Result.Output {
+		if video && b.firstFrame() {
+			continue
+		}
 		switch b.Type {
 		case "image", "video", "audio":
 			o := genOutput{kind: b.Type, url: b.url(), preview: b.PreviewURL}
+			if b.Type == "video" && o.preview == "" {
+				o.preview = frame
+			}
 			if b.DurationMs != nil {
 				o.durationMs = *b.DurationMs
 			}
@@ -321,12 +347,17 @@ func (a *app) genTile(c *ui.Context, r *genRun, o *genOutput, size float32) {
 				})
 			}
 			if o.kind == "video" || o.kind == "audio" {
-				ui.Box(c.Key("badge")).Absolute().Top(4).Left(4).Size(20, 20).Radius(10).Center().Background(ui.RGBA(0, 0, 0, 0.55)).Children(func() {
-					ui.Icon(c, icon("play")).Size(12, 12).TextColor(ui.RGBA(255, 255, 255, 1))
-				})
-				if o.durationMs > 0 {
-					ui.Text(c.Key("dur"), duration(o.durationMs)).FontSize(10).Font(fontMono).TextColor(ui.RGBA(255, 255, 255, 1)).
-						Padding(1, 4).Radius(4).Background(ui.RGBA(0, 0, 0, 0.55)).Absolute().Bottom(4).Right(4)
+				// The play mark and the length sit on the picture, as the
+				// web's video tiles have them.
+				white, shade := ui.RGBA(255, 255, 255, 1), ui.RGBA(0, 0, 0, 0.5)
+				ui.Icon(c.Key("badge"), icon("play")).Size(14, 14).TextColor(white).Absolute().Bottom(6).Left(6)
+				length := time.Duration(o.durationMs) * time.Millisecond
+				if length == 0 && o.kind == "video" {
+					length = a.videoLength(o.url)
+				}
+				if length > 0 {
+					ui.Text(c.Key("dur"), mediaLength(length)).FontSize(11).Font(fontMono).TextColor(white).TextShadow(0, 1, 2, shade).
+						Absolute().Bottom(5).Right(6)
 				}
 			}
 		}
@@ -607,4 +638,71 @@ func truncateStart(c *ui.Context, text string, size, width float32) string {
 		}
 	}
 	return "…" + string(r[lo:])
+}
+
+// mediaLength is a video's length on its tile, as the web's: 0:05.
+func mediaLength(d time.Duration) string {
+	s := int(d / time.Second)
+	if s >= 3600 {
+		return fmt.Sprintf("%d:%02d:%02d", s/3600, s/60%60, s%60)
+	}
+	return fmt.Sprintf("%d:%02d", s/60, s%60)
+}
+
+// videoLength is a video's length, read once from its file's movie
+// header, as the web reads it from the video's metadata.
+func (a *app) videoLength(url string) time.Duration {
+	if d, ok := a.videoLengths[url]; ok || url == "" {
+		return d
+	}
+	a.once("length:"+url, func(ctx context.Context) {
+		d, err := mp4.Duration(&rangeReader{ctx: ctx, url: url})
+		if err != nil {
+			return
+		}
+		a.update(func() { a.videoLengths[url] = d })
+	})
+	return 0
+}
+
+// rangeReader reads a remote file through HTTP ranges, 64 KiB at a time,
+// keeping the last range for the reads within it.
+type rangeReader struct {
+	ctx   context.Context
+	url   string
+	start int64
+	buf   []byte
+}
+
+func (r *rangeReader) ReadAt(p []byte, off int64) (int, error) {
+	if off < r.start || off+int64(len(p)) > r.start+int64(len(r.buf)) {
+		n := max(int64(len(p)), 64<<10)
+		req, err := http.NewRequestWithContext(r.ctx, "GET", r.url, nil)
+		if err != nil {
+			return 0, err
+		}
+		req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", off, off+n-1))
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return 0, err
+		}
+		defer res.Body.Close()
+		switch {
+		case res.StatusCode == http.StatusRequestedRangeNotSatisfiable:
+			return 0, io.EOF
+		case res.StatusCode == http.StatusOK && off == 0, res.StatusCode == http.StatusPartialContent:
+		default:
+			return 0, fmt.Errorf("range of %s: HTTP %d", r.url, res.StatusCode)
+		}
+		b, err := io.ReadAll(io.LimitReader(res.Body, n))
+		if err != nil {
+			return 0, err
+		}
+		r.start, r.buf = off, b
+	}
+	n := copy(p, r.buf[off-r.start:])
+	if n < len(p) {
+		return n, io.EOF
+	}
+	return n, nil
 }

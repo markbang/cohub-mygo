@@ -1,14 +1,22 @@
 package app
 
 import (
+	"context"
 	"embed"
 	"fmt"
+	"log"
 	"math"
+	"net/http"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/egoist/mygo/ui"
+
+	"cohub-mygo/internal/webfont"
 )
 
 // The web app's theme CSS (apps/web/src/styles), read as the browser reads
@@ -404,21 +412,8 @@ func buildPalette(name, custom string) *palette {
 			p.identity[i] = p.textTertiary
 		}
 	}
-	font := resolveVar(vars["font-sans"], vars, 0)
-	font = strings.ReplaceAll(font, `"`, "")
-	font = strings.NewReplacer("Geist Variable", "Geist", "Figtree Variable", "Figtree").Replace(font)
-	p.font = strings.Join(strings.Fields(font), " ")
-	if p.font == "" {
-		p.font = "Geist, sans-serif"
-	}
-	p.font += ", PingFang SC, Noto Sans CJK SC"
-	mono := strings.ReplaceAll(resolveVar(vars["font-mono"], vars, 0), `"`, "")
-	mono = strings.NewReplacer("Geist Mono Variable", "Geist Mono").Replace(mono)
-	p.mono = strings.Join(strings.Fields(mono), " ")
-	if p.mono == "" {
-		p.mono = "Geist Mono, monospace"
-	}
-	p.mono += ", Noto Sans Mono CJK SC, monospace"
+	p.font, p.mono = themeFonts(vars)
+	p.font, p.mono = expandWebFonts(p.font), expandWebFonts(p.mono)
 	if p.sidebarBg == (ui.Color{}) {
 		p.sidebarBg = p.bgPrimary
 	}
@@ -429,4 +424,89 @@ func buildPalette(name, custom string) *palette {
 	p.popBg = solid.MixOklab(p.text, 0.06)
 	p.popHead = solid.MixOklab(p.text, 0.035)
 	return p
+}
+
+// themeFonts are the families of --font-sans and --font-mono, with the
+// fallbacks for Chinese.
+func themeFonts(vars map[string]string) (sans, mono string) {
+	font := resolveVar(vars["font-sans"], vars, 0)
+	font = strings.ReplaceAll(font, `"`, "")
+	font = strings.NewReplacer("Geist Variable", "Geist", "Figtree Variable", "Figtree").Replace(font)
+	sans = strings.Join(strings.Fields(font), " ")
+	if sans == "" {
+		sans = "Geist, sans-serif"
+	}
+	sans += ", PingFang SC, Noto Sans CJK SC"
+	m := strings.ReplaceAll(resolveVar(vars["font-mono"], vars, 0), `"`, "")
+	m = strings.NewReplacer("Geist Mono Variable", "Geist Mono").Replace(m)
+	mono = strings.Join(strings.Fields(m), " ")
+	if mono == "" {
+		mono = "Geist Mono, monospace"
+	}
+	mono += ", Noto Sans Mono CJK SC, monospace"
+	return sans, mono
+}
+
+// webFonts are the families the custom theme's web fonts registered, by the
+// family they make up: a service such as cn-font-split splits a font by
+// script, and the faces of a family are its weights, not its scripts, so
+// each face is a family of its own that the theme's family stands for.
+// webFontGen counts the times they changed.
+var (
+	webFonts   = map[string][]string{}
+	webFontGen int
+)
+
+func expandWebFonts(list string) string {
+	var out []string
+	for _, f := range strings.Split(list, ",") {
+		f = strings.TrimSpace(f)
+		if faces := webFonts[strings.ToLower(f)]; len(faces) > 0 {
+			out = append(out, faces...)
+		} else if f != "" {
+			out = append(out, f)
+		}
+	}
+	return strings.Join(out, ", ")
+}
+
+// loadWebFonts registers the web fonts that the custom theme's fonts come
+// from, kept in the user's cache once fetched.
+func (a *app) loadWebFonts(css string) {
+	if css == a.webFontsCSS || !strings.Contains(css, "@import") && !strings.Contains(css, "@font-face") {
+		return
+	}
+	a.webFontsCSS = css
+	vars, _ := cssVars("light", css)
+	sans, mono := themeFonts(vars)
+	families := append(strings.Split(sans, ","), strings.Split(mono, ",")...)
+	for i := range families {
+		families[i] = strings.TrimSpace(families[i])
+	}
+	dir, err := os.UserCacheDir()
+	if err != nil {
+		return
+	}
+	dir = filepath.Join(dir, "cohub-mygo", "webfonts")
+	a.spawn(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		faces, err := webfont.Load(ctx, http.DefaultClient, css, families, dir)
+		if err != nil {
+			log.Printf("custom theme fonts: %v", err)
+			return
+		}
+		got := map[string][]string{}
+		for i, f := range faces {
+			name := fmt.Sprintf("%s %d", f.Family, i)
+			if ui.RegisterFont(f.Data, name) == nil {
+				key := strings.ToLower(f.Family)
+				got[key] = append(got[key], name)
+			}
+		}
+		a.update(func() {
+			webFonts = got
+			webFontGen++
+		})
+	})
 }

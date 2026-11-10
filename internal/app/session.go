@@ -784,8 +784,10 @@ func (a *app) composerModel() cohub.ModelChoice {
 			return cohub.ModelChoice{Provider: t.Provider, ID: t.Model, Level: lv}
 		}
 	}
-	if len(a.models) > 0 {
-		return cohub.ModelChoice{Provider: a.models[0].Provider, ID: a.models[0].ID}
+	for _, md := range a.models {
+		if !md.Model.Hidden {
+			return cohub.ModelChoice{Provider: md.Provider, ID: md.ID}
+		}
 	}
 	return cohub.ModelChoice{}
 }
@@ -834,7 +836,7 @@ func (a *app) modelPicker(c *ui.Context) {
 				models := append([]*cohub.Model(nil), a.models...)
 				sort.SliceStable(models, func(i, j int) bool { return models[i].ID == cur.ID && models[j].ID != cur.ID })
 				for _, mod := range models {
-					if q != "" && !strings.Contains(strings.ToLower(mod.ID), strings.ToLower(q)) {
+					if mod.Model.Hidden && mod.ID != cur.ID || q != "" && !strings.Contains(strings.ToLower(mod.ID), strings.ToLower(q)) {
 						continue
 					}
 					n++

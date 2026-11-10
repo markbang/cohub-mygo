@@ -304,6 +304,16 @@ func TestCompare(t *testing.T) {
 					if err := tt.Click(fill(act["click"].(string))); err != nil {
 						t.Log(err)
 					}
+				case act["textPart"] != nil:
+					part := fill(act["textPart"].(string))
+					for _, text := range tt.Texts() {
+						if strings.Contains(text, part) {
+							if err := tt.Click(text); err != nil {
+								t.Log(err)
+							}
+							break
+						}
+					}
 				case act["clickLabel"] != nil:
 					if err := tt.Click(fill(act["clickLabel"].(string))); err != nil {
 						t.Log(err)
@@ -876,5 +886,52 @@ func TestDisplayStreamsOverWebRTC(t *testing.T) {
 	defer mu.Unlock()
 	if page.closed != 1 || deleted != "sess1" {
 		t.Fatalf("closed %d times, deleted session %q", page.closed, deleted)
+	}
+}
+
+// A chat forked from another lists right under it in the inbox, titled by
+// what was said after forking while it has no title, and opens on a click.
+func TestInboxNestsForks(t *testing.T) {
+	a := demoApp(t)
+	parent := a.sessions[3]
+	fork := &cohub.Session{ID: "fork-1", SpaceID: parent.SpaceID, Source: "web", LatestMessageText: "继续",
+		LastMessageAt: a.now().Add(-time.Minute), Space: parent.Space}
+	a.sessions = append([]*cohub.Session{fork}, a.sessions...)
+	a.inboxForks = []cohub.SessionFork{{ParentSessionID: parent.ID, ChildSessionID: fork.ID, Depth: 1}}
+	rows := a.visibleRows()
+	at := -1
+	for i, r := range rows {
+		if r.s == parent {
+			at = i
+		}
+	}
+	if at < 0 || at+1 >= len(rows) || rows[at+1].s != fork || rows[at+1].depth != 1 || rows[at+1].title() != "继续" {
+		t.Fatalf("the fork isn't under its parent: %+v", rows)
+	}
+	tt := ui.NewTester(a.view, 1440, 900)
+	pr, _ := tt.Find(chatTitle(parent))
+	fr, ok := tt.Find("继续")
+	if !ok || fr.Y <= pr.Y || fr.Y-pr.Y > 80 {
+		t.Fatalf("the fork's row at %v, its parent's at %v", fr, pr)
+	}
+	if err := tt.Click("继续"); err != nil {
+		t.Fatal(err)
+	}
+	if a.route.sessionID() != fork.ID {
+		t.Fatalf("route %v after clicking the fork", a.route)
+	}
+}
+
+// A video's first frame is its tile's poster rather than a tile of its own.
+func TestVideoTakesItsFirstFrame(t *testing.T) {
+	var r genRun
+	if err := json.Unmarshal([]byte(`{"status":"completed","result":{"output":[
+		{"type":"video","source":{"type":"url","url":"https://x/v.mp4"}},
+		{"type":"image","meta":{"role":"first_frame"},"source":{"type":"url","url":"https://x/f.png"}}]}}`), &r); err != nil {
+		t.Fatal(err)
+	}
+	out := r.outputs()
+	if len(out) != 1 || out[0].kind != "video" || out[0].preview != "https://x/f.png" {
+		t.Fatalf("outputs %+v", out)
 	}
 }

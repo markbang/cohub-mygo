@@ -57,7 +57,7 @@ func (a *app) streams(spaceID, id string) bool {
 		return false
 	}
 	if a.rtc == nil {
-		a.rtc = &displayRTC{failed: map[string]bool{}, off: !mygo.WebViewAvailable()}
+		a.rtc = &displayRTC{failed: map[string]bool{}, off: !webViewsAvailable()}
 	}
 	if a.rtc.off || a.rtc.failed[spaceID+"/"+id] {
 		return false

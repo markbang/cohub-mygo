@@ -152,6 +152,9 @@ func (a *app) avatarSeed(c *ui.Context, url, name, seed string, size, radius flo
 		radius = tileRadius(size)
 	}
 	if bmp := a.images.get(url); bmp != nil {
+		if anim := a.images.animation(url); anim != nil {
+			bmp = anim.frame(c)
+		}
 		return ui.Image(c, bmp).Size(size, size).Fit(ui.Cover).Radius(radius).Border(1, p.borderSubtle)
 	}
 	mark := initials(name)
@@ -289,8 +292,21 @@ func (a *app) menu(c *ui.Context, anchor ui.Element, open *bool, items []menuIte
 }
 
 func (a *app) menuWidth(c *ui.Context, anchor ui.Element, open *bool, width float32, items []menuItem) {
+	a.menuAt(c, anchor, open, width, false, items)
+}
+
+// menuEnd is a menu whose end lines up with the anchor's, as the header
+// buttons' at the window's end.
+func (a *app) menuEnd(c *ui.Context, anchor ui.Element, open *bool, width float32, items []menuItem) {
+	a.menuAt(c, anchor, open, width, true, items)
+}
+
+func (a *app) menuAt(c *ui.Context, anchor ui.Element, open *bool, width float32, end bool, items []menuItem) {
 	p := a.pal
 	ui.PopoverBase(c, anchor, open, func(panel ui.Element) {
+		if end {
+			panel.AttachTo(anchor, ui.AnchorBottomEnd, ui.AnchorTopEnd)
+		}
 		panel.MinWidth(180).Padding(4, 0).Radius(8).Background(p.bgElevated).Border(1, p.borderSubtle).
 			Shadow(0, 10, 24, 0, ui.RGBA(0, 0, 0, 0.12)).Margin(4, 0, 4, 0)
 		if width > 0 {
