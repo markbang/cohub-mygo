@@ -82,11 +82,12 @@ func (a *app) sessionView(c *ui.Context) {
 		pad = 16
 	}
 	ui.Box(c.Key("timeline-box")).Grow(1).MinHeight(0).Children(func() {
-		ui.List(c.Key("timeline-"+id), &a.timeline, len(turns), func(i int) {
+		list := ui.List(c.Key("timeline-"+id), &a.timeline, len(turns), func(i int) {
 			ui.Column(c).FillWidth().MaxWidth(chatMaxWidth).Margin(0, ui.Auto).Gap(10).Children(func() {
 				a.turnView(c, id, turns[i], tl)
 			})
-		}).Fill().Padding(28, pad, 32, pad).Gap(28).Scrollbars(a.compact).Children(func() {
+		}).Fill().Padding(28, pad, 32, pad).Gap(28).Scrollbars(a.compact).TrackScroll(&a.timelineScroll)
+		list.Children(func() {
 			switch {
 			case !tl.loaded && a.api != nil:
 				ui.Column(c).Grow(1).Center().Children(func() { a.spinner(c, 18, p.textTertiary) })
@@ -104,9 +105,11 @@ func (a *app) sessionView(c *ui.Context) {
 			ui.Box(c.Key("older")).Attach(ui.AnchorTop, ui.AnchorTop).Top(12).Children(func() { a.spinner(c, 16, p.textTertiary) })
 		}
 		if !a.compact && len(turns) > 0 {
-			a.turnRail(c, turns)
+			a.turnRail(c, id, turns, tl, list.Bounds().H)
 		}
-		if len(turns) > 0 && !a.timeline.AtEnd() {
+		if a.compact {
+			a.timelinePill(c, turns)
+		} else if len(turns) > 0 && !a.timeline.AtEnd() {
 			down := ui.ButtonBase(c.Key("to-end")).Size(32, 32).Radius(16).Center().Background(p.bgPrimary).Border(1, p.borderSubtle).
 				Shadow(0, 4, 12, 0, ui.RGBA(0, 0, 0, 0.08)).Label(m("x_to_latest")).FocusRing(false).Children(func() {
 				ui.Icon(c, icon("arrow-down")).Size(16, 16).TextColor(p.textSecond)
@@ -160,28 +163,50 @@ func (a *app) archivedNotice(c *ui.Context, s *cohub.Session) {
 }
 
 // turnRail is TurnRail.svelte: a hairline down the timeline's right with a
-// mark for each turn, the one in view in the brand's color. Hovering a
-// mark opens the turn navigator beside it.
-func (a *app) turnRail(c *ui.Context, turns []*cohub.Turn) {
+// mark for each turn, the one in view in the brand's color, over a track
+// whose thumb shows where the timeline is and drags it. Hovering a mark
+// opens the turn navigator beside it; a control at the top loads the turns
+// before the first loaded.
+func (a *app) turnRail(c *ui.Context, sessionID string, turns []*cohub.Turn, tl *sessionTurns, listH float32) {
 	p := a.pal
-	first, last := a.timeline.Visible()
+	first, _ := a.timeline.Visible()
 	n := len(turns)
 	line := p.borderSubtle.Alpha(0.65)
-	thumb := p.placeholder.Alpha(0.35)
 	nav := &a.turnNav
 	rail := ui.Box(c.Key("rail")).Attach(ui.AnchorTopRight, ui.AnchorTopRight).Top(4).Right(4).Width(28).HeightPercent(97).PassThrough()
-	// The rail passes the pointer through: it is hovered over its marks
-	// and the navigator, which are inside it.
+	// The rail passes the pointer through: it is hovered over its marks,
+	// its track and the navigator, which are inside it.
 	nav.hold(c, rail.Hovered())
 	railH := rail.Bounds().H
 	rail.Draw(func(pt *ui.Painter, r ui.Rect) {
 		pt.Fill(ui.Rect{X: r.X + r.W - 14, Y: r.Y, W: 1, H: r.H}, line, 0)
-		if n > 1 && last >= first {
-			top := r.H * float32(first) / float32(n)
-			h := max(r.H*float32(last-first+1)/float32(n), 24)
-			pt.Fill(ui.Rect{X: r.X + r.W - 15, Y: r.Y + min(top, r.H-h), W: 3, H: h}, thumb, 1.5)
-		}
 	}).Children(func() {
+		a.railTrack(c, listH)
+		older := tl.hasMore || tl.loadingOlder
+		if older {
+			b := ui.ButtonBase(c.Key("older")).Absolute().Top(-2).Right(2).Size(24, 24).Center().
+				Label(m("turnrail_load_older")).Tooltip(m("turnrail_load_older")).FocusRing(false)
+			hover := b.Hovered()
+			b.Children(func() {
+				if tl.loadingOlder {
+					a.spinner(c, 12, p.textTertiary)
+					return
+				}
+				ui.Column(c).Gap(2).AlignItems(ui.Center).Opacity(map[bool]float32{true: 1, false: 0.7}[hover]).Children(func() {
+					for _, al := range []float32{0.7, 0.45, 0.25} {
+						ui.Box(c).Size(4, 4).Radius(2).Background(p.placeholder.Alpha(al))
+					}
+				})
+			})
+			if b.Clicked() {
+				a.loadOlderTurns(sessionID)
+			}
+		}
+		// The marks keep clear of the control above them.
+		from, span := float32(0), float32(94)
+		if older {
+			from, span = 5, 89
+		}
 		at := float32(-1)
 		for i, t := range turns {
 			cur := i == first
@@ -198,13 +223,13 @@ func (a *app) turnRail(c *ui.Context, turns []*cohub.Turn) {
 			if cur {
 				w, h, col = 12, 20, p.brand
 			}
-			top := float32(0)
+			top := from
 			if n > 1 {
-				top = float32(i) / float32(n-1) * 94
+				top = from + float32(i)/float32(n-1)*span
 			}
 			mark := ui.ButtonBase(c.Key(t.ID)).Absolute().TopPercent(top).Right(2).Size(24, h+4).Center().
 				Label(m("turnrail_jump_turn", "n", t.Sequence)).FocusRing(false)
-			if mark.Hovered() {
+			if mark.Hovered() && !a.railDrag.on {
 				nav.show(t.ID)
 				if !cur {
 					w, col = 10, col.Alpha(1)
@@ -224,6 +249,63 @@ func (a *app) turnRail(c *ui.Context, turns []*cohub.Turn) {
 		if nav.open && at >= 0 && railH > 0 {
 			a.turnNavigator(c, turns, at, railH)
 		}
+	})
+}
+
+// railDrag is a drag of the rail's track: where the pointer is down the
+// track, and where on the thumb it holds it.
+type railDrag struct {
+	on      bool
+	y, grab float32
+}
+
+// railTrack is the rail's scroll track, as the web's: its thumb shows the
+// timeline's place and size; a press puts the thumb's middle there, and a
+// drag moves it, scrolling the timeline.
+func (a *app) railTrack(c *ui.Context, listH float32) {
+	p := a.pal
+	sc := &a.timelineScroll
+	if sc.MaxY <= 1 || listH <= 0 {
+		return
+	}
+	track := ui.Box(c.Key("track")).Absolute().Top(0).Bottom(0).Right(4).Width(20).Cursor(ui.CursorPointer).Label(m("turnrail_scroll"))
+	th := track.Bounds().H
+	frac := min(max(listH/(listH+sc.MaxY), 0.06), 0.64)
+	thumbH := th * frac
+	thumbTop := (th - thumbH) * min(max(sc.Y/sc.MaxY, 0), 1)
+	d := &a.railDrag
+	_, dy, held := track.Dragged()
+	_, py, _ := track.PointerPosition()
+	scrollTo := func(y float32) {
+		if room := th - thumbH; room > 0 {
+			sc.Y = min(max((y-d.grab)/room, 0), 1) * sc.MaxY
+			c.Invalidate()
+		}
+	}
+	switch {
+	case held && !d.on:
+		d.on, d.y, d.grab = true, py, thumbH/2
+		if py >= thumbTop && py <= thumbTop+thumbH {
+			d.grab = py - thumbTop
+		}
+		a.turnNav = turnNav{}
+		scrollTo(d.y)
+	case held:
+		d.y += dy
+		scrollTo(d.y)
+	case d.on:
+		d.on = false
+	}
+	hover, dragging := track.Hovered(), d.on
+	track.Draw(func(pt *ui.Painter, r ui.Rect) {
+		w, right, col := float32(3), float32(4.5), p.placeholder.Alpha(0.35)
+		switch {
+		case dragging:
+			w, right, col = 5, 3.5, p.brand.Alpha(0.7)
+		case hover:
+			w, right, col = 5, 3.5, p.textTertiary.Alpha(0.45)
+		}
+		pt.Fill(ui.Rect{X: r.X + r.W - right - w, Y: r.Y + thumbTop, W: w, H: thumbH}, col, w/2)
 	})
 }
 
@@ -562,7 +644,7 @@ func (a *app) processView(c *ui.Context, sessionID string, t *cohub.Turn, tl *se
 						a.thinking(c, fmt.Sprint("live-think", i), b.Thinking, true)
 					}
 				case "tool_use", "toolCall":
-					a.toolRow(c.Key(i), b, results[b.ID], true)
+					a.toolRow(c.Key(i), b, results[b.ID], toolSource{}, true)
 				}
 			}
 		})
@@ -601,7 +683,7 @@ func (a *app) stepEntries(c *ui.Context, t *cohub.Turn, msgs []*cohub.StepMessag
 		for i, m := range msgs {
 			if m.HasText() || m.StopReason == "error" || m.Meta.MessageKind == "compacted" {
 				flush(i)
-				a.stepMessage(c.Key(fmt.Sprint("step", i)), m)
+				a.stepMessage(c.Key(fmt.Sprint("step", i)), t, m)
 				continue
 			}
 			run = append(run, m)
@@ -647,10 +729,10 @@ func (a *app) stepRun(c *ui.Context, t *cohub.Turn, msgs []*cohub.StepMessage) {
 			names[i] = fmt.Sprintf("%s ×%d", n, counts[n])
 		}
 	}
-	ui.Column(c).Gap(8).Children(func() { a.stepRunBody(c, msgs, tools, parts, names, failed, open) })
+	ui.Column(c).Gap(8).Children(func() { a.stepRunBody(c, t, msgs, tools, parts, names, failed, open) })
 }
 
-func (a *app) stepRunBody(c *ui.Context, msgs []*cohub.StepMessage, tools []cohub.Block, parts, names []string, failed int, open bool) {
+func (a *app) stepRunBody(c *ui.Context, t *cohub.Turn, msgs []*cohub.StepMessage, tools []cohub.Block, parts, names []string, failed int, open bool) {
 	p := a.pal
 	row := ui.ButtonBase(c.Key("head")).Row().Gap(8).AlignItems(ui.Center).Justify(ui.Start).MinHeight(28).Padding(4, msgInset).Radius(6).FocusRing(false).Children(func() {
 		col := p.success.Alpha(0.75)
@@ -678,16 +760,16 @@ func (a *app) stepRunBody(c *ui.Context, msgs []*cohub.StepMessage, tools []cohu
 	if open {
 		ui.Column(c.Key("body")).Gap(8).MarginStart(msgInset + 3).PaddingStart(11).BorderStartWidth(1).BorderColor(p.borderSubtle.Alpha(0.7)).Children(func() {
 			for i, m := range msgs {
-				ui.Column(c.Key(i)).Gap(6).Children(func() { a.stepBody(c, m) })
+				ui.Column(c.Key(i)).Gap(6).Children(func() { a.stepBody(c, t, m) })
 			}
 		})
 	}
 }
 
 // stepMessage is a step with text: its thinking, text, tools and meta.
-func (a *app) stepMessage(c *ui.Context, m *cohub.StepMessage) {
+func (a *app) stepMessage(c *ui.Context, t *cohub.Turn, m *cohub.StepMessage) {
 	ui.Column(c).Gap(8).Children(func() {
-		a.stepBody(c, m)
+		a.stepBody(c, t, m)
 		a.metaRow(c.Key("meta"), func() {
 			p := a.pal
 			a.metaCopy(c, m.Text)
@@ -702,7 +784,7 @@ func (a *app) stepMessage(c *ui.Context, m *cohub.StepMessage) {
 	})
 }
 
-func (a *app) stepBody(c *ui.Context, m *cohub.StepMessage) {
+func (a *app) stepBody(c *ui.Context, t *cohub.Turn, m *cohub.StepMessage) {
 	p := a.pal
 	results := toolResults(m.Content)
 	for i, b := range m.Content {
@@ -718,7 +800,7 @@ func (a *app) stepBody(c *ui.Context, m *cohub.StepMessage) {
 				})
 			}
 		case "tool_use", "toolCall":
-			a.toolRow(c.Key(i), b, results[b.ID], false)
+			a.toolRow(c.Key(i), b, results[b.ID], toolSource{t.ID, m.ToolCallsObjectKey}, false)
 		}
 	}
 	if m.Error != "" {
@@ -729,7 +811,7 @@ func (a *app) stepBody(c *ui.Context, m *cohub.StepMessage) {
 // toolRow is one tool call: its name, what it ran on, and how it went. A
 // click opens what it got and gave back, as the web's; a call running
 // shows it open. result is the call's result, when it came.
-func (a *app) toolRow(c *ui.Context, b cohub.Block, result *cohub.Block, live bool) {
+func (a *app) toolRow(c *ui.Context, b cohub.Block, result *cohub.Block, src toolSource, live bool) {
 	p := a.pal
 	status := "done"
 	if b.Meta != nil && b.Meta.ToolStatus != "" {
@@ -786,15 +868,43 @@ func (a *app) toolRow(c *ui.Context, b cohub.Block, result *cohub.Block, live bo
 			a.foldOpen[key] = !open
 		}
 		if open {
-			a.toolDetail(c, b, result, running)
+			a.toolDetail(c, b, result, src, running)
 		}
 	})
 }
 
 // toolDetail is a tool call opened: its input, the main one first and the
 // others by name, then its output, or that it still runs.
-func (a *app) toolDetail(c *ui.Context, b cohub.Block, result *cohub.Block, running bool) {
+func (a *app) toolDetail(c *ui.Context, b cohub.Block, result *cohub.Block, src toolSource, running bool) {
 	p := a.pal
+	// A finished step's file leaves its results out: its tool calls file
+	// has them, and the inputs whole.
+	if result != nil && result.Meta != nil && result.Meta.ResultDetail == "omitted" {
+		calls, err, ok := a.toolCalls(src)
+		var call *cohub.ToolCall
+		for _, tc := range calls {
+			if tc.ID == b.ID {
+				call = tc
+			}
+		}
+		full := cohub.Block{Type: "tool_result", ToolUse: b.ID}
+		switch {
+		case src.key == "" || ok && call == nil:
+			full.Content, _ = json.Marshal(m("tool_result_omitted"))
+		case !ok:
+			full.Content, _ = json.Marshal(m("tool_loading_details"))
+		case err != nil:
+			full.Content, full.IsError = json.RawMessage(strconv.Quote(m("tool_load_failed"))), true
+		default:
+			if len(call.Input) > 0 {
+				b.Input = call.Input
+			}
+			if call.Result != nil {
+				full.Content, full.IsError = call.Result.Content, call.Result.IsError
+			}
+		}
+		result = &full
+	}
 	main, params := toolInputParts(b)
 	out, outLabel, outCol := "", m("tool_out"), p.textSecond
 	switch {
@@ -836,6 +946,37 @@ func (a *app) toolDetail(c *ui.Context, b cohub.Block, result *cohub.Block, runn
 			})
 		}
 	})
+}
+
+// toolSource is where a step's tool calls are whole: its turn, and the
+// file of them.
+type toolSource struct{ turn, key string }
+
+// toolCalls loads a step's tool calls file once, and reports whether it
+// came.
+func (a *app) toolCalls(src toolSource) ([]*cohub.ToolCall, error, bool) {
+	if src.key == "" {
+		return nil, nil, false
+	}
+	key := "toolcalls:" + src.key
+	sessionID := a.route.sessionID()
+	a.once(key, func(ctx context.Context) {
+		calls, err := a.api.ToolCalls(ctx, sessionID, src.turn, src.key)
+		a.update(func() {
+			if err != nil {
+				a.pages.json[key] = err
+				return
+			}
+			a.pages.json[key] = calls
+		})
+	})
+	switch v := a.pages.json[key].(type) {
+	case []*cohub.ToolCall:
+		return v, nil, true
+	case error:
+		return nil, v, true
+	}
+	return nil, nil, false
 }
 
 // toolInputParts splits a call's input into its main value, as the

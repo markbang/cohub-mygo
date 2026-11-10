@@ -150,7 +150,10 @@ func (b Block) ResultText() string {
 type BlockMeta struct {
 	Summary    string `json:"summary"`
 	ToolStatus string `json:"toolStatus"`
-	Timing     *struct {
+	// ResultDetail is "omitted" for a tool result a step file leaves out:
+	// its message's tool calls file has it.
+	ResultDetail string `json:"resultDetail"`
+	Timing       *struct {
 		DurationMs int64 `json:"durationMs"`
 	} `json:"timing"`
 }
@@ -167,7 +170,9 @@ type StepMessage struct {
 	DurationMs int64     `json:"durationMs"`
 	CreatedAt  time.Time `json:"createdAt"`
 	Content    []Block   `json:"content"`
-	Meta       struct {
+	// ToolCallsObjectKey is the file of the step's tool calls, whole.
+	ToolCallsObjectKey string `json:"toolCallsObjectKey"`
+	Meta               struct {
 		MessageKind     string `json:"messageKind"`
 		TurnID          string `json:"turnId"`
 		MessageOrdinal  *int   `json:"messageOrdinal"`
@@ -636,30 +641,58 @@ func (cl *Client) SpaceUsage(ctx context.Context, spaceID string, days int) (*Sp
 
 // Steps loads the intermediate messages of a turn, through a signed URL.
 func (cl *Client) Steps(ctx context.Context, sessionID, turnID, objectKey string) ([]*StepMessage, error) {
+	var file struct {
+		Messages []*StepMessage `json:"messages"`
+	}
+	return file.Messages, cl.turnObject(ctx, sessionID, turnID, objectKey, &file)
+}
+
+// ToolCall is a tool call whole, from its step's tool calls file.
+type ToolCall struct {
+	ID     string          `json:"id"`
+	Name   string          `json:"name"`
+	Input  json.RawMessage `json:"input"`
+	Result *struct {
+		Content json.RawMessage `json:"content"`
+		IsError bool            `json:"isError"`
+	} `json:"result"`
+}
+
+// ToolCalls reads a step's tool calls file, for the results its step file
+// left out.
+func (cl *Client) ToolCalls(ctx context.Context, sessionID, turnID, objectKey string) ([]*ToolCall, error) {
+	var file struct {
+		ToolCalls []*ToolCall `json:"toolCalls"`
+	}
+	return file.ToolCalls, cl.turnObject(ctx, sessionID, turnID, objectKey, &file)
+}
+
+// turnObject reads a file of a turn's from storage, through a signed URL.
+func (cl *Client) turnObject(ctx context.Context, sessionID, turnID, objectKey string, out any) error {
 	var signed struct {
 		URLs map[string]string `json:"urls"`
 	}
 	if err := cl.Do(ctx, "POST", fmt.Sprintf("/api/sessions/%s/turns/%s/signed-urls", url.PathEscape(sessionID), url.PathEscape(turnID)),
 		map[string]any{"objectKeys": []string{objectKey}}, &signed); err != nil {
-		return nil, err
+		return err
 	}
 	u := signed.URLs[objectKey]
 	if u == "" {
-		return nil, errors.New("no signed URL for the steps")
+		return errors.New("no signed URL for " + objectKey)
 	}
 	req, err := http.NewRequestWithContext(ctx, "GET", u, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	res, err := cl.http.Do(req)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer res.Body.Close()
-	var file struct {
-		Messages []*StepMessage `json:"messages"`
+	if res.StatusCode >= 300 {
+		return &StatusError{Status: res.StatusCode, msg: fmt.Sprintf("GET %s: %d", objectKey, res.StatusCode)}
 	}
-	return file.Messages, json.NewDecoder(res.Body).Decode(&file)
+	return json.NewDecoder(res.Body).Decode(out)
 }
 
 // Get reads any JSON endpoint, for pages that show what they read.

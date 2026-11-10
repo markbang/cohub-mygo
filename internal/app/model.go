@@ -177,6 +177,9 @@ type app struct {
 	sidebarW, panelW, mainW float32 // the panes' widths: the sidebar, the right panel, the main column beside a window
 	paneDrag                *paneDrag
 	turnNav                 turnNav
+	timelineScroll          ui.ScrollState // the timeline's offset, which the rail's track reads and drags
+	railDrag                railDrag
+	turnSheetOpen           bool            // the compact shell's turn list
 	followupBusy            map[string]bool // follow-ups being steered or cancelled
 	flags                   map[string]*bool
 }
@@ -595,7 +598,7 @@ func (a *app) show(r route) {
 	a.route = r
 	a.sendErr = ""
 	a.userMenu = false
-	a.turnNav = turnNav{}
+	a.turnNav, a.turnSheetOpen = turnNav{}, false
 	if r.kind == routeSessions && !a.compact && len(a.sessions) > 0 {
 		// /sessions opens the latest chat, as the web does.
 		a.route = route{kind: routeSession, session: a.sessions[0].ID}
@@ -607,7 +610,7 @@ func (a *app) show(r route) {
 		a.resolveSlug(r.sub)
 	}
 	if id := a.route.sessionID(); id != "" && id != prevSession {
-		a.timeline = ui.ListState{}
+		a.timeline, a.timelineScroll = ui.ListState{}, ui.ScrollState{}
 		if s := a.session(id); s != nil {
 			a.markSeen(s)
 		}

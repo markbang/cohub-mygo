@@ -204,3 +204,108 @@ func filterTurns(turns []*cohub.Turn, query string, authors bool) []*cohub.Turn 
 	}
 	return out
 }
+
+// timelinePill floats over the compact timeline's bottom, as the web's:
+// to the latest when scrolled up, and the turn list.
+func (a *app) timelinePill(c *ui.Context, turns []*cohub.Turn) {
+	down := len(turns) > 0 && !a.timeline.AtEnd()
+	list := len(turns) > 1
+	if !down && !list {
+		return
+	}
+	p := a.pal
+	ui.Row(c.Key("pill")).Attach(ui.AnchorBottom, ui.AnchorBottom).Bottom(12).Gap(2).Padding(4).Radius(18).
+		Background(p.bgPrimary.Alpha(0.95)).Border(1, p.borderSubtle.Alpha(0.8)).Shadow(0, 4, 18, 0, ui.RGBA(0, 0, 0, 0.16)).Children(func() {
+		btn := func(key, ic, label string) bool {
+			b := ui.ButtonBase(c.Key(key)).Size(28, 28).Radius(14).Center().Label(label).FocusRing(false).Children(func() {
+				ui.Icon(c, icon(ic)).Size(16, 16).TextColor(p.textSecond)
+			})
+			if b.Pressed() || b.Hovered() {
+				b.Background(p.hover)
+			}
+			return b.Clicked()
+		}
+		if down && btn("to-end", "arrow-down", m("x_to_latest")) {
+			a.timeline.ScrollToEnd()
+		}
+		if list && btn("turns", "list-tree", m("chat_open_turn_list")) {
+			a.turnSheetOpen = true
+		}
+	})
+	if a.turnSheetOpen {
+		a.turnSheet(c, turns)
+	}
+}
+
+// turnSheet is the compact shell's turn list, as the web's bottom sheet:
+// a turn's message and how it went; a tap jumps there.
+func (a *app) turnSheet(c *ui.Context, turns []*cohub.Turn) {
+	p := a.pal
+	first, _ := a.timeline.Visible()
+	ui.Overlay(c, func() {
+		ui.Box(c.Key("scrim")).Absolute().Top(0).Left(0).Right(0).Bottom(0).Background(p.overlay()).
+			Label(m("bottom_sheet_close")).OnClick(func() { a.turnSheetOpen = false })
+		ui.Column(c.Key("sheet")).Absolute().Left(0).Right(0).Bottom(0).MaxHeight(a.height*0.72).Radius(16, 16, 0, 0).
+			Background(p.bgPrimary).BorderWidth(1, 0, 0, 0).BorderColor(p.borderSubtle).Shadow(0, -12, 36, 0, ui.RGBA(0, 0, 0, 0.28)).
+			Label(m("bottom_sheet_aria")).Children(func() {
+			ui.Box(c).Size(36, 4).Radius(2).Background(p.borderSubtle).Margin(10, ui.Auto, 0, ui.Auto).Shrink(0)
+			ui.Scroll(c.Key("turns")).Grow(1).MinHeight(0).Children(func() {
+				ui.Column(c).Padding(8, 0).Children(func() {
+					for i, t := range turns {
+						a.turnSheetRow(c.Key(t.ID), t, i == first)
+					}
+				})
+			})
+		})
+	})
+}
+
+func (a *app) turnSheetRow(c *ui.Context, t *cohub.Turn, on bool) {
+	p := a.pal
+	text := turnNavText(t)
+	statusCol := p.textTertiary
+	switch t.Status {
+	case "failed":
+		statusCol = p.errorC
+	case "running":
+		statusCol = p.info
+	case "interrupted":
+		statusCol = p.warning
+	}
+	b := ui.ButtonBase(c).Row().Gap(12).AlignItems(ui.Start).Justify(ui.Start).Padding(12, 16).FocusRing(false).Label("#" + strconv.Itoa(t.Sequence))
+	switch {
+	case on:
+		b.Background(p.brand.Alpha(0.1))
+	case b.Pressed():
+		b.Background(p.hover)
+	}
+	b.Children(func() {
+		num := p.textTertiary
+		if on {
+			num = p.brand
+		}
+		ui.Text(c, "#"+strconv.Itoa(t.Sequence)).FontSize(11).FontWeight(500).TextColor(num).Width(40).Shrink(0).Margin(2, 0, 0, 0)
+		ui.Column(c).Grow(1).MinWidth(0).Gap(4).Children(func() {
+			if text == "" {
+				ui.Text(c, m("navigator_empty_msg")).FontSize(13).LineHeight(1.625).TextColor(p.placeholder)
+			} else {
+				ui.Text(c, text).FontSize(13).LineHeight(1.625).TextColor(p.text).MaxLines(3)
+			}
+			ui.Row(c).Gap(4).AlignItems(ui.Center).Children(func() {
+				if !t.StartedAt.IsZero() {
+					ui.Text(c, clock(t.StartedAt, a.now())+" ·").FontSize(11).TextColor(p.placeholder).Shrink(0)
+				}
+				status := t.Status
+				if t.Model != "" {
+					status += " · " + t.Model
+				}
+				ui.Text(c, status).FontSize(11).TextColor(statusCol).SingleLine().MinWidth(0)
+			})
+		})
+	})
+	id := t.ID
+	if b.Clicked() {
+		a.turnSheetOpen = false
+		a.jumpToTurn(id)
+	}
+}

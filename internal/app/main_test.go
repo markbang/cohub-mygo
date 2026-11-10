@@ -689,6 +689,86 @@ func TestToolCallOpens(t *testing.T) {
 	snapshot(t, tt, "desktop-tool-open")
 }
 
+// A finished step's file leaves its tool results out; opening a call loads
+// them from the step's tool calls file, where it showed no output.
+func TestToolCallLoadsOmittedResult(t *testing.T) {
+	var srv *httptest.Server
+	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/sessions/demo-0/turns/t1/signed-urls":
+			fmt.Fprintf(w, `{"urls":{"calls.json":%q}}`, srv.URL+"/obj/calls.json")
+		case "/obj/calls.json":
+			io.WriteString(w, `{"toolCalls":[{"id":"c1","name":"bash","input":{"command":"ls"},"result":{"content":"a.txt","isError":false}}]}`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	a := demoApp(t)
+	a.sync = true
+	a.api = cohub.NewWithToken(srv.URL, "x", "", srv.Client())
+	tl := a.timelineOf("demo-0")
+	tl.steps["t1"] = []*cohub.StepMessage{{ID: "m1", ToolCallsObjectKey: "calls.json", Content: []cohub.Block{
+		{Type: "tool_use", ID: "c1", Name: "bash", Input: json.RawMessage(`{"command":"ls"}`)},
+		{Type: "tool_result", ToolUse: "c1", Content: json.RawMessage(`[]`), Meta: &cohub.BlockMeta{ResultDetail: "omitted"}},
+	}}}
+	tl.expanded["t1"], a.foldOpen["m1"], a.foldOpen["tool:c1"] = true, true, true
+	tt := ui.NewTester(a.view, 1440, 900)
+	a.timeline.ScrollTo(0, ui.Start)
+	for i := 0; i < 3; i++ {
+		tt.Frame()
+		a.flush()
+	}
+	tt.Frame()
+	if !tt.HasText("a.txt") {
+		t.Fatalf("no output: %q", tt.Texts())
+	}
+}
+
+// Dragging the thumb along the rail's track scrolls the timeline, as the
+// web's scroll track does.
+func TestRailTrackScrollsTimeline(t *testing.T) {
+	a := demoApp(t)
+	tt := ui.NewTester(a.view, 1440, 900)
+	tt.Frame()
+	sc := &a.timelineScroll
+	r, ok := tt.Find(m("turnrail_scroll"))
+	if !ok || sc.MaxY <= 0 || sc.Y < sc.MaxY-1 {
+		t.Fatalf("track %v, scroll %v of %v", ok, sc.Y, sc.MaxY)
+	}
+	x := r.X + r.W/2
+	tt.Press(x, r.Y+r.H/2)
+	tt.Move(x, r.Y+r.H/4)
+	tt.Move(x, r.Y)
+	tt.Release(x, r.Y)
+	tt.Frame()
+	if sc.Y != 0 {
+		t.Fatalf("scrolled to %v of %v", sc.Y, sc.MaxY)
+	}
+}
+
+// In the compact shell, the pill over the timeline opens the turn list,
+// and a turn in it jumps there and closes it.
+func TestCompactTurnList(t *testing.T) {
+	a := demoApp(t)
+	tt := ui.NewTester(a.view, 420, 860)
+	a.navigate("/sessions/demo-0")
+	tt.Frame()
+	if err := tt.Click(m("chat_open_turn_list")); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	if !a.turnSheetOpen {
+		t.Fatal("the list stayed shut")
+	}
+	if err := tt.Click("#1"); err != nil {
+		t.Fatal(err)
+	}
+	if a.turnSheetOpen {
+		t.Fatal("the list stayed open after the jump")
+	}
+}
+
 // Hovering a turn's mark opens the turn navigator: its search filters the
 // turns, a turn in it closes it, and it closes a moment after the pointer
 // leaves.
