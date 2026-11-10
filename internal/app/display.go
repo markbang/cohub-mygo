@@ -26,6 +26,7 @@ type displayInfo struct {
 	Width  int    `json:"width"`
 	Height int    `json:"height"`
 	Input  bool   `json:"input"`
+	Stream bool   `json:"stream"` // over WebRTC
 }
 
 type displayView struct {
@@ -139,12 +140,12 @@ var displayKeys = map[ui.Key]string{
 }
 
 func (a *app) displayView(c *ui.Context, spaceID, id string) {
-	p := a.pal
-	v := a.displayState
-	if v == nil || v.space != spaceID || v.id != id {
-		v = &displayView{space: spaceID, id: id}
-		a.displayState = v
+	if a.streams(spaceID, id) {
+		a.rtcView(c, spaceID, id)
+		return
 	}
+	p := a.pal
+	v := a.displayOf(spaceID, id)
 	if time.Since(v.at) > 500*time.Millisecond {
 		a.captureDisplay(v)
 	}
@@ -208,8 +209,25 @@ func (a *app) displayView(c *ui.Context, spaceID, id string) {
 				map[string]any{"type": "pointer", "action": "up", "x": x, "y": y, "button": button})
 		}
 	}
-	// What is typed goes to the display from the bar under it: text as
-	// it is entered, and the editing keys as they are pressed.
+	a.displayKeysBar(c, v)
+}
+
+func (a *app) displayOf(spaceID, id string) *displayView {
+	v := a.displayState
+	if v == nil || v.space != spaceID || v.id != id {
+		v = &displayView{space: spaceID, id: id}
+		a.displayState = v
+	}
+	return v
+}
+
+// displayKeysBar is the bar under a display, which types into it: its
+// text input takes the system's input methods, which the display itself
+// does not.
+func (a *app) displayKeysBar(c *ui.Context, v *displayView) {
+	p := a.pal
+	// What is typed goes to the display: text as it is entered, and the
+	// editing keys as they are pressed.
 	ui.Row(c.Key("keys")).Height(40).Gap(6).Padding(0, 8).AlignItems(ui.Center).BorderWidth(1, 0, 0, 0).BorderColor(p.borderSubtle).Background(p.bgContent).Children(func() {
 		ui.Icon(c, icon("keyboard")).Size(14, 14).TextColor(p.textTertiary)
 		in := ui.TextInputBase(c.Key("type"), &a.displayTyped).Placeholder(m("x_display_type")).PlaceholderColor(p.placeholder).

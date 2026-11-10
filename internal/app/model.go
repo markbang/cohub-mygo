@@ -123,6 +123,7 @@ type app struct {
 	handledCommands              map[string]bool
 	displayTyped                 string
 	displayState                 *displayView
+	rtc                          *displayRTC
 	portToast                    *portToast
 	publish                      *publishForm
 	danmakuWidth                 float32
@@ -505,6 +506,9 @@ func (a *app) goBack() {
 
 func (a *app) show(r route) {
 	prevSession := a.route.sessionID()
+	if r.space != a.route.space || r.display() != a.route.display() {
+		a.closeDisplay()
+	}
 	a.route = r
 	a.sendErr = ""
 	a.userMenu = false
