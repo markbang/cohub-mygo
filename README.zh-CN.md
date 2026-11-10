@@ -21,7 +21,6 @@ curl -fsSL https://github.com/markbang/cohub-mygo/releases/latest/download/insta
 ## TODO
 
 - [x] 缓存数据，加快启动。
-- [ ] 跨设备同步已读 / 未读状态。
 - [x] 用 WebRTC 显示实时画面。
 - [x] 在 macOS 和 Windows 上验证 GPU 渲染。
 - [ ] 添加 macOS 公证和 Windows 代码签名。
