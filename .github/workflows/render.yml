@@ -1,0 +1,92 @@
+# Launches the app with the demo data on macOS and Windows and fails unless
+# its window draws through the GPU renderer: Metal on macOS, Direct3D 11 on
+# Windows, where runners without a GPU use WARP, Windows' rasterizer on the
+# CPU, behind the same renderer. The screenshot and the frame log are kept.
+name: Render
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: render-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  render:
+    name: Render ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: macOS, os: macos-latest }
+          - { name: Windows, os: windows-latest }
+    env:
+      CGO_ENABLED: "0"
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Find Go's caches
+        id: go-env
+        run: |
+          echo "build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+          echo "mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ${{ steps.go-env.outputs.build }}
+            ${{ steps.go-env.outputs.mod }}
+          key: render-go-${{ matrix.name }}-${{ hashFiles('go.mod', 'go.sum') }}
+          restore-keys: render-go-${{ matrix.name }}-
+      - run: go build -o "$RUNNER_TEMP/cohub-mygo$(go env GOEXE)" .
+      # COHUB_CAPTURE saves the window once the demo's pictures came, then
+      # quits; MYGO_FRAME_STATS=all logs the path that drew each frame.
+      - name: Launch with the demo
+        timeout-minutes: 3
+        env:
+          COHUB_DEMO: "1"
+          COHUB_CAPTURE: ${{ runner.temp }}/window.png
+          MYGO_FRAME_STATS: all
+        run: |
+          mkdir -p render
+          "$RUNNER_TEMP/cohub-mygo$(go env GOEXE)" > render/frames.log 2>&1 || {
+            tail -n 40 render/frames.log
+            exit 1
+          }
+          cp "$COHUB_CAPTURE" render/window.png
+      - name: Check the frames' path
+        run: |
+          paths="$(grep -oE '\(drawn (on the GPU|by the GPU renderer in software|in memory)' render/frames.log | sort | uniq -c)"
+          {
+            echo "### ${{ matrix.name }}"
+            grep -E "mygo: (native UI|drawing)" render/frames.log || true
+            echo '```'
+            echo "${paths:-no frames logged}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "$paths"
+          if ! grep -q "(drawn on the GPU" render/frames.log; then
+            echo "::error::No frame was drawn by the GPU renderer on ${{ matrix.name }}"
+            grep -E "mygo: (native UI|drawing)" render/frames.log || tail -n 20 render/frames.log
+            exit 1
+          fi
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: render-${{ matrix.name }}
+          path: render/
+          if-no-files-found: ignore
+          retention-days: 14
