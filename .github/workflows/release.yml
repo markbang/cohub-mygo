@@ -64,6 +64,11 @@ jobs:
             platform: linux/amd64,linux/arm64
     env:
       CGO_ENABLED: "0"
+      # Each platform signs once its secrets are set (see RELEASING.md), and
+      # builds as before without them: signed ad hoc on macOS, unsigned on
+      # Windows.
+      MACOS_SIGNING: ${{ secrets.MACOS_CERTIFICATE != '' }}
+      WINDOWS_SIGNING: ${{ secrets.WINDOWS_CERTIFICATE != '' }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -86,17 +91,70 @@ jobs:
             ${{ steps.go-env.outputs.mod }}
           key: release-go-${{ matrix.name }}-${{ hashFiles('go.mod', 'go.sum') }}
           restore-keys: release-go-${{ matrix.name }}-
-      - name: Install NSIS for Windows installers
+      - name: Install NSIS and osslsigncode for Windows installers
         if: matrix.name == 'Windows'
-        run: sudo apt-get update && sudo apt-get install -y nsis
+        run: sudo apt-get update && sudo apt-get install -y nsis osslsigncode
+      # The certificate signs the app; the notary profile notarizes its disk
+      # image. Both go in a keychain of the job, where codesign and
+      # notarytool look, and mygo.json gets the profile for this build.
+      - name: Import the Developer ID and the notary credentials
+        if: matrix.name == 'macOS' && env.MACOS_SIGNING == 'true'
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          password="$(openssl rand -base64 24)"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          echo "$MACOS_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security import "$RUNNER_TEMP/certificate.p12" -k "$keychain" \
+            -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          rm "$RUNNER_TEMP/certificate.p12"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$password" "$keychain"
+          security list-keychains -d user -s "$keychain" login.keychain
+          xcrun notarytool store-credentials notary --keychain "$keychain" \
+            --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD"
+          identity="$(security find-identity -v -p codesigning "$keychain" \
+            | grep -o '"Developer ID Application: [^"]*"' | head -n 1 | tr -d '"')"
+          if [ -z "$identity" ]; then
+            echo "::error::MACOS_CERTIFICATE holds no Developer ID Application identity"
+            exit 1
+          fi
+          jq --arg k "$keychain" '.macos.notarize = {keychainProfile: "notary", keychain: $k}' \
+            mygo.json > "$RUNNER_TEMP/mygo.json"
+          mv "$RUNNER_TEMP/mygo.json" mygo.json
+          echo "MYGO_SIGN=$identity" >> "$GITHUB_ENV"
+      - name: Write the Windows certificate
+        if: matrix.name == 'Windows' && env.WINDOWS_SIGNING == 'true'
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+        run: |
+          echo "$WINDOWS_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/code-signing.pfx"
+          jq --arg c "$RUNNER_TEMP/code-signing.pfx" '.windows.certificate = $c' \
+            mygo.json > "$RUNNER_TEMP/mygo.json"
+          mv "$RUNNER_TEMP/mygo.json" mygo.json
       - name: Build signed packages
         env:
           GH_TOKEN: ${{ github.token }}
           MYGO_UPDATER_PRIVATE_KEY: ${{ secrets.MYGO_UPDATER_PRIVATE_KEY }}
+          MYGO_WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
         shell: bash
         run: |
           test -n "$MYGO_UPDATER_PRIVATE_KEY"
-          go tool mygo build -platform "${{ matrix.platform }}"
+          case "${{ matrix.name }}/$MACOS_SIGNING/$WINDOWS_SIGNING" in
+            macOS/false/*) echo "::warning::macOS apps are signed ad hoc: Gatekeeper blocks them. See RELEASING.md." ;;
+            Windows/*/false) echo "::warning::Windows apps are unsigned: SmartScreen warns. See RELEASING.md." ;;
+          esac
+          args=(-platform "${{ matrix.platform }}")
+          if [[ -n "${MYGO_SIGN:-}" ]]; then
+            args+=(-sign "$MYGO_SIGN")
+          fi
+          go tool mygo build "${args[@]}"
       - uses: actions/upload-artifact@v7
         with:
           name: packages-${{ matrix.name }}
