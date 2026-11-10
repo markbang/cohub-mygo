@@ -1,6 +1,8 @@
 package app
 
 import (
+	"log"
+	"runtime"
 	"time"
 
 	"github.com/egoist/mygo/ui"
@@ -32,6 +34,13 @@ func clampPane(v, def, lo, hi float32) float32 {
 // panel on desktops, as the web app's (app) layout; one column with a tab
 // bar below 768 DIPs, as its compact shell.
 func (a *app) view(c *ui.Context) {
+	if a.perf && !a.firstFrame {
+		a.firstFrame = true
+		var m runtime.MemStats
+		runtime.ReadMemStats(&m)
+		log.Printf("perf: first frame in %s, heap %.1f MB, %d goroutines",
+			time.Since(a.startAt).Round(time.Millisecond), float64(m.HeapAlloc)/(1<<20), runtime.NumGoroutine())
+	}
 	a.applyTheme(c)
 
 	c.OnShortcut(ui.Ctrl|ui.Alt, ui.KeyLeft, func() { a.sidebarOpen = !a.sidebarOpen })

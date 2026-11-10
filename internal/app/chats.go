@@ -66,6 +66,11 @@ var chatSourceGroups = []struct {
 	{"other", []string{"other"}},
 }
 
+var sourceNames = map[string]string{
+	"web": "Web App", "cli": "CLI", "websocket": "Websocket", "feishu": "Feishu", "wechat": "WeChat",
+	"discord": "Discord", "qq": "QQ", "scheduled_task": "Scheduled Task", "space_hook": "Hook", "public_api": "Public API",
+}
+
 func sourceName(source string) string {
 	switch source {
 	case "":
@@ -73,10 +78,7 @@ func sourceName(source string) string {
 	case "other":
 		return m("chats_source_other")
 	}
-	return map[string]string{
-		"web": "Web App", "cli": "CLI", "websocket": "Websocket", "feishu": "Feishu", "wechat": "WeChat",
-		"discord": "Discord", "qq": "QQ", "scheduled_task": "Scheduled Task", "space_hook": "Hook", "public_api": "Public API",
-	}[source]
+	return sourceNames[source]
 }
 
 // chatTitle is a chat's title; while it has none, its latest message on

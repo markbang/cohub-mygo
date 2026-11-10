@@ -94,6 +94,20 @@ func preview(s string) string {
 	return oneLine(s)
 }
 
+// previewOf caches preview by its text: a row asks every frame, and the
+// three regex passes are the row's costliest work.
+func (a *app) previewOf(s string) string {
+	if p, ok := a.previewRows[s]; ok {
+		return p
+	}
+	p := preview(s)
+	if a.previewRows == nil || len(a.previewRows) >= 1024 {
+		a.previewRows = map[string]string{}
+	}
+	a.previewRows[s] = p
+	return p
+}
+
 // initials is avatar-initials.ts: two letters for Latin-like names (from
 // two words, else the first word), one glyph for CJK or emoji.
 func initials(name string) string {
@@ -157,7 +171,14 @@ func (a *app) avatarSeed(c *ui.Context, url, name, seed string, size, radius flo
 		}
 		return ui.Image(c, bmp).Size(size, size).Fit(ui.Cover).Radius(radius).Border(1, p.borderSubtle)
 	}
-	mark := initials(name)
+	mark, ok := a.initialsRow[name]
+	if !ok {
+		mark = initials(name)
+		if a.initialsRow == nil {
+			a.initialsRow = map[string]string{}
+		}
+		a.initialsRow[name] = mark
+	}
 	tone := p.identity[identityTone(seed)]
 	pair, single := monoSizes(size)
 	fs, fw := pair, 600

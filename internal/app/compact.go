@@ -94,7 +94,7 @@ func (a *app) compactChats(c *ui.Context) {
 						if s.Running() {
 							a.runningPill(c, s.ActiveTurn.StartedAt)
 						}
-						ui.Text(c, preview(s.LatestMessageText)).FontSize(14).TextColor(p.textTertiary.MixOklab(p.placeholder, 0.4)).SingleLine().Grow(1).MinWidth(0)
+						ui.Text(c, a.previewOf(s.LatestMessageText)).FontSize(14).TextColor(p.textTertiary.MixOklab(p.placeholder, 0.4)).SingleLine().Grow(1).MinWidth(0)
 						if a.unread(s) {
 							a.dot(c, p.errorC, 6)
 						}

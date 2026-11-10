@@ -96,7 +96,7 @@ func (a *app) turnNotified(payload json.RawMessage) {
 			}
 			body := n.meta()
 			if n.UserPreview != nil && *n.UserPreview != "" {
-				body = preview(*n.UserPreview) + "\n" + body
+				body = a.previewOf(*n.UserPreview) + "\n" + body
 			}
 			nt := mygo.NewNotification(mygo.NotificationOptions{Title: title, Body: body})
 			sid, space := n.SessionID, n.SpaceID
@@ -138,7 +138,7 @@ func (a *app) noticesView(c *ui.Context) {
 					}
 					ui.Text(c, title).FontSize(13).FontWeight(500).SingleLine()
 					if n.UserPreview != nil && *n.UserPreview != "" {
-						ui.Text(c, preview(*n.UserPreview)).FontSize(12).TextColor(p.textTertiary).SingleLine()
+						ui.Text(c, a.previewOf(*n.UserPreview)).FontSize(12).TextColor(p.textTertiary).SingleLine()
 					}
 					col := p.textTertiary
 					if n.Status == "failed" {
