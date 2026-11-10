@@ -255,6 +255,35 @@ func (a *app) moreMenu(c *ui.Context, s *cohub.Session) {
 	}
 }
 
+// sessionMenu is a chat row's secondary-click menu: the actions native
+// lists offer, without reaching for the row's hover buttons.
+func (a *app) sessionMenu(s *cohub.Session, inSpace bool) []menuItem {
+	items := []menuItem{
+		{icon: "message-square", label: m("x_open"), run: func() { a.openSession(s) }},
+		{icon: "pencil", label: m("common_rename"), run: func() { a.rowRenaming, a.renameText = s.ID, s.Title }},
+	}
+	if inSpace {
+		items = append(items, menuItem{icon: "text-cursor-input", label: m("common_insert"), run: func() {
+			a.insertReference("/sessions/" + s.ID + ".jsonl")
+		}})
+	}
+	archived := s.ArchivedAt != nil
+	ic, label := "archive", m("session_archive")
+	switch {
+	case archived:
+		ic, label = "archive-restore", m("session_unarchive")
+	case s.Running():
+		label = m("session_archive_running")
+	}
+	items = append(items, menuItem{icon: ic, label: label, run: func() {
+		if !archived && s.Running() {
+			return
+		}
+		a.setSessionArchived(s, !archived)
+	}})
+	return items
+}
+
 // insertReference puts a path in the composer as the web does: ` path `.
 func (a *app) insertReference(path string) {
 	a.draft += " `" + path + "` "
