@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -787,5 +788,93 @@ func TestDemoStepsUnfold(t *testing.T) {
 	tt.Frame()
 	if !a.timelines["demo-0"].expanded["t1"] {
 		t.Fatal("the steps stayed folded")
+	}
+}
+
+// fakeDisplayPage answers the display page's scripts as a page streaming
+// would, and notes what the app asked of it.
+type fakeDisplayPage struct {
+	state  string
+	answer string
+	closed int
+}
+
+func (f *fakeDisplayPage) Eval(code string) (any, error) {
+	switch {
+	case strings.HasPrefix(code, "return cohubDisplay.offer("):
+		return "v=0 offer", nil
+	case strings.HasPrefix(code, "return cohubDisplay.answer("):
+		json.NewDecoder(strings.NewReader(strings.TrimPrefix(code, "return cohubDisplay.answer("))).Decode(&f.answer)
+	case code == "return cohubDisplay.info()":
+		return map[string]any{"state": f.state}, nil
+	case code == "cohubDisplay.close()":
+		f.closed++
+	}
+	return nil, nil
+}
+
+// Opening a display that streams signals its page's offer and the
+// display's answer through the API, shows it connected once the page is,
+// and leaving it closes the page's connection and the display's session.
+func TestDisplayStreamsOverWebRTC(t *testing.T) {
+	var mu sync.Mutex
+	var offers []string
+	deleted := ""
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		switch {
+		case r.URL.Path == "/api/spaces/s1/displays":
+			io.WriteString(w, `{"displays":[{"id":"screen","name":"Virtual display","width":1280,"height":800,"input":true,"stream":true}]}`)
+		case r.URL.Path == "/api/spaces/s1/rtc/ice-servers":
+			io.WriteString(w, `{"iceServers":[{"urls":["stun:stun.example:3478"]}]}`)
+		case r.Method == "POST" && r.URL.Path == "/api/spaces/s1/displays/screen/sessions":
+			var in struct{ Offer string }
+			json.NewDecoder(r.Body).Decode(&in)
+			offers = append(offers, in.Offer)
+			io.WriteString(w, `{"sessionId":"sess1","answer":"v=0 answer"}`)
+		case r.Method == "DELETE" && strings.HasPrefix(r.URL.Path, "/api/spaces/s1/displays/screen/sessions/"):
+			deleted = strings.TrimPrefix(r.URL.Path, "/api/spaces/s1/displays/screen/sessions/")
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	a := demoApp(t)
+	clock := a.now()
+	a.now = func() time.Time { return clock }
+	a.sync = true
+	a.api = cohub.NewWithToken(srv.URL, "x", "", srv.Client())
+	page := &fakeDisplayPage{state: "connecting"}
+	a.rtc = &displayRTC{page: page, failed: map[string]bool{}}
+	tt := ui.NewTester(a.view, 1440, 900)
+	a.go_(route{kind: routeSpace, space: "s1", win: "display:screen"})
+	for i := 0; i < 4; i++ {
+		tt.Frame()
+		a.flush()
+	}
+	mu.Lock()
+	if len(offers) != 1 || offers[0] != "v=0 offer" {
+		t.Fatalf("offers %q", offers)
+	}
+	mu.Unlock()
+	if page.answer != "v=0 answer" || a.rtc.session != "sess1" || a.rtc.state != "connecting" {
+		t.Fatalf("answer %q, session %q, state %q", page.answer, a.rtc.session, a.rtc.state)
+	}
+
+	page.state = "connected"
+	clock = clock.Add(2 * time.Second)
+	tt.Frame()
+	a.flush()
+	if a.rtc.state != "connected" {
+		t.Fatalf("state %q after the page connected", a.rtc.state)
+	}
+
+	a.go_(route{kind: routeSessions})
+	a.flush()
+	mu.Lock()
+	defer mu.Unlock()
+	if page.closed != 1 || deleted != "sess1" {
+		t.Fatalf("closed %d times, deleted session %q", page.closed, deleted)
 	}
 }

@@ -1,0 +1,179 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  video { width: 100%; height: 100%; object-fit: contain; outline: none; display: block; }
+</style>
+</head>
+<body>
+<video id="v" autoplay muted playsinline tabindex="0"></video>
+<script>
+// A display of a Space's runtime over WebRTC, as the SDK's DisplayConnection:
+// the app does the signaling with its account and calls offer and answer;
+// the page plays the stream and sends what is pressed, scrolled and typed
+// over it on the input channel, as the display's own pointer and keys.
+(() => {
+  const video = document.getElementById("v");
+  let pc = null, control = null, input = null, tag = null;
+  let state = "idle", reason = "", display = null, rtt = null;
+  let pingTimer = 0, pingId = 0, pingAt = 0;
+  let cursorAt = null, cursorSent = 0, cursorTimer = 0;
+
+  const sendControl = (m) => { if (control && control.readyState === "open") control.send(JSON.stringify(m)); };
+  const sendInput = (events) => {
+    if (!input || input.readyState !== "open") return false;
+    if (input.bufferedAmount > 65536 && events.every((e) => e.type === "pointer" && e.action === "move")) return false;
+    input.send(JSON.stringify({ events }));
+    return true;
+  };
+
+  function close(why) {
+    if (state === "closed") return;
+    state = "closed";
+    reason = why || reason || "closed";
+    clearInterval(pingTimer);
+    clearTimeout(cursorTimer);
+    if (pc) pc.close();
+    pc = control = input = null;
+    video.srcObject = null;
+  }
+
+  function onControl(data) {
+    let m;
+    try { m = JSON.parse(data); } catch { return; }
+    switch (m.type) {
+      case "ready":
+      case "display": display = m.display || display; break;
+      case "pong": if (m.id === pingId) rtt = Math.round(performance.now() - pingAt); break;
+      case "error": reason = m.code || m.message || "error"; break;
+      case "closed": close(m.reason); break;
+    }
+  }
+
+  // tag names the connection, so that an answer to an older offer, of a
+  // display left since, is turned away.
+  async function offer(iceServers, t) {
+    close("replaced");
+    tag = t; state = "connecting"; reason = ""; display = null; rtt = null;
+    if (typeof RTCPeerConnection === "undefined") { state = "unsupported"; throw new Error("unsupported"); }
+    pc = new RTCPeerConnection({ iceServers: iceServers || [], bundlePolicy: "max-bundle" });
+    pc.addTransceiver("video", { direction: "recvonly" });
+    pc.ontrack = (e) => {
+      if ("jitterBufferTarget" in e.receiver) e.receiver.jitterBufferTarget = 0;
+      video.srcObject = e.streams[0] || new MediaStream([e.track]);
+      video.play().catch(() => {});
+    };
+    pc.onconnectionstatechange = () => {
+      if (!pc) return;
+      if (pc.connectionState === "connected") state = "connected";
+      else if (pc.connectionState === "failed") close("failed");
+    };
+    control = pc.createDataChannel("control");
+    control.onmessage = (e) => typeof e.data === "string" && onControl(e.data);
+    control.onopen = () => {
+      const ping = () => { pingId++; pingAt = performance.now(); sendControl({ type: "ping", id: pingId }); };
+      ping();
+      pingTimer = setInterval(ping, 5000);
+    };
+    control.onclose = () => close(reason || "closed");
+    input = pc.createDataChannel("input");
+    await pc.setLocalDescription(await pc.createOffer());
+    await new Promise((done) => {
+      if (pc.iceGatheringState === "complete") return done();
+      const t = setTimeout(done, 2000);
+      pc.addEventListener("icegatheringstatechange", () => {
+        if (pc && pc.iceGatheringState === "complete") { clearTimeout(t); done(); }
+      });
+    });
+    return pc.localDescription.sdp;
+  }
+
+  async function answer(sdp, t) {
+    if (!pc || t !== tag) throw new Error("no offer");
+    await pc.setRemoteDescription({ type: "answer", sdp });
+  }
+
+  function info() {
+    return {
+      state, reason, rtt, display,
+      width: video.videoWidth, height: video.videoHeight,
+      frames: video.getVideoPlaybackQuality ? video.getVideoPlaybackQuality().totalVideoFrames : 0,
+    };
+  }
+
+  // The point of the display under the event, from 0 to 1, in the video
+  // as object-fit: contain shows it; null outside it.
+  function point(e) {
+    const r = video.getBoundingClientRect();
+    const w = video.videoWidth, h = video.videoHeight;
+    if (!w || !h || !r.width || !r.height) return null;
+    const s = Math.min(r.width / w, r.height / h);
+    const vw = w * s, vh = h * s;
+    const x = (e.clientX - r.left - (r.width - vw) / 2) / vw;
+    const y = (e.clientY - r.top - (r.height - vh) / 2) / vh;
+    if (x < 0 || x > 1 || y < 0 || y > 1) return null;
+    return { x, y };
+  }
+  const buttons = ["primary", "middle", "secondary"];
+
+  function cursor(p) {
+    cursorAt = p;
+    if (cursorTimer) return;
+    const flush = () => { cursorTimer = 0; cursorSent = performance.now(); sendControl(cursorAt ? { type: "cursor", ...cursorAt } : { type: "cursor" }); };
+    const wait = cursorSent + 33 - performance.now();
+    if (wait <= 0) flush(); else cursorTimer = setTimeout(flush, wait);
+  }
+
+  video.addEventListener("pointerdown", (e) => {
+    const p = point(e);
+    if (!p) return;
+    video.focus();
+    video.setPointerCapture(e.pointerId);
+    sendInput([{ type: "pointer", action: "down", ...p, button: buttons[e.button] || "primary" }]);
+    e.preventDefault();
+  });
+  video.addEventListener("pointermove", (e) => {
+    const p = point(e);
+    cursor(p);
+    if (p) sendInput([{ type: "pointer", action: "move", ...p }]);
+  });
+  video.addEventListener("pointerup", (e) => {
+    const p = point(e) || cursorAt;
+    if (p) sendInput([{ type: "pointer", action: "up", x: p.x, y: p.y, button: buttons[e.button] || "primary" }]);
+  });
+  video.addEventListener("pointerleave", () => cursor(null));
+  video.addEventListener("contextmenu", (e) => e.preventDefault());
+  video.addEventListener("wheel", (e) => {
+    const p = point(e);
+    if (!p) return;
+    const scale = e.deltaMode === 1 ? 1 : e.deltaMode === 2 ? 10 : 1 / 40;
+    const clamp = (v) => Math.max(-10, Math.min(10, Math.round(v * scale * 100) / 100));
+    const dx = clamp(e.deltaX), dy = clamp(e.deltaY);
+    if (dx || dy) sendInput([{ type: "scroll", ...p, ...(dx ? { dx } : {}), ...(dy ? { dy } : {}) }]);
+    e.preventDefault();
+  }, { passive: false });
+
+  // Keys held with Cmd stay the app's, for its shortcuts; the others go
+  // to the display: characters as text, the rest as keys pressed and let go.
+  const typing = (e) => e.key.length === 1 && !e.ctrlKey && !e.altKey;
+  video.addEventListener("keydown", (e) => {
+    if (e.metaKey || e.isComposing) return;
+    e.preventDefault();
+    if (typing(e)) sendInput([{ type: "text", text: e.key }]);
+    else sendInput([{ type: "key", action: "down", key: e.key }]);
+  });
+  video.addEventListener("keyup", (e) => {
+    if (e.metaKey || e.isComposing || typing(e)) return;
+    e.preventDefault();
+    sendInput([{ type: "key", action: "up", key: e.key }]);
+  });
+  document.addEventListener("visibilitychange", () => sendControl({ type: document.hidden ? "pause" : "resume" }));
+
+  window.cohubDisplay = { offer, answer, info, close, send: sendInput };
+})();
+</script>
+</body>
+</html>

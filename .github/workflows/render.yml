@@ -1,7 +1,8 @@
 # Launches the app with the demo data on macOS and Windows and fails unless
 # its window draws through the GPU renderer: Metal on macOS, Direct3D 11 on
 # Windows, where runners without a GPU use WARP, Windows' rasterizer on the
-# CPU, behind the same renderer. The screenshot and the frame log are kept.
+# CPU, behind the same renderer. It also checks that the system's web view
+# can take a display's WebRTC stream. The screenshot and the log are kept.
 name: Render
 
 on:
@@ -60,6 +61,7 @@ jobs:
           COHUB_DEMO: "1"
           COHUB_CAPTURE: ${{ runner.temp }}/window.png
           MYGO_FRAME_STATS: all
+          COHUB_PROBE_WEBRTC: "1"
         run: |
           mkdir -p render
           "$RUNNER_TEMP/cohub-mygo$(go env GOEXE)" > render/frames.log 2>&1 || {
@@ -81,6 +83,15 @@ jobs:
           if ! grep -q "(drawn on the GPU" render/frames.log; then
             echo "::error::No frame was drawn by the GPU renderer on ${{ matrix.name }}"
             grep -E "mygo: (native UI|drawing)" render/frames.log || tail -n 20 render/frames.log
+            exit 1
+          fi
+      - name: Check the web view takes WebRTC
+        run: |
+          probe="$(grep -o 'webrtc probe: .*' render/frames.log || echo 'webrtc probe: no result')"
+          echo "$probe"
+          echo "$probe" >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$probe" != "webrtc probe: ok"* ]]; then
+            echo "::error::$probe"
             exit 1
           fi
       - uses: actions/upload-artifact@v7
