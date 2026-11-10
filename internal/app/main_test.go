@@ -28,7 +28,7 @@ import (
 func demoApp(t *testing.T) *app {
 	t.Helper()
 	a := newApp()
-	a.seenPath = ""
+	a.seenPath, a.cachePath = "", ""
 	a.seen = map[string]time.Time{}
 	// The user's own preferences and custom theme stay out of the tests.
 	a.prefs.path, a.theme, a.customCSS = "", "system", ""
@@ -244,7 +244,7 @@ func TestCompare(t *testing.T) {
 		t.Skip(err)
 	}
 	a := newApp()
-	a.seenPath = ""
+	a.seenPath, a.cachePath = "", ""
 	a.sync = true
 	a.api = cl
 	a.images.onLoad = nil
@@ -737,5 +737,41 @@ func TestOpenWith(t *testing.T) {
 	a.openFile(id, "data/q.csv")
 	if a.route.win != "app:"+app1+":data/q.csv" {
 		t.Fatalf("open %q", a.route.win)
+	}
+}
+
+// A launch shows the last refresh's Spaces, chats and the latest chat's
+// turns from the startup cache before the API answers, and a refresh with a
+// newer chat moves the window off the cache's latest one.
+func TestStartupCacheShowsLastChats(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "startup.json")
+	srv := httptest.NewServer(http.NotFoundHandler())
+	defer srv.Close()
+	prev := demoApp(t)
+	prev.api, prev.cachePath, prev.sync = cohub.NewWithToken(srv.URL, "x", "", srv.Client()), path, true
+	prev.saveStartupCache()
+	prev.flush()
+
+	a := newApp()
+	a.seenPath, a.prefs.path, a.theme, a.customCSS = "", "", "system", ""
+	a.seen = map[string]time.Time{}
+	a.api, a.cachePath, a.sync = cohub.NewWithToken(srv.URL, "x", "", srv.Client()), path, true
+	ui.NewTester(a.view, 1440, 900)
+	a.loadStartupCache()
+	a.flush()
+	if len(a.spaces) != len(prev.spaces) || len(a.sessions) != len(prev.sessions) {
+		t.Fatalf("%d spaces and %d chats, want %d and %d", len(a.spaces), len(a.sessions), len(prev.spaces), len(prev.sessions))
+	}
+	if a.route.sessionID() != "demo-0" {
+		t.Fatalf("route %v, want the latest chat", a.route)
+	}
+	if tl := a.timelines["demo-0"]; tl == nil || !tl.loaded || len(tl.turns) != len(prev.timelines["demo-0"].turns) {
+		t.Fatalf("timeline %+v", tl)
+	}
+
+	newer := &cohub.Session{ID: "newer", SpaceID: "s1", Title: "newer", LastMessageAt: a.now().Add(time.Minute)}
+	a.showLists(a.me, a.spaces, append([]*cohub.Session{newer}, a.sessions...), a.models, true)
+	if a.route.sessionID() != "newer" {
+		t.Fatalf("route %v after a refresh with a newer chat", a.route)
 	}
 }

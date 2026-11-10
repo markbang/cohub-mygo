@@ -20,7 +20,7 @@ curl -fsSL https://github.com/markbang/cohub-mygo/releases/latest/download/insta
 
 ## TODO
 
-- [ ] Cache data for faster startup.
+- [x] Cache data for faster startup.
 - [ ] Sync read/unread status across devices.
 - [ ] Use WebRTC for live displays.
 - [ ] Test GPU rendering on macOS and Windows.

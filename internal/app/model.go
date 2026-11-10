@@ -28,6 +28,7 @@ type sessionTurns struct {
 	turns   []*cohub.Turn
 	hasMore bool
 	loaded  bool
+	fetched bool // loaded from the API, not only the startup cache
 	err     string
 	// live is the reply of the running turn so far, from the stream snapshot.
 	live      string
@@ -66,6 +67,8 @@ type app struct {
 	loading       map[string]bool
 	seen          map[string]time.Time
 	seenPath      string
+	cachePath     string // the startup cache, "" for none
+	cacheOpened   route  // the cache's latest chat, until a refresh
 	images        *imageCache
 	pages         pageData
 
@@ -207,6 +210,7 @@ func newApp() *app {
 	a.md.OnLink = func(u string) { a.openLink(u) }
 	a.md.Block = a.mdBlock
 	a.images.onLoad = func(fn func()) { a.update(fn) }
+	a.cachePath = startupCachePath()
 	if dir, err := os.UserConfigDir(); err == nil {
 		a.seenPath = filepath.Join(dir, "cohub-mygo", "seen.json")
 		if b, err := os.ReadFile(a.seenPath); err == nil {
@@ -289,6 +293,7 @@ func (a *app) start() {
 	}
 	a.api = cl
 	a.status = m("sync_connecting")
+	a.loadStartupCache()
 	a.spawn(a.refresh)
 	a.spawn(a.loadCustomTheme)
 	if !a.sync {
@@ -323,23 +328,40 @@ func (a *app) refresh() {
 			}
 		}
 		a.status = ""
-		a.me = me
-		sort.SliceStable(spaces, func(i, j int) bool { return spaces[i].Activity().After(spaces[j].Activity()) })
-		a.spaces = spaces
-		sort.SliceStable(sessions, func(i, j int) bool { return sessions[i].When().After(sessions[j].When()) })
-		if filter == a.chats {
-			a.sessions = sessions
-		}
-		if models != nil {
-			a.models = models
-		}
-		if a.rt != nil {
-			a.rt.watch(a.currentSpace())
-		}
-		if a.route.kind == routeSessions && len(sessions) > 0 && !a.compact {
-			a.go_(route{kind: routeSession, session: sessions[0].ID})
-		}
+		a.showLists(me, spaces, sessions, models, filter == a.chats)
+		a.saveStartupCache()
 	})
+}
+
+// showLists shows the account's Spaces, chats and models, from the API or
+// the startup cache, and opens the latest chat where the window waits for
+// one.
+func (a *app) showLists(me *cohub.Me, spaces []*cohub.Space, sessions []*cohub.Session, models []*cohub.Model, sameFilter bool) {
+	a.me = me
+	sort.SliceStable(spaces, func(i, j int) bool { return spaces[i].Activity().After(spaces[j].Activity()) })
+	a.spaces = spaces
+	sort.SliceStable(sessions, func(i, j int) bool { return sessions[i].When().After(sessions[j].When()) })
+	if sameFilter {
+		a.sessions = sessions
+	}
+	if models != nil {
+		a.models = models
+	}
+	if a.rt != nil {
+		a.rt.watch(a.currentSpace())
+	}
+	if len(sessions) > 0 && !a.compact {
+		latest := route{kind: routeSession, session: sessions[0].ID}
+		switch {
+		case a.route.kind == routeSessions:
+			a.go_(latest)
+		case a.cacheOpened.kind == routeSession && a.route == a.cacheOpened && a.route != latest:
+			// The window still shows the cache's latest chat: a newer
+			// one came since.
+			a.show(latest)
+		}
+	}
+	a.cacheOpened = route{}
 }
 
 // poll refreshes the lists every 16 seconds and the open session every
@@ -390,7 +412,8 @@ func (a *app) loadTurns(sessionID string) {
 	}
 	a.update(func() {
 		tl := a.timelineOf(sessionID)
-		tl.loaded = true
+		fresh := !tl.fetched
+		tl.loaded, tl.fetched = true, true
 		if err != nil {
 			tl.err = err.Error()
 			return
@@ -420,6 +443,11 @@ func (a *app) loadTurns(sessionID string) {
 			if !page.Turns[len(page.Turns)-1].Running() {
 				s.ActiveTurn = nil
 			}
+		}
+		// The latest chat opens on the next launch. While it runs, the
+		// refreshes keep its cache.
+		if len(a.sessions) > 0 && a.sessions[0].ID == sessionID && (fresh || !lastRunning(tl)) {
+			a.saveStartupCache()
 		}
 	})
 }
