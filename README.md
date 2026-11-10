@@ -8,9 +8,9 @@ A [Cohub](https://cohub.live) desktop client built with [MyGo](https://mygo.egoi
 
 | Platform | x64 | ARM64 |
 | --- | --- | --- |
-| macOS | [DMG](https://github.com/markbang/cohub-mygo/releases/download/v0.0.2/cohub-mygo-0.0.2-amd64.dmg) | [DMG](https://github.com/markbang/cohub-mygo/releases/download/v0.0.2/cohub-mygo-0.0.2-arm64.dmg) |
-| Windows | [Installer](https://github.com/markbang/cohub-mygo/releases/download/v0.0.2/cohub-mygo-setup-0.0.2-amd64.exe) | [Installer](https://github.com/markbang/cohub-mygo/releases/download/v0.0.2/cohub-mygo-setup-0.0.2-arm64.exe) |
-| Linux | [deb](https://github.com/markbang/cohub-mygo/releases/download/v0.0.2/cohub-mygo_0.0.2_amd64.deb) · [tar.gz](https://github.com/markbang/cohub-mygo/releases/download/v0.0.2/cohub-mygo-0.0.2-linux-amd64.tar.gz) | [deb](https://github.com/markbang/cohub-mygo/releases/download/v0.0.2/cohub-mygo_0.0.2_arm64.deb) · [tar.gz](https://github.com/markbang/cohub-mygo/releases/download/v0.0.2/cohub-mygo-0.0.2-linux-arm64.tar.gz) |
+| macOS | [DMG](https://github.com/markbang/cohub-mygo/releases/download/v0.0.3/cohub-mygo-0.0.3-amd64.dmg) | [DMG](https://github.com/markbang/cohub-mygo/releases/download/v0.0.3/cohub-mygo-0.0.3-arm64.dmg) |
+| Windows | [Installer](https://github.com/markbang/cohub-mygo/releases/download/v0.0.3/cohub-mygo-setup-0.0.3-amd64.exe) | [Installer](https://github.com/markbang/cohub-mygo/releases/download/v0.0.3/cohub-mygo-setup-0.0.3-arm64.exe) |
+| Linux | [deb](https://github.com/markbang/cohub-mygo/releases/download/v0.0.3/cohub-mygo_0.0.3_amd64.deb) · [tar.gz](https://github.com/markbang/cohub-mygo/releases/download/v0.0.3/cohub-mygo-0.0.3-linux-amd64.tar.gz) | [deb](https://github.com/markbang/cohub-mygo/releases/download/v0.0.3/cohub-mygo_0.0.3_arm64.deb) · [tar.gz](https://github.com/markbang/cohub-mygo/releases/download/v0.0.3/cohub-mygo-0.0.3-linux-arm64.tar.gz) |
 
 Or install on macOS / Linux:
 
@@ -24,7 +24,7 @@ On Windows, in PowerShell:
 irm https://github.com/markbang/cohub-mygo/releases/latest/download/install.ps1 | iex
 ```
 
-The app checks for updates in the background and offers to install them; **Check for Updates…** is in the account menu, and on macOS in the app menu. The `.deb` package is updated by the package manager instead. Versions up to 0.0.2 don't update themselves: install the next one by hand once.
+The app checks for updates in the background and offers to install them; **Check for Updates…** is in the account menu, and on macOS in the app menu. The `.deb` package is updated by the package manager instead. Versions up to 0.0.2 don't update themselves: install 0.0.3 or later by hand once.
 
 The apps aren't signed. If you download from the browser, allow the app the first time you open it: on Windows, **More info → Run anyway**; on macOS, **System Settings → Privacy & Security → Open Anyway**.
 

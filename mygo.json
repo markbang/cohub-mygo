@@ -2,7 +2,7 @@
   "name": "Cohub MyGo",
   "slug": "cohub-mygo",
   "identifier": "dev.bangwu.cohub-mygo",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "copyright": "© 2026 bangwu",
   "license": "MIT",
   "urlSchemes": ["cohub"],
