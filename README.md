@@ -8,9 +8,9 @@ A [Cohub](https://cohub.live) desktop client built with [MyGo](https://mygo.egoi
 
 | Platform | x64 | ARM64 |
 | --- | --- | --- |
-| macOS | [DMG](https://github.com/markbang/cohub-mygo/releases/download/v0.0.1/cohub-mygo-0.0.1-amd64.dmg) | [DMG](https://github.com/markbang/cohub-mygo/releases/download/v0.0.1/cohub-mygo-0.0.1-arm64.dmg) |
-| Windows | [Installer](https://github.com/markbang/cohub-mygo/releases/download/v0.0.1/cohub-mygo-setup-0.0.1-amd64.exe) | [Installer](https://github.com/markbang/cohub-mygo/releases/download/v0.0.1/cohub-mygo-setup-0.0.1-arm64.exe) |
-| Linux | [deb](https://github.com/markbang/cohub-mygo/releases/download/v0.0.1/cohub-mygo_0.0.1_amd64.deb) · [tar.gz](https://github.com/markbang/cohub-mygo/releases/download/v0.0.1/cohub-mygo-0.0.1-linux-amd64.tar.gz) | [deb](https://github.com/markbang/cohub-mygo/releases/download/v0.0.1/cohub-mygo_0.0.1_arm64.deb) · [tar.gz](https://github.com/markbang/cohub-mygo/releases/download/v0.0.1/cohub-mygo-0.0.1-linux-arm64.tar.gz) |
+| macOS | [DMG](https://github.com/markbang/cohub-mygo/releases/download/v0.0.2/cohub-mygo-0.0.2-amd64.dmg) | [DMG](https://github.com/markbang/cohub-mygo/releases/download/v0.0.2/cohub-mygo-0.0.2-arm64.dmg) |
+| Windows | [Installer](https://github.com/markbang/cohub-mygo/releases/download/v0.0.2/cohub-mygo-setup-0.0.2-amd64.exe) | [Installer](https://github.com/markbang/cohub-mygo/releases/download/v0.0.2/cohub-mygo-setup-0.0.2-arm64.exe) |
+| Linux | [deb](https://github.com/markbang/cohub-mygo/releases/download/v0.0.2/cohub-mygo_0.0.2_amd64.deb) · [tar.gz](https://github.com/markbang/cohub-mygo/releases/download/v0.0.2/cohub-mygo-0.0.2-linux-amd64.tar.gz) | [deb](https://github.com/markbang/cohub-mygo/releases/download/v0.0.2/cohub-mygo_0.0.2_arm64.deb) · [tar.gz](https://github.com/markbang/cohub-mygo/releases/download/v0.0.2/cohub-mygo-0.0.2-linux-arm64.tar.gz) |
 
 Or install on macOS / Linux:
 
