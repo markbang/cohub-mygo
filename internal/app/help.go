@@ -239,6 +239,7 @@ func (a *app) signOut() {
 		go func() {
 			exec.Command("cohub", "auth", "logout").Run()
 			a.update(func() {
+				a.dropStartupCache()
 				a.api, a.me, a.spaces, a.sessions = nil, nil, nil, nil
 				a.timelines = map[string]*sessionTurns{}
 				a.pages.init()
