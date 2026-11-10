@@ -1,5 +1,8 @@
 /build/
+/dist/
+__pycache__/
 /.mygo/
+mygo-update.key
 mygo_windows_*.syso
 /screenshots/live-*
 /screenshots/web-reference-*

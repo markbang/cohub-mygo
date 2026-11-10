@@ -12,16 +12,48 @@
 |---|---|---|
 | ![](screenshots/desktop-chat-light.png) | ![](screenshots/desktop-chat-dark.png) | ![](screenshots/compact-chats.png) |
 
-## 运行
+## 安装
+
+macOS / Linux 一行安装（自动选择 x64 / ARM64，验证 Ed25519 签名）：
 
 ```sh
-go run .                       # 使用 cohub CLI 的账号
-COHUB_DEMO=1 go run .          # 演示数据
-go tool mygo dev               # 改代码后自动重启
-go tool mygo build             # 打包 dmg / 安装器 / AppImage
+curl -fsSL https://github.com/markbang/cohub-mygo/releases/latest/download/install.sh | sh
 ```
 
-需要 Go 1.27+。Linux 上还需要 GTK 3。
+也可以使用仓库里的入口脚本：
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/markbang/cohub-mygo/main/install.sh | sh
+```
+
+Linux 安装到 `~/.local/cohub-mygo.app`，命令是 `~/.local/bin/cohub-mygo`，同时注册桌面入口；系统需要 GTK 3 和 OpenSSL 3。macOS 安装到 `/Applications`，没有写入权限时使用 `~/Applications`。
+
+Windows PowerShell：
+
+```powershell
+irm https://github.com/markbang/cohub-mygo/releases/latest/download/install.ps1 | iex
+```
+
+也可从 [Releases](https://github.com/markbang/cohub-mygo/releases) 下载 macOS DMG、Windows 安装器，或 Linux `.deb` / `.tar.gz`。v0.0.1 的 macOS 包使用临时签名、未经 Apple 公证，Windows 安装器没有代码签名证书；直接下载安装包时，系统可能显示来源确认提示。
+
+卸载（保留用户配置）：
+
+```sh
+curl -fsSL https://github.com/markbang/cohub-mygo/releases/latest/download/install.sh | sh -s -- --uninstall
+```
+
+账号使用 [Cohub CLI](https://cohub.live/docs) 的登录状态；先安装 CLI 并运行 `cohub auth login`。客户端也可以发起 CLI 的设备登录。
+
+## 从源码运行
+
+```sh
+CGO_ENABLED=0 go run .         # 使用 cohub CLI 的账号
+COHUB_DEMO=1 go run .          # 演示数据
+go tool mygo dev              # 改代码后自动重启
+go tool mygo build            # 打包 DMG / Windows 安装器 / Linux deb 与 tar.gz
+```
+
+需要 Go 1.27.3+。Linux 上还需要 GTK 3。
 
 ## 已复刻的部分
 
@@ -78,6 +110,21 @@ SNAPSHOT_DIR=screenshots go test ./...          # 输出演示数据截图
 COHUB_LIVE=1 go test -run Realtime ./...        # 用真实账号连 realtime 网关
 COHUB_CAPTURE=/tmp/shot.png go run .            # 真窗口运行 12 秒后截图并退出
 ```
+
+## 发布
+
+普通推送和 Pull Request 跑 `.github/workflows/ci.yml`：格式检查、`go vet`、离屏测试、安装脚本语法检查。
+
+推送与 `mygo.json` 版本一致的 `v*` tag 时，`.github/workflows/release.yml` 先跑测试，再构建 macOS / Windows / Linux 的 amd64 和 arm64。`tools/prepare-release.py` 检查六个平台的文件是否齐全、逐个验证更新包的 Ed25519 签名，生成统一的 `SHA256SUMS`；全部成功后才发布 GitHub Release。
+
+更新签名公钥保存在 `mygo.json`，私钥只在本机配置目录和仓库的 `MYGO_UPDATER_PRIVATE_KEY` Actions Secret 中。下一版本先更新 `mygo.json` 与 `CHANGELOG.md`，提交并推送，再打 tag：
+
+```sh
+git tag v0.0.2
+git push origin main v0.0.2
+```
+
+已发布版本不覆盖；修复后发布新版本。
 
 ## 资源
 
