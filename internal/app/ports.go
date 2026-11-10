@@ -5,14 +5,16 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 )
 
 // The sandbox's ports, as the web's port windows: a port that starts
-// listening says so in a toast, and opens as ?window=port:3000. The web
-// shows the page inside the window; a native client without a web view
+// listening says so in a toast, and opens as ?window=port:3000, its page
+// inside the window as the web shows it. Without a web view the window
 // shows the port's state and its address, and opens it in the browser.
 
 type portEndpoint struct {
@@ -132,6 +134,9 @@ func (a *app) portActions(c *ui.Context, spaceID, port string) {
 	}
 	if a.iconButton(c.Key("refresh"), "refresh-cw", m("port_refresh"), false).Clicked() {
 		a.reload("ports:" + spaceID)
+		if pv := a.pageViews[ep.URL]; pv != nil && pv.web != nil {
+			pv.web.Page().Reload()
+		}
 	}
 	if ep.URL != "" && a.iconButton(c.Key("open"), "external-link", m("port_open_external"), false).Clicked() {
 		c.OpenURL(ep.URL)
@@ -149,10 +154,20 @@ func (a *app) portActions(c *ui.Context, spaceID, port string) {
 	a.menus["port-more"] = open
 }
 
-// portView is a port's window: the page runs in the browser.
+// portView is a port's window: its page, or where to open it.
 func (a *app) portView(c *ui.Context, spaceID, port string) {
 	p := a.pal
 	ep, ok := a.ports(spaceID)[port]
+	if ok && ep.Status != "closed" {
+		if web, embeds := a.pageView(ep.URL); embeds {
+			if web == nil {
+				ui.Column(c.Key("page-wait")).Grow(1).Center().Background(p.bgContent).Children(func() { a.spinner(c, 16, p.textTertiary) })
+				return
+			}
+			ui.WebView(c.Key("page"), web).Grow(1).MinHeight(0)
+			return
+		}
+	}
 	ui.Column(c.Key("body")).Grow(1).Center().Padding(24).Background(p.bgContent).Children(func() {
 		ui.Column(c).MaxWidth(360).Gap(6).AlignItems(ui.Center).Children(func() {
 			ui.Box(c).Size(40, 40).Radius(8).Border(1, p.borderSubtle).Background(p.bgSurface).Center().Children(func() {
@@ -252,3 +267,30 @@ func (a *app) portChips(c *ui.Context, spaceID string) {
 		})
 	})
 }
+
+// pageView is a web view of the page at url, made once, for a window the
+// web shows a page in: nil while it's made, and embeds false where there
+// are no web views.
+func (a *app) pageView(url string) (web *mygo.WebView, embeds bool) {
+	if a.win == nil || url == "" || !webViewsAvailable() {
+		return nil, false
+	}
+	pv := a.pageViews[url]
+	if pv == nil {
+		pv = &pageView{}
+		a.pageViews[url] = pv
+		win := a.win
+		go func() {
+			web, err := win.NewWebView(mygo.WebViewOptions{URL: url, Page: mygo.PageOptions{Untrusted: true}})
+			a.update(func() { pv.web, pv.failed = web, err != nil })
+		}()
+	}
+	return pv.web, !pv.failed
+}
+
+type pageView struct {
+	web    *mygo.WebView
+	failed bool
+}
+
+var webViewsAvailable = sync.OnceValue(mygo.WebViewAvailable)

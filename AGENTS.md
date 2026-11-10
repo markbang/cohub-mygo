@@ -7,6 +7,8 @@
 - `internal/cohub`: the Cohub API's types and client, the gateway's WebSocket, and the reducer of streamed replies. No views and no copy: text for the window, like an untitled chat's name, stays in `internal/app`.
 - `internal/i18n`: the copy in zh-CN and en. `messages/` is the web app's catalogs, word for word; the app's own words go in `extraMessages`. Views call `m("key")`.
 - `internal/cron`: parsing cron expressions and previewing their runs.
+- `internal/mp4`: an MP4's duration from its movie header, for video tiles.
+- `internal/webfont`: the web fonts a custom theme's stylesheet loads, decoded for registering.
 
 Put new logic that needs no view or `*app` into a package of its own under `internal/`, and keep `internal/app` for what draws or holds the app's state. Follow `.agents/skills/mygo-maintenance` for MyGo's UI rules.
 

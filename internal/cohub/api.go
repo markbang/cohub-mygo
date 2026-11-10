@@ -174,6 +174,7 @@ type Model struct {
 	Model    struct {
 		Name             string             `json:"name"`
 		Reasoning        bool               `json:"reasoning"`
+		Hidden           bool               `json:"hidden"` // left out of pickers
 		ContextWindow    int64              `json:"contextWindow"`
 		ThinkingLevelMap map[string]*string `json:"thinkingLevelMap"`
 		Input            []string           `json:"input"`

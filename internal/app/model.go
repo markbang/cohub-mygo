@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -79,6 +80,10 @@ type app struct {
 	chats                        chatsFilter                 // the inbox's source, "web" at first
 	chipSpaces                   []string                    // the chips, fixed once shown
 	chipChats                    map[string][]*cohub.Session // a chip's chats by chip and filter
+	chipForks                    map[string][]cohub.SessionFork
+	inboxForks                   []cohub.SessionFork // the forks among sessions
+	videoLengths                 map[string]time.Duration
+	pageViews                    map[string]*pageView // by URL
 	panelTab                     int
 	theme                        string // a built-in theme's name, or "system"
 	prefs                        prefs
@@ -167,6 +172,7 @@ type app struct {
 	pal         *palette
 	palKey      string
 	customCSS   string // the Home Space's .cohub/theme.css
+	webFontsCSS string // the theme whose web fonts loaded
 	homeSpace   string
 	compact     bool
 }
@@ -191,6 +197,9 @@ func newApp() *app {
 		chats:          chatsFilter{source: "web"},
 		mediaFilter:    "all",
 		chipChats:      map[string][]*cohub.Session{},
+		chipForks:      map[string][]cohub.SessionFork{},
+		videoLengths:   map[string]time.Duration{},
+		pageViews:      map[string]*pageView{},
 		editors:        map[string]*fileEdit{},
 		viewportOff:    map[string]bool{},
 		looseSessions:  map[string]*cohub.Session{},
@@ -295,6 +304,7 @@ func (a *app) start() {
 	a.api = cl
 	a.status = m("sync_connecting")
 	a.loadStartupCache()
+	a.loadWebFonts(a.customCSS)
 	a.spawn(a.refresh)
 	a.spawn(a.loadCustomTheme)
 	if !a.sync {
@@ -311,6 +321,7 @@ func (a *app) refresh() {
 		me       *cohub.Me
 		spaces   []*cohub.Space
 		sessions []*cohub.Session
+		forks    []cohub.SessionFork
 		models   []*cohub.Model
 		errs     [3]error
 	)
@@ -318,7 +329,12 @@ func (a *app) refresh() {
 	go func() { defer wg.Done(); me, errs[0] = a.api.Me(ctx) }()
 	go func() { defer wg.Done(); spaces, errs[1] = a.api.Spaces(ctx) }()
 	filter := a.chats
-	go func() { defer wg.Done(); sessions, errs[2] = mySessions(ctx, a.api, filter) }()
+	go func() {
+		defer wg.Done()
+		var page chatsPage
+		page, errs[2] = mySessions(ctx, a.api, filter)
+		sessions, forks = page.Sessions, page.Forks
+	}()
 	go func() { defer wg.Done(); models, _ = a.api.Models(ctx) }()
 	wg.Wait()
 	a.update(func() {
@@ -329,6 +345,9 @@ func (a *app) refresh() {
 			}
 		}
 		a.status = ""
+		if filter == a.chats {
+			a.inboxForks = forks
+		}
 		a.showLists(me, spaces, sessions, models, filter == a.chats)
 		a.saveStartupCache()
 	})
@@ -705,6 +724,16 @@ func (a *app) chatSpaces() []*cohub.Space {
 }
 
 // visibleSessions are the inbox's chats: the user's, or the chosen Space's.
+// visibleRows are the visible chats as the inbox lists them: forks under
+// the chat they were forked from.
+func (a *app) visibleRows() []treeRow {
+	forks := a.inboxForks
+	if f, ok := a.chipForks["chip:"+a.chip+":"+a.chats.key()]; ok && a.chip != "" {
+		forks = f
+	}
+	return forkTree(a.visibleSessions(), forks)
+}
+
 func (a *app) visibleSessions() []*cohub.Session {
 	if a.chip == "" {
 		return a.sessions
@@ -715,12 +744,13 @@ func (a *app) visibleSessions() []*cohub.Session {
 	}
 	id, filter := a.chip, a.chats
 	a.once(key, func(ctx context.Context) {
-		list, err := spaceChats(ctx, a.api, id, filter)
+		page, err := spaceChats(ctx, a.api, id, filter)
 		if err != nil {
 			return
 		}
+		list := page.Sessions
 		sort.SliceStable(list, func(i, j int) bool { return list[i].When().After(list[j].When()) })
-		a.update(func() { a.chipChats[key] = list })
+		a.update(func() { a.chipChats[key], a.chipForks[key] = list, page.Forks })
 	})
 	var out []*cohub.Session
 	for _, s := range a.sessions {
@@ -893,6 +923,7 @@ func (a *app) abort() {
 type imageCache struct {
 	mu     sync.Mutex
 	m      map[string]*ui.Bitmap
+	anims  map[string]*gifAnim // animated GIFs, as avatars play them
 	failed map[string]bool
 	busy   map[string]bool
 	sem    chan struct{}
@@ -902,7 +933,7 @@ type imageCache struct {
 
 func newImageCache() *imageCache {
 	return &imageCache{
-		m: map[string]*ui.Bitmap{}, failed: map[string]bool{}, busy: map[string]bool{},
+		m: map[string]*ui.Bitmap{}, anims: map[string]*gifAnim{}, failed: map[string]bool{}, busy: map[string]bool{},
 		sem: make(chan struct{}, 6), client: &http.Client{Timeout: 20 * time.Second},
 	}
 }
@@ -925,7 +956,7 @@ func (ic *imageCache) get(url string) *ui.Bitmap {
 func (ic *imageCache) load(url string) {
 	ic.sem <- struct{}{}
 	defer func() { <-ic.sem }()
-	bmp, err := ic.fetch(url)
+	bmp, anim, err := ic.fetch(url)
 	set := func() {
 		ic.mu.Lock()
 		defer ic.mu.Unlock()
@@ -935,6 +966,9 @@ func (ic *imageCache) load(url string) {
 			return
 		}
 		ic.m[url] = bmp
+		if anim != nil {
+			ic.anims[url] = anim
+		}
 	}
 	if ic.onLoad != nil {
 		ic.onLoad(set)
@@ -943,23 +977,39 @@ func (ic *imageCache) load(url string) {
 	}
 }
 
-func (ic *imageCache) fetch(url string) (*ui.Bitmap, error) {
+func (ic *imageCache) fetch(url string) (*ui.Bitmap, *gifAnim, error) {
 	res, err := ic.client.Get(url)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
-		return nil, io.ErrUnexpectedEOF
+		return nil, nil, io.ErrUnexpectedEOF
 	}
 	b, err := io.ReadAll(io.LimitReader(res.Body, 8<<20))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if isWebP(b) {
-		return decodeWebP(b)
+		bmp, err := decodeWebP(b)
+		return bmp, nil, err
 	}
-	return ui.DecodeBitmap(b)
+	bmp, err := ui.DecodeBitmap(b)
+	if err != nil {
+		return nil, nil, err
+	}
+	var anim *gifAnim
+	if bytes.HasPrefix(b, []byte("GIF8")) {
+		anim = decodeGIFAnim(b)
+	}
+	return bmp, anim, nil
+}
+
+// animation is the animation of an animated GIF at url, once it loaded.
+func (ic *imageCache) animation(url string) *gifAnim {
+	ic.mu.Lock()
+	defer ic.mu.Unlock()
+	return ic.anims[url]
 }
 
 // wait blocks until every image asked for has loaded or failed (tests).
@@ -997,6 +1047,7 @@ func (a *app) loadCustomTheme() {
 	a.update(func() {
 		a.homeSpace = home.ID
 		a.customCSS = css
+		a.loadWebFonts(css)
 	})
 	if dir, err := os.UserConfigDir(); err == nil && !a.sync {
 		path := filepath.Join(dir, "cohub-mygo", "theme.css")

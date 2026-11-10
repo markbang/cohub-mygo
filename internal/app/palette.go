@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
@@ -111,13 +112,21 @@ func (a *app) paletteItems() []paletteItem {
 			items = append(items, runCommand)
 		}
 	}
+	var spaces, chats []paletteItem
 	if s.tab == 0 || s.tab == 1 {
-		for i, sp := range a.filteredSpaces(0, "") {
+		list := a.filteredSpaces(0, "")
+		if s.tab == 0 {
+			// All of them by the Spaces' own activity, as the web's.
+			list = append([]*cohub.Space(nil), list...)
+			sort.SliceStable(list, func(i, j int) bool { return list[i].LastActivityAt.After(list[j].LastActivityAt) })
+		}
+		for _, sp := range list {
 			if match(sp.Name, sp.Description) {
-				items = append(items, spaceItem(sp))
-			}
-			if i == 0 && s.tab == 0 && match("new space") {
-				items = append(items, newSpace)
+				it := spaceItem(sp)
+				if s.tab == 0 {
+					it.time = dateTime(sp.LastActivityAt, now)
+				}
+				spaces = append(spaces, it)
 			}
 		}
 	}
@@ -128,11 +137,31 @@ func (a *app) paletteItems() []paletteItem {
 			}
 			name, av := a.spaceName(se.SpaceID)
 			sess := se
-			items = append(items, paletteItem{
+			chats = append(chats, paletteItem{
 				key: "session:" + se.ID, title: chatTitle(se), sub: name, avatar: av, seed: se.SpaceID, owner: se.UserProfile,
 				time: dateTime(se.When(), now), choose: func() { a.openSession(sess) },
 			})
 		}
+	}
+	if s.tab == 0 {
+		// Spaces and chats take turns, New Space after the first of each.
+		withNew := match("new space")
+		for i := 0; i < max(len(spaces), len(chats)); i++ {
+			if i < len(spaces) {
+				items = append(items, spaces[i])
+			}
+			if i < len(chats) {
+				items = append(items, chats[i])
+			}
+			if i == 0 && withNew {
+				items, withNew = append(items, newSpace), false
+			}
+		}
+		if withNew {
+			items = append(items, newSpace)
+		}
+	} else {
+		items = append(append(items, spaces...), chats...)
 	}
 	if s.tab == 4 {
 		for _, cmd := range []paletteItem{

@@ -77,8 +77,8 @@ func (a *app) chatsSidebar(c *ui.Context) {
 		}
 	})
 	a.chipBar(c)
-	list := a.visibleSessions()
-	a.sessionList.Key = func(i int) any { return list[i].ID }
+	list := a.visibleRows()
+	a.sessionList.Key = func(i int) any { return list[i].s.ID }
 	ui.List(c.Key("sessions"), &a.sessionList, len(list), func(i int) {
 		a.sessionRow(c, list[i])
 	}).Grow(1).Padding(6, 6, 6, 6).Gap(0).Children(func() {
@@ -152,15 +152,22 @@ func (a *app) spaceChip(c *ui.Context, id, name, avatar string) {
 // sessionRow is a chat in the list, as SessionRow.svelte: the Space's
 // picture, the title and time, then how long a running turn has run and
 // the latest reply.
-func (a *app) sessionRow(c *ui.Context, s *cohub.Session) {
+func (a *app) sessionRow(c *ui.Context, tr treeRow) {
 	p := a.pal
 	now := a.now()
+	s := tr.s
 	row := ui.Row(c.Key(s.ID)).Gap(10).AlignItems(ui.Center).Height(52).Padding(0, 6).Radius(6).Children(func() {
-		name, av := a.spaceName(s.SpaceID)
-		a.avatarSeed(c, av, name, s.SpaceID, 36, 8)
+		a.inboxGuides(c, tr, 6, 36, 10, 16)
+		if tr.depth > 0 {
+			// A fork has no avatar: its title lines up with its parent's.
+			ui.Box(c).Width(36 + float32(tr.depth-1)*16).Shrink(0)
+		} else {
+			name, av := a.spaceName(s.SpaceID)
+			a.avatarSeed(c, av, name, s.SpaceID, 36, 8)
+		}
 		ui.Column(c).Grow(1).MinWidth(0).Gap(2).Children(func() {
 			ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
-				ui.Text(c, chatTitle(s)).FontSize(14).FontWeight(500).SingleLine().Grow(1).MinWidth(0)
+				ui.Text(c, tr.title()).FontSize(14).FontWeight(500).SingleLine().Grow(1).MinWidth(0)
 				ui.Text(c, relTime(s.When(), now)).FontSize(11).TextColor(p.textTertiary).Shrink(0)
 			})
 			ui.Row(c).Gap(6).AlignItems(ui.Center).Height(18).Children(func() {

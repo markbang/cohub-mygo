@@ -12,16 +12,17 @@ import (
 // launch shows it at once while the API loads. A refresh replaces all of
 // it, so a stale or another account's cache shows only until then.
 type startupCache struct {
-	Version  int              `json:"v"`
-	API      string           `json:"api"`
-	Me       *cohub.Me        `json:"me"`
-	Spaces   []*cohub.Space   `json:"spaces"`
-	Filter   string           `json:"filter"`
-	Sessions []*cohub.Session `json:"sessions"`
-	Models   []*cohub.Model   `json:"models"`
-	Chat     string           `json:"chat,omitempty"`
-	Turns    []*cohub.Turn    `json:"turns,omitempty"`
-	HasMore  bool             `json:"hasMore,omitempty"`
+	Version  int                 `json:"v"`
+	API      string              `json:"api"`
+	Me       *cohub.Me           `json:"me"`
+	Spaces   []*cohub.Space      `json:"spaces"`
+	Filter   string              `json:"filter"`
+	Sessions []*cohub.Session    `json:"sessions"`
+	Forks    []cohub.SessionFork `json:"forks,omitempty"`
+	Models   []*cohub.Model      `json:"models"`
+	Chat     string              `json:"chat,omitempty"`
+	Turns    []*cohub.Turn       `json:"turns,omitempty"`
+	HasMore  bool                `json:"hasMore,omitempty"`
 }
 
 const startupCacheVersion = 1
@@ -58,6 +59,9 @@ func (a *app) loadStartupCache() {
 				tl := a.timelineOf(c.Chat)
 				tl.turns, tl.hasMore, tl.loaded = c.Turns, c.HasMore, true
 			}
+			if c.Filter == a.chats.key() {
+				a.inboxForks = c.Forks
+			}
 			a.showLists(c.Me, c.Spaces, c.Sessions, c.Models, c.Filter == a.chats.key())
 			if len(a.sessions) > 0 {
 				a.cacheOpened = route{kind: routeSession, session: a.sessions[0].ID}
@@ -75,7 +79,7 @@ func (a *app) saveStartupCache() {
 	}
 	c := startupCache{
 		Version: startupCacheVersion, API: a.api.Base(), Me: a.me, Spaces: a.spaces,
-		Filter: a.chats.key(), Sessions: a.sessions, Models: a.models,
+		Filter: a.chats.key(), Sessions: a.sessions, Forks: a.inboxForks, Models: a.models,
 	}
 	if len(a.sessions) > 0 {
 		id := a.sessions[0].ID

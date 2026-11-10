@@ -21,7 +21,7 @@
     "scroll": -30000
    },
    {
-    "click": "12 步 · 14 个工具 · ↑319.3k (缓存 237.4k) ↓4.2k · US$0.541 · 2分 30秒"
+    "textPart": " 步 · "
    }
   ]
  },
@@ -455,7 +455,7 @@
  },
  {
   "name": "board",
-  "path": "/spaces/{BOARD_SPACE}?window=file%3Aapp_context_router.board",
+  "path": "/spaces/{BOARD_SPACE}?window=file%3A{BOARD}",
   "actions": [
    {
     "wait": 6000

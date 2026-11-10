@@ -1,6 +1,8 @@
 package app
 
 import (
+	"fmt"
+
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/markdown"
 )
@@ -113,7 +115,7 @@ func (a *app) applyTheme(c *ui.Context) {
 	if a.customThemeOn() {
 		custom = a.customCSS
 	}
-	if key := name + "\x00" + custom; key != a.palKey {
+	if key := fmt.Sprint(name, "\x00", custom, "\x00", webFontGen); key != a.palKey {
 		a.palKey = key
 		a.pal = buildPalette(name, custom)
 		fontSans, fontMono = a.pal.font, a.pal.mono
