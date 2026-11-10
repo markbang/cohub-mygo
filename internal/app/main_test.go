@@ -775,3 +775,17 @@ func TestStartupCacheShowsLastChats(t *testing.T) {
 		t.Fatalf("route %v after a refresh with a newer chat", a.route)
 	}
 }
+
+// Clicking a reply's steps unfolds them in the demo, whose timeline once
+// lacked the map of unfolded turns and panicked on the click.
+func TestDemoStepsUnfold(t *testing.T) {
+	a := demoApp(t)
+	tt := ui.NewTester(a.view, 1440, 900)
+	if err := tt.Click("19 步 · 19 个工具"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	if !a.timelines["demo-0"].expanded["t1"] {
+		t.Fatal("the steps stayed folded")
+	}
+}

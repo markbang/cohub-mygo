@@ -62,7 +62,9 @@ func loadDemo(a *app) {
 		}
 	}
 	done := at(9 * time.Minute)
-	a.timelines["demo-0"] = &sessionTurns{loaded: true, turns: []*cohub.Turn{
+	tl := a.timelineOf("demo-0")
+	tl.loaded = true
+	tl.turns = []*cohub.Turn{
 		{
 			ID: "t1", Sequence: 1, Status: "completed", AuthorProfile: me,
 			UserContent:      []cohub.Block{{Type: "text", Text: "看看这个 https://nsh.dev/"}},
@@ -78,7 +80,7 @@ func loadDemo(a *app) {
 			Model:       "claude-opus-5-5", ThinkingLevel: "high", StartedAt: at(3 * time.Minute),
 			IntermediateSummary: &cohub.IntermediateSummary{MessageCount: 7, ToolCallCount: 7},
 		},
-	}}
+	}
 }
 
 const demoReply = "**Native Shell (NSH)** 是 Longbridge 出的跨平台原生 UI 框架，用 Rust 写。\n\n" +
