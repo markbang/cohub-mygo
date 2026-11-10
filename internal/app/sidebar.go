@@ -48,7 +48,7 @@ func (a *app) sidebarTop(c *ui.Context) {
 		}
 		search := ui.ButtonBase(c.Key("search")).Row().Gap(4).AlignItems(ui.Center).Height(26).Padding(0, 8).Radius(6).Background(p.hover).Label(m("x_search_k")).FocusRing(false).Children(func() {
 			ui.Icon(c, icon("search")).Size(13, 13).TextColor(p.textTertiary)
-			ui.Text(c, "⌘K").FontSize(10).TextColor(p.textTertiary)
+			ui.Text(c, keyHint("K")).FontSize(10).TextColor(p.textTertiary)
 		})
 		if search.Hovered() {
 			search.Background(p.hoverStrong)
@@ -339,7 +339,7 @@ func (a *app) spaceSidebar(c *ui.Context) {
 			nb := ui.Row(c.Key("new")).Gap(6).AlignItems(ui.Center).Height(32).Padding(0, 8).Radius(7).Background(p.brandMuted).Border(1, p.brandBorder).Margin(0, 0, 4, 0).Cursor(ui.CursorPointer).Children(func() {
 				ui.Icon(c, icon("plus")).Size(14, 14).TextColor(p.brand)
 				ui.Text(c, m("sidebar_new_chat")).FontSize(12).FontWeight(500).TextColor(p.brand).Grow(1)
-				ui.Text(c, "⌘O").FontSize(10).TextColor(p.brand).Padding(1, 4).Radius(4).Border(1, p.brandBorder)
+				ui.Text(c, keyHint("N")).FontSize(10).TextColor(p.brand).Padding(1, 4).Radius(4).Border(1, p.brandBorder)
 			})
 			if nb.Hovered() {
 				nb.Background(p.brand.Alpha(0.15))

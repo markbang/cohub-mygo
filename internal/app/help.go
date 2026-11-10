@@ -31,25 +31,20 @@ func (a *app) helpSections() []struct {
 	title, desc string
 	items       []helpItem
 } {
-	mod := "Ctrl"
-	if runtime.GOOS == "darwin" {
-		mod = "⌘"
-	}
+	mod := cmdSymbol()
 	return []struct {
 		title, desc string
 		items       []helpItem
 	}{
 		{m("help_global"), m("help_global_desc"), []helpItem{
 			{m("help_search_everywhere"), [][]string{{mod, "K"}}},
-			{m("help_new_chat"), [][]string{{mod, "O"}}},
-			{m("help_focus_chats"), [][]string{{mod, "⇧", "U"}}},
-			{m("help_toggle_left"), [][]string{{"Ctrl", "Alt", "←"}}},
-			{m("help_toggle_right"), [][]string{{"Ctrl", "Alt", "→"}}},
+			{m("help_new_chat"), [][]string{{mod, "N"}}},
+			{m("help_toggle_left"), [][]string{{mod, altSymbol(), "←"}}},
+			{m("help_toggle_right"), [][]string{{mod, altSymbol(), "→"}}},
 			{m("help_open_help"), [][]string{{"?"}}},
 		}},
 		{m("help_session_page"), m("help_session_desc"), []helpItem{
 			{m("help_open_model_selector"), [][]string{{mod, "⇧", "M"}}},
-			{m("help_focus_composer"), [][]string{{"i"}}},
 			{m("help_scroll_down"), [][]string{{"j"}}},
 			{m("help_scroll_up"), [][]string{{"k"}}},
 			{m("help_next_turn"), [][]string{{"Shift", "J"}}},
