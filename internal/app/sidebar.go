@@ -80,9 +80,29 @@ func (a *app) chatsSidebar(c *ui.Context) {
 	a.chipBar(c)
 	list := a.visibleRows()
 	a.sessionList.Key = func(i int) any { return list[i].s.ID }
-	ui.List(c.Key("sessions"), &a.sessionList, len(list), func(i int) {
+	a.sessionList.Selected = &a.selectedChat
+	l := ui.List(c.Key("sessions"), &a.sessionList, len(list), func(i int) {
 		a.sessionRow(c, list[i])
-	}).Grow(1).Padding(6, 6, 6, 6).Gap(0).Children(func() {
+	}).Grow(1).Padding(6, 6, 6, 6).Gap(0)
+	if !l.Focused() {
+		// The open chat is the choice while the list does not have the
+		// keyboard; the arrows move the choice without opening it.
+		a.selectedChat = -1
+		for i, row := range list {
+			if row.s.ID == a.route.sessionID() {
+				a.selectedChat = i
+				break
+			}
+		}
+	}
+	if a.focusChats {
+		l.Focus()
+		a.focusChats = false
+	}
+	if l.Submitted() && a.selectedChat >= 0 && a.selectedChat < len(list) {
+		a.openSession(list[a.selectedChat].s)
+	}
+	l.Children(func() {
 		if len(list) == 0 {
 			if a.status != "" && a.me == nil {
 				ui.Row(c).Gap(6).Padding(16, 10).Children(func() {
