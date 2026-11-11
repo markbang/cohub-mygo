@@ -43,13 +43,19 @@ func (a *app) view(c *ui.Context) {
 	}
 	a.applyTheme(c)
 
-	c.OnShortcut(ui.Ctrl|ui.Alt, ui.KeyLeft, func() { a.sidebarOpen = !a.sidebarOpen })
+	c.OnShortcut(toggleMods(), ui.KeyLeft, func() { a.sidebarOpen = !a.sidebarOpen })
+	c.OnShortcut(ui.Cmd, ui.KeyN, func() { a.newChat() })
 	c.OnShortcut(ui.Cmd, ui.KeyO, func() { a.newChat() })
 	c.OnShortcut(ui.Cmd, ui.KeyK, func() { a.palette.toggle(paletteAll) })
 	c.OnShortcut(ui.Cmd, ui.KeyComma, func() { a.go_(route{kind: routeSettings, sub: "general"}) })
+	c.OnShortcut(ui.Cmd, ui.KeyB, func() { a.sidebarOpen = !a.sidebarOpen })
 	c.OnShortcut(ui.Cmd, ui.KeyBracketLeft, func() { a.goBack() })
+	if runtime.GOOS != "darwin" {
+		// Where going back is Alt+Left, as in browsers and file managers.
+		c.OnShortcut(ui.Alt, ui.KeyLeft, func() { a.goBack() })
+	}
 	c.OnShortcut(ui.Cmd|ui.Shift, ui.KeyM, func() { a.menus["model"] = true })
-	c.OnShortcut(ui.Ctrl|ui.Alt, ui.KeyRight, func() { a.panelOpen = !a.panelOpen })
+	c.OnShortcut(toggleMods(), ui.KeyRight, func() { a.panelOpen = !a.panelOpen })
 	a.pageKeys(c)
 
 	w, h := c.Size()

@@ -165,9 +165,9 @@ func (a *app) paletteItems() []paletteItem {
 	}
 	if s.tab == 4 {
 		for _, cmd := range []paletteItem{
-			{key: "cmd-new-chat", command: true, title: m("sidebar_new_chat"), sub: "⌘O", choose: a.newChat},
-			{key: "cmd-settings", command: true, title: m("nav_settings"), sub: "⌘,", choose: func() { a.go_(route{kind: routeSettings, sub: "general"}) }},
-			{key: "cmd-sidebar", command: true, title: m("x_toggle_sidebar"), sub: "⌘B", choose: func() { a.sidebarOpen = !a.sidebarOpen }},
+			{key: "cmd-new-chat", command: true, title: m("sidebar_new_chat"), sub: keyHint("N"), choose: a.newChat},
+			{key: "cmd-settings", command: true, title: m("nav_settings"), sub: keyHint(","), choose: func() { a.go_(route{kind: routeSettings, sub: "general"}) }},
+			{key: "cmd-sidebar", command: true, title: m("x_toggle_sidebar"), sub: keyHint("B"), choose: func() { a.sidebarOpen = !a.sidebarOpen }},
 			{key: "cmd-manage", command: true, title: "Manage Spaces", sub: "Browse, organize, and archive spaces", choose: func() { a.go_(route{kind: routeSpaces}) }},
 			{key: "cmd-changelog", command: true, title: "Changelog", sub: "What's new in Cohub", choose: func() { a.openURL("https://cohub.live/changelog") }},
 			{key: "cmd-general", command: true, title: m("nav_general"), sub: m("nav_settings"), choose: func() { a.go_(route{kind: routeSettings, sub: "general"}) }},
@@ -239,7 +239,7 @@ func (a *app) paletteView(c *ui.Context) {
 				}
 				return true
 			})
-			ui.Text(c, "⌘K").FontSize(10).TextColor(p.textTertiary).Padding(2, 5).Radius(4).Border(1, p.border)
+			ui.Text(c, keyHint("K")).FontSize(10).TextColor(p.textTertiary).Padding(2, 5).Radius(4).Border(1, p.border)
 		})
 		ui.Row(c).Height(36).Shrink(0).Gap(2).AlignItems(ui.Center).Padding(0, 10).Children(func() {
 			for i, t := range s.tabs() {

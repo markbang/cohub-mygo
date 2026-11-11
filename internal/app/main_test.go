@@ -1292,3 +1292,27 @@ func TestVideoTakesItsFirstFrame(t *testing.T) {
 		t.Fatalf("outputs %+v", out)
 	}
 }
+
+// Cmd+B toggles the sidebar, as the palette has always said.
+func TestCmdBTogglesSidebar(t *testing.T) {
+	a := demoApp(t)
+	tt := ui.NewTester(a.view, 1440, 900)
+	tt.TypeKey(ui.Cmd, ui.KeyB, "")
+	if a.sidebarOpen {
+		t.Fatal("Cmd+B left the sidebar open")
+	}
+	tt.TypeKey(ui.Cmd, ui.KeyB, "")
+	if !a.sidebarOpen {
+		t.Fatal("Cmd+B did not bring the sidebar back")
+	}
+}
+
+// Cmd+N starts a new chat, as native apps make a new document.
+func TestCmdNStartsChat(t *testing.T) {
+	a := demoApp(t)
+	tt := ui.NewTester(a.view, 1440, 900)
+	tt.TypeKey(ui.Cmd, ui.KeyN, "")
+	if a.route.kind != routeNewSession {
+		t.Fatalf("Cmd+N left route %v", a.route)
+	}
+}
