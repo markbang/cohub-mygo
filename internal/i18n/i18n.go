@@ -36,6 +36,7 @@ var extraMessages = map[string][2]string{
 	"x_menu_file":         {"文件", "File"},
 	"x_menu_view":         {"视图", "View"},
 	"x_menu_help":         {"帮助", "Help"},
+	"x_forward":           {"前进", "Forward"},
 	"x_runtime_offline":   {"本机运行时离线", "The local runtime is offline"},
 	"x_name":              {"名称", "Name"},
 	"x_sign_out_detail":   {"会同时退出 cohub 命令行的登录。", "This also signs the cohub CLI out."},

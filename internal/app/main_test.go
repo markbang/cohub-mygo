@@ -1438,3 +1438,47 @@ func TestRestoresLastChat(t *testing.T) {
 		t.Fatalf("recorded %q/%q", b.prefs.LastSession, b.prefs.LastSpace)
 	}
 }
+
+// Cmd+F finds text in the loaded turns; the query filters and Enter walks
+// to the next match.
+func TestFindInChat(t *testing.T) {
+	a := demoApp(t)
+	tt := ui.NewTester(a.view, 1440, 900)
+	tt.TypeKey(ui.Cmd, ui.KeyF, "")
+	if !a.find.open {
+		t.Fatal("Cmd+F did not open the find bar")
+	}
+	tt.Type("MyGo")
+	tt.Frame()
+	if len(a.find.turns) != 2 || a.find.turns[0] != 0 || a.find.turns[1] != 1 {
+		t.Fatalf("found %v, want the first two turns", a.find.turns)
+	}
+	a.find.query = "nothing-matches-this"
+	tt.Frame()
+	if len(a.find.turns) != 0 {
+		t.Fatalf("found %v for a missing query", a.find.turns)
+	}
+}
+
+// Back and Forward walk the route history, and a new navigation drops the
+// forward pages, as in a browser.
+func TestForwardNavigation(t *testing.T) {
+	a := demoApp(t)
+	tt := ui.NewTester(a.view, 1440, 900)
+	a.openSession(a.session("demo-1"))
+	tt.Frame()
+	a.goBack()
+	if a.route.sessionID() != "demo-0" {
+		t.Fatalf("back went to %q", a.route.sessionID())
+	}
+	a.goForward()
+	if a.route.sessionID() != "demo-1" {
+		t.Fatalf("forward went to %q", a.route.sessionID())
+	}
+	a.goBack()
+	a.go_(route{kind: routeSettings, sub: "general"})
+	a.goForward()
+	if a.route.kind != routeSettings {
+		t.Fatalf("forward after a new page went to %+v", a.route)
+	}
+}

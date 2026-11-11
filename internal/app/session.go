@@ -81,6 +81,7 @@ func (a *app) sessionView(c *ui.Context) {
 	if a.compact {
 		pad = 16
 	}
+	a.findBar(c, turns)
 	ui.Box(c.Key("timeline-box")).Grow(1).MinHeight(0).Children(func() {
 		list := ui.List(c.Key("timeline-"+id), &a.timeline, len(turns), func(i int) {
 			ui.Column(c).FillWidth().MaxWidth(chatMaxWidth).Margin(0, ui.Auto).Gap(10).Children(func() {
@@ -1088,8 +1089,12 @@ func (a *app) composer(c *ui.Context, running bool) {
 			a.attachmentStrip(c)
 			in := ui.TextAreaBase(c.Key("draft"), &a.draft).Lines(2, 10).Placeholder(m("composer_placeholder")).Label(m("x_message")).PlaceholderColor(p.placeholder).
 				FontSize(14).LineHeight(1.55).Padding(0, 9)
-			if !a.compact {
+			if !a.compact && !a.find.open {
 				in.AutoFocus()
+			}
+			if a.focusDraft {
+				in.Focus()
+				a.focusDraft = false
 			}
 			if a.draftCaret >= 0 {
 				in.SetTextSelection(a.draftCaret, a.draftCaret)
