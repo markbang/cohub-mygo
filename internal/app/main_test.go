@@ -1482,3 +1482,16 @@ func TestForwardNavigation(t *testing.T) {
 		t.Fatalf("forward after a new page went to %+v", a.route)
 	}
 }
+
+// The app icon counts unread chats, without counting a chat twice when it
+// is in both the inbox and its Space.
+func TestUnreadBadgeCount(t *testing.T) {
+	a := demoApp(t)
+	if got := a.unreadCount(); got != 1 {
+		t.Fatalf("unread %d, want the one unseen chat", got)
+	}
+	a.markSeen(a.session("demo-2"))
+	if got := a.unreadCount(); got != 0 {
+		t.Fatalf("unread %d after reading", got)
+	}
+}
