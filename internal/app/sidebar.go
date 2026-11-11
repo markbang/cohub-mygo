@@ -178,6 +178,9 @@ func (a *app) sessionRow(c *ui.Context, tr treeRow, index int) {
 	now := a.now()
 	s := tr.s
 	selected := index == a.selectedChat
+	stamp := relTime(s.When(), now)
+	// The time's own slot, wide enough for a date as 01-02 15:04.
+	timeSlot := max(float32(34), float32(len(stamp))*6.3+8)
 	fg, second := p.text, p.textTertiary
 	if selected {
 		// The list draws its choice in the accent color; its text has to
@@ -194,7 +197,7 @@ func (a *app) sessionRow(c *ui.Context, tr treeRow, index int) {
 			a.avatarSeed(c, av, name, s.SpaceID, 36, 8)
 		}
 		ui.Column(c).Grow(1).MinWidth(0).Gap(2).Children(func() {
-			ui.Row(c).Gap(8).AlignItems(ui.Center).Padding(0, 34, 0, 0).Children(func() {
+			ui.Row(c).FillWidth().Gap(8).AlignItems(ui.Center).Padding(0, timeSlot, 0, 0).Children(func() {
 				ui.Text(c, tr.title()).FontSize(14).FontWeight(500).TextColor(fg).SingleLine().Grow(1).MinWidth(0)
 			})
 			ui.Row(c).Gap(6).AlignItems(ui.Center).Height(18).Children(func() {
@@ -223,7 +226,7 @@ func (a *app) sessionRow(c *ui.Context, tr treeRow, index int) {
 		row.Children(func() {
 			t := ui.Box(c.Key("time")).Absolute().Top(6).Right(6).Height(18).AlignItems(ui.End).Justify(ui.End)
 			t.Children(func() {
-				ui.Text(c, relTime(s.When(), now)).FontSize(11).TextColor(second).SingleLine()
+				ui.Text(c, stamp).FontSize(11).TextColor(second).SingleLine()
 			})
 		})
 	}
