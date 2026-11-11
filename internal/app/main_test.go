@@ -1109,8 +1109,8 @@ func TestOpenWith(t *testing.T) {
 }
 
 // A launch shows the last refresh's Spaces, chats and the latest chat's
-// turns from the startup cache before the API answers, and a refresh with a
-// newer chat moves the window off the cache's latest one.
+// turns from the startup cache before the API answers, and a refresh with
+// a newer chat leaves the open chat alone, as a native window does.
 func TestStartupCacheShowsLastChats(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "startup.json")
 	srv := httptest.NewServer(http.NotFoundHandler())
@@ -1139,8 +1139,8 @@ func TestStartupCacheShowsLastChats(t *testing.T) {
 
 	newer := &cohub.Session{ID: "newer", SpaceID: "s1", Title: "newer", LastMessageAt: a.now().Add(time.Minute)}
 	a.showLists(a.me, a.spaces, append([]*cohub.Session{newer}, a.sessions...), a.models, true)
-	if a.route.sessionID() != "newer" {
-		t.Fatalf("route %v after a refresh with a newer chat", a.route)
+	if a.route.sessionID() != "demo-0" {
+		t.Fatalf("route %v after a refresh with a newer chat, want the open chat", a.route)
 	}
 }
 
