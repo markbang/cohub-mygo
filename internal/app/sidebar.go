@@ -203,6 +203,7 @@ func (a *app) rowActions(c *ui.Context, row ui.Element, s *cohub.Session, inSpac
 					if t != s.Title {
 						old := s.Title
 						s.Title = t
+						a.updateWindowTitle()
 						a.act(func(ctx context.Context) error {
 							var title any = t
 							if t == "" {

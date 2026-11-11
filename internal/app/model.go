@@ -375,6 +375,7 @@ func (a *app) refresh() {
 			a.inboxForks = forks
 		}
 		a.showLists(me, spaces, sessions, models, filter == a.chats)
+		a.updateWindowTitle()
 		a.saveStartupCache()
 	})
 }
@@ -645,6 +646,7 @@ func (a *app) show(r route) {
 	if sp := a.route.space; sp != "" && a.route.area() == areaSpace {
 		a.once("space-sessions:"+sp, func(context.Context) { a.loadSpaceSessions(sp) })
 	}
+	a.updateWindowTitle()
 }
 
 // openSession shows a chat where the window is: in the Space's sidebar

@@ -1316,3 +1316,20 @@ func TestCmdNStartsChat(t *testing.T) {
 		t.Fatalf("Cmd+N left route %v", a.route)
 	}
 }
+
+// The window names the chat it shows, as a document window does.
+func TestWindowTitleNamesChat(t *testing.T) {
+	a := demoApp(t)
+	ui.NewTester(a.view, 1440, 900)
+	if got, want := a.windowTitle(), "看看这个 https://nsh.dev/ — Cohub"; got != want {
+		t.Errorf("title %q, want %q", got, want)
+	}
+	a.go_(route{kind: routeSettings, sub: "general"})
+	if got, want := a.windowTitle(), "Cohub"; got != want {
+		t.Errorf("settings title %q, want %q", got, want)
+	}
+	a.openSpace("s2")
+	if got, want := a.windowTitle(), "cohub-mobile — Cohub"; got != want {
+		t.Errorf("Space title %q, want %q", got, want)
+	}
+}
