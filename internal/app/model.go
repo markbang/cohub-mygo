@@ -186,6 +186,7 @@ type app struct {
 	focusChats   bool
 	find         findState
 	focusDraft   bool
+	badge        int // the unread count last shown on the app icon
 	md           markdown.Options
 	mdTheme      *markdown.Theme
 	mdThemeKey   string
@@ -289,7 +290,11 @@ func (a *app) update(fn func()) {
 		fn()
 		return
 	}
-	a.win.Update(func() { a.gen++; fn() })
+	a.win.Update(func() {
+		a.gen++
+		fn()
+		a.updateBadge()
+	})
 }
 
 // spawn runs slow work off the main thread, or queues it for flush in tests.
@@ -733,6 +738,7 @@ func (a *app) openSpace(id string) { a.go_(route{kind: routeSpace, space: id}) }
 
 func (a *app) markSeen(s *cohub.Session) {
 	a.seen[s.ID] = s.When()
+	a.updateBadge()
 	if a.seenPath == "" {
 		return
 	}
@@ -742,6 +748,44 @@ func (a *app) markSeen(s *cohub.Session) {
 		os.MkdirAll(filepath.Dir(path), 0o755)
 		os.WriteFile(path, b, 0o644)
 	}()
+}
+
+// unreadCount is how many chats the app icon should count: every chat
+// with something new, across the inbox and the Spaces loaded.
+func (a *app) unreadCount() int {
+	seen := map[string]bool{}
+	n := 0
+	for _, list := range [][]*cohub.Session{a.sessions, a.sessionsOfSpaces()} {
+		for _, s := range list {
+			if seen[s.ID] {
+				continue
+			}
+			seen[s.ID] = true
+			if a.unread(s) {
+				n++
+			}
+		}
+	}
+	return n
+}
+
+func (a *app) sessionsOfSpaces() []*cohub.Session {
+	var out []*cohub.Session
+	for _, list := range a.spaceSessions {
+		out = append(out, list...)
+	}
+	return out
+}
+
+// updateBadge keeps the app icon's count in step with the unread chats.
+func (a *app) updateBadge() {
+	if a.win == nil {
+		return
+	}
+	if n := a.unreadCount(); n != a.badge {
+		a.badge = n
+		mygo.App.SetBadgeCount(n)
+	}
 }
 
 func (a *app) unread(s *cohub.Session) bool {
