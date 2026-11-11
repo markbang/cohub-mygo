@@ -77,6 +77,7 @@ type app struct {
 
 	route                        route
 	back                         []route
+	forward                      []route
 	chip                         string // the chats sidebar's Space filter, "" for all
 	spacesNav                    int
 	chats                        chatsFilter                 // the inbox's source, "web" at first
@@ -183,6 +184,8 @@ type app struct {
 	// rows it shows; focusChats hands it the keyboard for the next frame.
 	selectedChat int
 	focusChats   bool
+	find         findState
+	focusDraft   bool
 	md           markdown.Options
 	mdTheme      *markdown.Theme
 	mdThemeKey   string
@@ -616,6 +619,7 @@ func (a *app) go_(r route) {
 	if len(a.back) > 50 {
 		a.back = a.back[1:]
 	}
+	a.forward = nil
 	a.show(r)
 }
 
@@ -624,8 +628,23 @@ func (a *app) goBack() {
 		a.show(route{kind: routeSessions})
 		return
 	}
+	a.forward = append(a.forward, a.route)
+	if len(a.forward) > 50 {
+		a.forward = a.forward[1:]
+	}
 	r := a.back[len(a.back)-1]
 	a.back = a.back[:len(a.back)-1]
+	a.show(r)
+}
+
+// goForward goes to the page goBack left, as Cmd+] does.
+func (a *app) goForward() {
+	if len(a.forward) == 0 {
+		return
+	}
+	a.back = append(a.back, a.route)
+	r := a.forward[len(a.forward)-1]
+	a.forward = a.forward[:len(a.forward)-1]
 	a.show(r)
 }
 

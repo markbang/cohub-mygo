@@ -64,6 +64,9 @@ func appMenu(a *app) *mygo.Menu {
 		}},
 		{Role: mygo.RoleEditMenu},
 		{Label: m("x_menu_view"), Submenu: []*mygo.MenuItem{
+			{Label: m("x_back"), Accelerator: "CmdOrCtrl+[", Click: func(*mygo.MenuItem, *mygo.Window) { a.goBack() }},
+			{Label: m("x_forward"), Accelerator: "CmdOrCtrl+]", Click: func(*mygo.MenuItem, *mygo.Window) { a.goForward() }},
+			mygo.Separator(),
 			{Label: m("x_toggle_sidebar"), Accelerator: "CmdOrCtrl+B", Click: toggleSidebar},
 			{Role: mygo.RoleToggleFullScreen},
 		}},

@@ -47,12 +47,19 @@ func (a *app) view(c *ui.Context) {
 	c.OnShortcut(ui.Cmd, ui.KeyN, func() { a.newChat() })
 	c.OnShortcut(ui.Cmd, ui.KeyO, func() { a.newChat() })
 	c.OnShortcut(ui.Cmd, ui.KeyK, func() { a.palette.toggle(paletteAll) })
+	c.OnShortcut(ui.Cmd, ui.KeyF, func() {
+		if a.route.sessionID() != "" {
+			a.find.open = true
+		}
+	})
 	c.OnShortcut(ui.Cmd, ui.KeyComma, func() { a.go_(route{kind: routeSettings, sub: "general"}) })
 	c.OnShortcut(ui.Cmd, ui.KeyB, func() { a.sidebarOpen = !a.sidebarOpen })
 	c.OnShortcut(ui.Cmd, ui.KeyBracketLeft, func() { a.goBack() })
+	c.OnShortcut(ui.Cmd, ui.KeyBracketRight, func() { a.goForward() })
 	if runtime.GOOS != "darwin" {
 		// Where going back is Alt+Left, as in browsers and file managers.
 		c.OnShortcut(ui.Alt, ui.KeyLeft, func() { a.goBack() })
+		c.OnShortcut(ui.Alt, ui.KeyRight, func() { a.goForward() })
 	}
 	c.OnShortcut(ui.Cmd|ui.Shift, ui.KeyM, func() { a.menus["model"] = true })
 	c.OnShortcut(toggleMods(), ui.KeyRight, func() { a.panelOpen = !a.panelOpen })
