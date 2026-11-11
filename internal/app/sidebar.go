@@ -82,7 +82,7 @@ func (a *app) chatsSidebar(c *ui.Context) {
 	a.sessionList.Key = func(i int) any { return list[i].s.ID }
 	a.sessionList.Selected = &a.selectedChat
 	l := ui.List(c.Key("sessions"), &a.sessionList, len(list), func(i int) {
-		a.sessionRow(c, list[i])
+		a.sessionRow(c, list[i], i)
 	}).Grow(1).Padding(6, 6, 6, 6).Gap(0)
 	if !l.Focused() {
 		// The open chat is the choice while the list does not have the
@@ -173,10 +173,17 @@ func (a *app) spaceChip(c *ui.Context, id, name, avatar string) {
 // sessionRow is a chat in the list, as SessionRow.svelte: the Space's
 // picture, the title and time, then how long a running turn has run and
 // the latest reply.
-func (a *app) sessionRow(c *ui.Context, tr treeRow) {
+func (a *app) sessionRow(c *ui.Context, tr treeRow, index int) {
 	p := a.pal
 	now := a.now()
 	s := tr.s
+	selected := index == a.selectedChat
+	fg, second := p.text, p.textTertiary
+	if selected {
+		// The list draws its choice in the accent color; its text has to
+		// read on that, not on the sidebar.
+		fg, second = p.brandFg, p.brandFg.Alpha(0.78)
+	}
 	row := ui.Row(c.Key(s.ID)).Gap(10).AlignItems(ui.Center).Height(52).Padding(0, 6).Radius(6).Children(func() {
 		a.inboxGuides(c, tr, 6, 36, 10, 16)
 		if tr.depth > 0 {
@@ -187,22 +194,30 @@ func (a *app) sessionRow(c *ui.Context, tr treeRow) {
 			a.avatarSeed(c, av, name, s.SpaceID, 36, 8)
 		}
 		ui.Column(c).Grow(1).MinWidth(0).Gap(2).Children(func() {
-			ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
-				ui.Text(c, tr.title()).FontSize(14).FontWeight(500).SingleLine().Grow(1).MinWidth(0)
-				ui.Text(c, relTime(s.When(), now)).FontSize(11).TextColor(p.textTertiary).Shrink(0)
+			ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
+				ui.Text(c, tr.title()).FontSize(14).FontWeight(500).TextColor(fg).SingleLine().Grow(1).MinWidth(0)
+				ui.Text(c, relTime(s.When(), now)).FontSize(11).TextColor(second).SingleLine().TextAlign(ui.End).MinWidth(30).Shrink(0)
 			})
 			ui.Row(c).Gap(6).AlignItems(ui.Center).Height(18).Children(func() {
 				if s.Running() {
-					a.runningPill(c, s.ActiveTurn.StartedAt)
+					a.runningPill(c, s.ActiveTurn.StartedAt, selected)
 				}
-				ui.Text(c, a.previewOf(s.LatestMessageText)).FontSize(12).TextColor(p.textTertiary).SingleLine().Grow(1).MinWidth(0)
+				ui.Text(c, a.previewOf(s.LatestMessageText)).FontSize(12).TextColor(second).SingleLine().Grow(1).MinWidth(0)
 				if a.unread(s) {
-					a.dot(c, p.errorC, 6)
+					col := p.errorC
+					if selected {
+						col = p.brandFg
+					}
+					a.dot(c, col, 6)
 				}
 			})
 		})
 	})
-	a.pressable(row, s.ID == a.route.sessionID())
+	if selected {
+		row.Cursor(ui.CursorPointer)
+	} else {
+		a.pressable(row, false)
+	}
 	row.OnClick(func() { a.openSession(s) })
 	row.ContextMenu(func(mn *ui.Menu) { fillMenu(mn, a.sessionMenu(s, false)) })
 	a.rowActions(c, row, s, false)
@@ -277,18 +292,22 @@ func (a *app) rowActions(c *ui.Context, row ui.Element, s *cohub.Session, inSpac
 }
 
 // runningPill shows that a turn runs, and for how long.
-func (a *app) runningPill(c *ui.Context, since time.Time) {
+func (a *app) runningPill(c *ui.Context, since time.Time, onAccent bool) {
 	p := a.pal
-	ui.Row(c).Gap(2).AlignItems(ui.Center).Padding(1, 5).Radius(4).Background(p.brandMuted).Shrink(0).Children(func() {
+	bg, dot, text := p.brandMuted, p.brand, p.textSecond
+	if onAccent {
+		bg, dot, text = p.brandFg.Alpha(0.16), p.brandFg, p.brandFg
+	}
+	ui.Row(c).Gap(2).AlignItems(ui.Center).Padding(1, 5).Radius(4).Background(bg).Shrink(0).Children(func() {
 		for i := 0; i < 3; i++ {
-			a.dot(c.Key(i), p.brand, 3).Opacity(0.55)
+			a.dot(c.Key(i), dot, 3).Opacity(0.55)
 		}
 		label := m("session_activity_running")
 		if !since.IsZero() {
 			label += " " + elapsed(since, a.now())
 			c.After(time.Second)
 		}
-		ui.Text(c, label).FontSize(11).TextColor(p.textSecond).SingleLine().MarginStart(4)
+		ui.Text(c, label).FontSize(11).TextColor(text).SingleLine().MarginStart(4)
 	})
 }
 
@@ -543,7 +562,7 @@ func (a *app) spaceSessionTreeRow(c *ui.Context, tr treeRow) {
 			}
 		})
 		if s.Running() {
-			ui.Row(c).Children(func() { a.runningPill(c, s.ActiveTurn.StartedAt) })
+			ui.Row(c).Children(func() { a.runningPill(c, s.ActiveTurn.StartedAt, false) })
 		}
 	})
 	if row.Hovered() && !on {
