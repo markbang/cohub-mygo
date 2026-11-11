@@ -1352,3 +1352,21 @@ func TestChatRowContextMenu(t *testing.T) {
 		t.Fatalf("renaming %q, want demo-3", a.rowRenaming)
 	}
 }
+
+// Coming back to a chat keeps the place the reader left, not its end.
+func TestChatKeepsScrollPosition(t *testing.T) {
+	a := demoApp(t)
+	benchTimeline(a, "demo-0", 100)
+	tt := ui.NewTester(a.view, 1440, 900)
+	tt.Frame()
+	a.timelineScroll.Y = 2000
+	tt.Frame()
+	a.go_(route{kind: routeSession, session: "demo-3"})
+	tt.Frame()
+	a.go_(route{kind: routeSession, session: "demo-0"})
+	tt.Frame()
+	if a.timelineScroll.Y < 1990 || a.timeline.AtEnd() {
+		t.Fatalf("returned to %v of %v (end %v), want 2000",
+			a.timelineScroll.Y, a.timelineScroll.MaxY, a.timeline.AtEnd())
+	}
+}

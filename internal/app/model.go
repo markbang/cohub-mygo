@@ -24,6 +24,11 @@ import (
 )
 
 // sessionTurns is what the timeline of one session shows.
+type chatScroll struct {
+	y     float32
+	atEnd bool
+}
+
 type sessionTurns struct {
 	turns        []*cohub.Turn
 	hasMore      bool // turns before the first loaded
@@ -171,15 +176,18 @@ type app struct {
 	rows        rowsCache
 	previewRows map[string]string
 	initialsRow map[string]string
-	md          markdown.Options
-	mdTheme     *markdown.Theme
-	mdThemeKey  string
-	pal         *palette
-	palKey      string
-	customCSS   string // the Home Space's .cohub/theme.css
-	webFontsCSS string // the theme whose web fonts loaded
-	homeSpace   string
-	compact     bool
+	// scrollMemory keeps where each chat was left, so that coming back
+	// does not throw the reader to the end again.
+	scrollMemory map[string]chatScroll
+	md           markdown.Options
+	mdTheme      *markdown.Theme
+	mdThemeKey   string
+	pal          *palette
+	palKey       string
+	customCSS    string // the Home Space's .cohub/theme.css
+	webFontsCSS  string // the theme whose web fonts loaded
+	homeSpace    string
+	compact      bool
 
 	sidebarW, panelW, mainW float32 // the panes' widths: the sidebar, the right panel, the main column beside a window
 	paneDrag                *paneDrag
@@ -205,6 +213,7 @@ func newApp() *app {
 		labelItems:     map[string][]cohub.LabelItem{},
 		loading:        map[string]bool{},
 		seen:           map[string]time.Time{},
+		scrollMemory:   map[string]chatScroll{},
 		groupsOpen:     map[string]bool{"labels": true, "chats": true, "all": true, "saves": true},
 		menus:          map[string]bool{},
 		foldOpen:       map[string]bool{},
@@ -622,7 +631,13 @@ func (a *app) show(r route) {
 		a.resolveSlug(r.sub)
 	}
 	if id := a.route.sessionID(); id != "" && id != prevSession {
+		if prevSession != "" && a.timelineScroll.MaxY > 0 {
+			a.scrollMemory[prevSession] = chatScroll{a.timelineScroll.Y, a.timeline.AtEnd()}
+		}
 		a.timeline, a.timelineScroll = ui.ListState{}, ui.ScrollState{}
+		if was, ok := a.scrollMemory[id]; ok && !was.atEnd {
+			a.timelineScroll.Y = was.y
+		}
 		if s := a.session(id); s != nil {
 			a.markSeen(s)
 		}
