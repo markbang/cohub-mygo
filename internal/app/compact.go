@@ -92,7 +92,7 @@ func (a *app) compactChats(c *ui.Context) {
 					})
 					ui.Row(c).Gap(8).AlignItems(ui.Center).Height(18).Children(func() {
 						if s.Running() {
-							a.runningPill(c, s.ActiveTurn.StartedAt)
+							a.runningPill(c, s.ActiveTurn.StartedAt, false)
 						}
 						ui.Text(c, a.previewOf(s.LatestMessageText)).FontSize(14).TextColor(p.textTertiary.MixOklab(p.placeholder, 0.4)).SingleLine().Grow(1).MinWidth(0)
 						if a.unread(s) {
