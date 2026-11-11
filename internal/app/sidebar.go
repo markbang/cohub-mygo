@@ -184,6 +184,7 @@ func (a *app) sessionRow(c *ui.Context, tr treeRow) {
 	})
 	a.pressable(row, s.ID == a.route.sessionID())
 	row.OnClick(func() { a.openSession(s) })
+	row.ContextMenu(func(mn *ui.Menu) { fillMenu(mn, a.sessionMenu(s, false)) })
 	a.rowActions(c, row, s, false)
 }
 
@@ -533,6 +534,7 @@ func (a *app) spaceSessionTreeRow(c *ui.Context, tr treeRow) {
 	}
 	row.Cursor(ui.CursorPointer)
 	row.OnClick(func() { a.openSession(s) })
+	row.ContextMenu(func(mn *ui.Menu) { fillMenu(mn, a.sessionMenu(s, true)) })
 	a.rowActions(c, row, s, true)
 }
 

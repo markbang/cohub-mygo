@@ -1333,3 +1333,22 @@ func TestWindowTitleNamesChat(t *testing.T) {
 		t.Errorf("Space title %q, want %q", got, want)
 	}
 }
+
+// A chat row's secondary click opens its actions, as native lists do.
+func TestChatRowContextMenu(t *testing.T) {
+	a := demoApp(t)
+	tt := ui.NewTester(a.view, 1440, 900)
+	if err := tt.RightClick("执行 npx skills@latest update"); err != nil {
+		t.Fatal(err)
+	}
+	menu := tt.Menu()
+	if len(menu) < 3 || menu[0] != "打开" || menu[1] != "重命名" {
+		t.Fatalf("menu %q", menu)
+	}
+	if err := tt.ChooseMenuItem("重命名"); err != nil {
+		t.Fatal(err)
+	}
+	if a.rowRenaming != "demo-3" {
+		t.Fatalf("renaming %q, want demo-3", a.rowRenaming)
+	}
+}
