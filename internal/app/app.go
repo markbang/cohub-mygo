@@ -62,7 +62,7 @@ func Run() error {
 	a.perf = os.Getenv("COHUB_PERF") != ""
 	useUpdates(a)
 	mygo.App.WhenReady(func() {
-		setMenu()
+		setMenu(a)
 		a.win = mygo.NewWindow(mygo.WindowOptions{
 			Title:         "Cohub",
 			Width:         1440,
