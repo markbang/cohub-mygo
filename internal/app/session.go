@@ -82,43 +82,47 @@ func (a *app) sessionView(c *ui.Context) {
 		pad = 16
 	}
 	a.findBar(c, turns)
-	ui.Box(c.Key("timeline-box")).Grow(1).MinHeight(0).Children(func() {
-		list := ui.List(c.Key("timeline-"+id), &a.timeline, len(turns), func(i int) {
-			ui.Column(c).FillWidth().MaxWidth(chatMaxWidth).Margin(0, ui.Auto).Gap(10).Children(func() {
-				a.turnView(c, id, turns[i], tl)
+	var listH float32
+	ui.Row(c.Key("timeline-row")).Grow(1).MinHeight(0).AlignItems(ui.Stretch).Children(func() {
+		ui.Box(c.Key("timeline-box")).Grow(1).MinHeight(0).Children(func() {
+			list := ui.List(c.Key("timeline-"+id), &a.timeline, len(turns), func(i int) {
+				ui.Column(c).FillWidth().MaxWidth(chatMaxWidth).Margin(0, ui.Auto).Gap(10).Children(func() {
+					a.turnView(c, id, turns[i], tl)
+				})
+			}).Fill().Padding(28, pad, 32, pad).Gap(28).TrackScroll(&a.timelineScroll)
+			list.Children(func() {
+				switch {
+				case !tl.loaded && a.api != nil:
+					ui.Column(c).Grow(1).Center().Children(func() { a.spinner(c, 18, p.textTertiary) })
+				case tl.err != "":
+					ui.Text(c, tl.err).FontSize(12).TextColor(p.errorC).Margin(ui.Auto)
+				case len(turns) == 0:
+					ui.Text(c, m("x_no_messages")).FontSize(13).TextColor(p.textTertiary).Margin(ui.Auto)
+				}
 			})
-		}).Fill().Padding(28, pad, 32, pad).Gap(28).TrackScroll(&a.timelineScroll)
-		list.Children(func() {
-			switch {
-			case !tl.loaded && a.api != nil:
-				ui.Column(c).Grow(1).Center().Children(func() { a.spinner(c, 18, p.textTertiary) })
-			case tl.err != "":
-				ui.Text(c, tl.err).FontSize(12).TextColor(p.errorC).Margin(ui.Auto)
-			case len(turns) == 0:
-				ui.Text(c, m("x_no_messages")).FontSize(13).TextColor(p.textTertiary).Margin(ui.Auto)
+			// Scrolled up to the first turn loaded, the turns before it load.
+			if first, last := a.timeline.Visible(); len(turns) > 0 && last >= first && first == 0 && tl.hasMore {
+				a.loadOlderTurns(id)
+			}
+			if tl.loadingOlder {
+				ui.Box(c.Key("older")).Attach(ui.AnchorTop, ui.AnchorTop).Top(12).Children(func() { a.spinner(c, 16, p.textTertiary) })
+			}
+			listH = list.Bounds().H
+			if a.compact {
+				a.timelinePill(c, turns)
+			} else if len(turns) > 0 && !a.timeline.AtEnd() {
+				down := ui.ButtonBase(c.Key("to-end")).Size(32, 32).Radius(16).Center().Background(p.bgPrimary).Border(1, p.borderSubtle).
+					Shadow(0, 4, 12, 0, ui.RGBA(0, 0, 0, 0.08)).Label(m("x_to_latest")).FocusRing(false).Children(func() {
+					ui.Icon(c, icon("arrow-down")).Size(16, 16).TextColor(p.textSecond)
+				})
+				down.Attach(ui.AnchorBottom, ui.AnchorBottom).Bottom(12)
+				if down.Clicked() {
+					a.timeline.ScrollToEnd()
+				}
 			}
 		})
-		// Scrolled up to the first turn loaded, the turns before it load.
-		if first, last := a.timeline.Visible(); len(turns) > 0 && last >= first && first == 0 && tl.hasMore {
-			a.loadOlderTurns(id)
-		}
-		if tl.loadingOlder {
-			ui.Box(c.Key("older")).Attach(ui.AnchorTop, ui.AnchorTop).Top(12).Children(func() { a.spinner(c, 16, p.textTertiary) })
-		}
 		if !a.compact && len(turns) > 0 {
-			a.turnRail(c, id, turns, tl, list.Bounds().H)
-		}
-		if a.compact {
-			a.timelinePill(c, turns)
-		} else if len(turns) > 0 && !a.timeline.AtEnd() {
-			down := ui.ButtonBase(c.Key("to-end")).Size(32, 32).Radius(16).Center().Background(p.bgPrimary).Border(1, p.borderSubtle).
-				Shadow(0, 4, 12, 0, ui.RGBA(0, 0, 0, 0.08)).Label(m("x_to_latest")).FocusRing(false).Children(func() {
-				ui.Icon(c, icon("arrow-down")).Size(16, 16).TextColor(p.textSecond)
-			})
-			down.Attach(ui.AnchorBottom, ui.AnchorBottom).Bottom(12)
-			if down.Clicked() {
-				a.timeline.ScrollToEnd()
-			}
+			a.turnRail(c, id, turns, tl, listH)
 		}
 	})
 	if s != nil {
@@ -174,13 +178,9 @@ func (a *app) turnRail(c *ui.Context, sessionID string, turns []*cohub.Turn, tl 
 	n := len(turns)
 	line := p.borderSubtle.Alpha(0.65)
 	nav := &a.turnNav
-	// The rail keeps clear of the desktop scrollbar, which draws over the
-	// timeline's right edge.
-	railRight := float32(4)
-	if !a.compact {
-		railRight += 12
-	}
-	rail := ui.Box(c.Key("rail")).Attach(ui.AnchorTopRight, ui.AnchorTopRight).Top(4).Right(railRight).Width(28).HeightPercent(97).PassThrough()
+	// The rail has a column of its own beside the timeline, so the
+	// scrollbar at the timeline's edge and its marks never share one.
+	rail := ui.Box(c.Key("rail")).Width(28).HeightPercent(97).Margin(4, 0).Shrink(0)
 	// The rail passes the pointer through: it is hovered over its marks,
 	// its track and the navigator, which are inside it.
 	nav.hold(c, rail.Hovered())
