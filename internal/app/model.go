@@ -397,6 +397,19 @@ func (a *app) refresh() {
 // showLists shows the account's Spaces, chats and models, from the API or
 // the startup cache, and opens the latest chat where the window waits for
 // one.
+// restoredRoute is where a launch or /sessions opens: the chat and Space
+// the window last showed, while it is still there, else fallback.
+func (a *app) restoredRoute(fallback string) route {
+	id := a.prefs.LastSession
+	if a.session(id) == nil {
+		id = fallback
+	}
+	if s := a.session(id); s != nil && a.prefs.LastSpace == s.SpaceID {
+		return route{kind: routeSpaceSession, space: s.SpaceID, session: id}
+	}
+	return route{kind: routeSession, session: id}
+}
+
 func (a *app) showLists(me *cohub.Me, spaces []*cohub.Space, sessions []*cohub.Session, models []*cohub.Model, sameFilter bool) {
 	a.me = me
 	sort.SliceStable(spaces, func(i, j int) bool { return spaces[i].Activity().After(spaces[j].Activity()) })
@@ -412,7 +425,7 @@ func (a *app) showLists(me *cohub.Me, spaces []*cohub.Space, sessions []*cohub.S
 		a.rt.watch(a.currentSpace())
 	}
 	if len(sessions) > 0 && !a.compact {
-		latest := route{kind: routeSession, session: sessions[0].ID}
+		latest := a.restoredRoute(sessions[0].ID)
 		switch {
 		case a.route.kind == routeSessions:
 			a.go_(latest)
@@ -626,14 +639,24 @@ func (a *app) show(r route) {
 	a.userMenu = false
 	a.turnNav, a.turnSheetOpen = turnNav{}, false
 	if r.kind == routeSessions && !a.compact && len(a.sessions) > 0 {
-		// /sessions opens the latest chat, as the web does.
-		a.route = route{kind: routeSession, session: a.sessions[0].ID}
+		// /sessions opens where the window last was, else the latest chat.
+		a.route = a.restoredRoute(a.sessions[0].ID)
 	}
 	if r.kind == routeNewSession {
 		a.palette.open(paletteSpaces)
 	}
 	if r.kind == routeSlug {
 		a.resolveSlug(r.sub)
+	}
+	if id := a.route.sessionID(); id != "" {
+		space := ""
+		if a.route.area() == areaSpace {
+			space = a.route.space
+		}
+		if a.prefs.LastSession != id || a.prefs.LastSpace != space {
+			a.prefs.LastSession, a.prefs.LastSpace = id, space
+			a.prefs.save()
+		}
 	}
 	if id := a.route.sessionID(); id != "" && id != prevSession {
 		if prevSession != "" && a.timelineScroll.MaxY > 0 {

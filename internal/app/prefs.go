@@ -18,6 +18,10 @@ type prefs struct {
 	SidebarWidth float32 `json:"sidebarWidth,omitempty"`
 	PanelWidth   float32 `json:"panelWidth,omitempty"`
 	MainWidth    float32 `json:"mainWidth,omitempty"`
+	// The chat and Space the window last showed, so that a launch opens
+	// where the user left, as a native app restores its window.
+	LastSession string `json:"lastSession,omitempty"`
+	LastSpace   string `json:"lastSpace,omitempty"`
 }
 
 func (p *prefs) danmaku() bool { return p.Danmaku == nil || *p.Danmaku }
