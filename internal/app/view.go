@@ -34,6 +34,9 @@ func clampPane(v, def, lo, hi float32) float32 {
 // panel on desktops, as the web app's (app) layout; one column with a tab
 // bar below 768 DIPs, as its compact shell.
 func (a *app) view(c *ui.Context) {
+	if a.zoom > 0 && a.zoom != 1 {
+		c.SetZoom(a.zoom)
+	}
 	if a.perf && !a.firstFrame {
 		a.firstFrame = true
 		var m runtime.MemStats
@@ -53,6 +56,10 @@ func (a *app) view(c *ui.Context) {
 		}
 	})
 	c.OnShortcut(ui.Cmd, ui.KeyComma, func() { a.go_(route{kind: routeSettings, sub: "general"}) })
+	c.OnShortcut(ui.Cmd|ui.Shift, ui.KeyEqual, func() { a.setZoom(a.zoom + zoomStep(a.zoom)) })
+	c.OnShortcut(ui.Cmd, ui.KeyEqual, func() { a.setZoom(a.zoom + zoomStep(a.zoom)) })
+	c.OnShortcut(ui.Cmd, ui.KeyMinus, func() { a.setZoom(a.zoom - zoomStep(a.zoom)) })
+	c.OnShortcut(ui.Cmd, ui.Key0, func() { a.setZoom(1) })
 	c.OnShortcut(ui.Cmd, ui.KeyB, func() { a.sidebarOpen = !a.sidebarOpen })
 	c.OnShortcut(ui.Cmd, ui.KeyBracketLeft, func() { a.goBack() })
 	c.OnShortcut(ui.Cmd, ui.KeyBracketRight, func() { a.goForward() })

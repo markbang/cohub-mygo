@@ -1495,3 +1495,21 @@ func TestUnreadBadgeCount(t *testing.T) {
 		t.Fatalf("unread %d after reading", got)
 	}
 }
+
+// Zoom follows the platform's keys and is kept for the next launch.
+func TestZoomKeys(t *testing.T) {
+	a := demoApp(t)
+	tt := ui.NewTester(a.view, 1440, 900)
+	tt.TypeKey(ui.Cmd, ui.KeyEqual, "")
+	if a.zoom <= 1 {
+		t.Fatalf("zoom in left %v", a.zoom)
+	}
+	tt.TypeKey(ui.Cmd, ui.Key0, "")
+	if a.zoom != 1 {
+		t.Fatalf("reset left %v", a.zoom)
+	}
+	tt.TypeKey(ui.Cmd, ui.KeyMinus, "")
+	if a.zoom >= 1 {
+		t.Fatalf("zoom out left %v", a.zoom)
+	}
+}

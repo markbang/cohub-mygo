@@ -187,6 +187,7 @@ type app struct {
 	find         findState
 	focusDraft   bool
 	badge        int // the unread count last shown on the app icon
+	zoom         float32
 	md           markdown.Options
 	mdTheme      *markdown.Theme
 	mdThemeKey   string
@@ -223,6 +224,7 @@ func newApp() *app {
 		seen:           map[string]time.Time{},
 		scrollMemory:   map[string]chatScroll{},
 		selectedChat:   -1,
+		zoom:           1,
 		groupsOpen:     map[string]bool{"labels": true, "chats": true, "all": true, "saves": true},
 		menus:          map[string]bool{},
 		foldOpen:       map[string]bool{},
@@ -270,6 +272,9 @@ func newApp() *app {
 		a.prefs.load()
 		if a.prefs.Theme != "" {
 			a.theme = a.prefs.Theme
+		}
+		if a.prefs.Zoom > 0 {
+			a.zoom = clampZoom(a.prefs.Zoom)
 		}
 		a.sidebarW = clampPane(a.prefs.SidebarWidth, sidebarWidth, sidebarMin, sidebarMax)
 		a.panelW = clampPane(a.prefs.PanelWidth, panelWidth, panelMin, panelMax)
