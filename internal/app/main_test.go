@@ -1419,3 +1419,22 @@ func TestAppMenu(t *testing.T) {
 		t.Fatalf("New Chat left route %v", a.route)
 	}
 }
+
+// A launch opens the chat the window last showed, not the newest one.
+func TestRestoresLastChat(t *testing.T) {
+	a := demoApp(t)
+	a.prefs.LastSession, a.prefs.LastSpace = "demo-3", "s2"
+	ui.NewTester(a.view, 1440, 900)
+	if a.route.sessionID() != "demo-3" || a.route.kind != routeSpaceSession {
+		t.Fatalf("opened %+v, want demo-3 in s2", a.route)
+	}
+	b := demoApp(t)
+	ui.NewTester(b.view, 1440, 900)
+	if b.route.sessionID() != "demo-0" {
+		t.Fatalf("without a last chat opened %q", b.route.sessionID())
+	}
+	b.openSession(b.session("demo-5"))
+	if b.prefs.LastSession != "demo-5" || b.prefs.LastSpace != "" {
+		t.Fatalf("recorded %q/%q", b.prefs.LastSession, b.prefs.LastSpace)
+	}
+}
