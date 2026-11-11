@@ -87,7 +87,7 @@ func (a *app) sessionView(c *ui.Context) {
 			ui.Column(c).FillWidth().MaxWidth(chatMaxWidth).Margin(0, ui.Auto).Gap(10).Children(func() {
 				a.turnView(c, id, turns[i], tl)
 			})
-		}).Fill().Padding(28, pad, 32, pad).Gap(28).Scrollbars(a.compact).TrackScroll(&a.timelineScroll)
+		}).Fill().Padding(28, pad, 32, pad).Gap(28).TrackScroll(&a.timelineScroll)
 		list.Children(func() {
 			switch {
 			case !tl.loaded && a.api != nil:
@@ -174,7 +174,13 @@ func (a *app) turnRail(c *ui.Context, sessionID string, turns []*cohub.Turn, tl 
 	n := len(turns)
 	line := p.borderSubtle.Alpha(0.65)
 	nav := &a.turnNav
-	rail := ui.Box(c.Key("rail")).Attach(ui.AnchorTopRight, ui.AnchorTopRight).Top(4).Right(4).Width(28).HeightPercent(97).PassThrough()
+	// The rail keeps clear of the desktop scrollbar, which draws over the
+	// timeline's right edge.
+	railRight := float32(4)
+	if !a.compact {
+		railRight += 12
+	}
+	rail := ui.Box(c.Key("rail")).Attach(ui.AnchorTopRight, ui.AnchorTopRight).Top(4).Right(railRight).Width(28).HeightPercent(97).PassThrough()
 	// The rail passes the pointer through: it is hovered over its marks,
 	// its track and the navigator, which are inside it.
 	nav.hold(c, rail.Hovered())
