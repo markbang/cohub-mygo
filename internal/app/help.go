@@ -39,6 +39,7 @@ func (a *app) helpSections() []struct {
 		{m("help_global"), m("help_global_desc"), []helpItem{
 			{m("help_search_everywhere"), [][]string{{mod, "K"}}},
 			{m("help_new_chat"), [][]string{{mod, "N"}}},
+			{m("help_focus_chats"), [][]string{{mod, "⇧", "U"}}},
 			{m("help_toggle_left"), [][]string{{mod, altSymbol(), "←"}}},
 			{m("help_toggle_right"), [][]string{{mod, altSymbol(), "→"}}},
 			{m("help_open_help"), [][]string{{"?"}}},
@@ -251,6 +252,10 @@ func (a *app) signOut() {
 func (a *app) pageKeys(c *ui.Context) {
 	c.OnShortcut(0, ui.KeySlash, func() {})
 	c.OnWindowShortcut(ui.Shift, ui.KeySlash, func() { a.helpOpen = true })
+	c.OnWindowShortcut(ui.Cmd|ui.Shift, ui.KeyU, func() {
+		a.sidebarOpen = true
+		a.focusChats = true
+	})
 	if a.route.sessionID() == "" {
 		return
 	}

@@ -1370,3 +1370,25 @@ func TestChatKeepsScrollPosition(t *testing.T) {
 			a.timelineScroll.Y, a.timelineScroll.MaxY, a.timeline.AtEnd())
 	}
 }
+
+// The chat list takes the keyboard: arrows choose, Enter opens.
+func TestChatListKeyboard(t *testing.T) {
+	a := demoApp(t)
+	tt := ui.NewTester(a.view, 1440, 900)
+	if a.selectedChat != 0 {
+		t.Fatalf("selected %d, want the open chat", a.selectedChat)
+	}
+	tt.TypeKey(ui.Cmd|ui.Shift, ui.KeyU, "")
+	first := a.route.sessionID()
+	tt.Key(0, ui.KeyDown)
+	if a.selectedChat != 1 {
+		t.Fatalf("Down selected %d, want 1", a.selectedChat)
+	}
+	if a.route.sessionID() != first {
+		t.Fatal("Down opened a chat instead of only choosing it")
+	}
+	tt.Key(0, ui.KeyEnter)
+	if a.route.sessionID() == first {
+		t.Fatal("Enter did not open the chosen chat")
+	}
+}

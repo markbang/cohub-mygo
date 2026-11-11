@@ -179,6 +179,10 @@ type app struct {
 	// scrollMemory keeps where each chat was left, so that coming back
 	// does not throw the reader to the end again.
 	scrollMemory map[string]chatScroll
+	// selectedChat is the chat list's keyboard choice, an index into the
+	// rows it shows; focusChats hands it the keyboard for the next frame.
+	selectedChat int
+	focusChats   bool
 	md           markdown.Options
 	mdTheme      *markdown.Theme
 	mdThemeKey   string
@@ -214,6 +218,7 @@ func newApp() *app {
 		loading:        map[string]bool{},
 		seen:           map[string]time.Time{},
 		scrollMemory:   map[string]chatScroll{},
+		selectedChat:   -1,
 		groupsOpen:     map[string]bool{"labels": true, "chats": true, "all": true, "saves": true},
 		menus:          map[string]bool{},
 		foldOpen:       map[string]bool{},
