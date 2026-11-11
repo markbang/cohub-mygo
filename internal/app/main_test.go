@@ -1392,3 +1392,30 @@ func TestChatListKeyboard(t *testing.T) {
 		t.Fatal("Enter did not open the chosen chat")
 	}
 }
+
+// The menu bar has File, View and Help beside the platform's menus.
+func TestAppMenu(t *testing.T) {
+	a := demoApp(t)
+	items := appMenu(a).Items()
+	labels := make([]string, len(items))
+	for i, it := range items {
+		labels[i] = it.Label
+	}
+	want := []string{"", "文件", "", "视图", "", "帮助"}
+	if len(items) != len(want) {
+		t.Fatalf("menus %q", labels)
+	}
+	for i := range want {
+		if want[i] != "" && labels[i] != want[i] {
+			t.Fatalf("menus %q, want %q at %d", labels, want, i)
+		}
+	}
+	file := items[1].Submenu
+	if len(file) < 1 || file[0].Label != "新建对话" {
+		t.Fatalf("File menu %+v", file)
+	}
+	file[0].Click(file[0], nil)
+	if a.route.kind != routeNewSession {
+		t.Fatalf("New Chat left route %v", a.route)
+	}
+}
