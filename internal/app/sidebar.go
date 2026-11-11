@@ -194,9 +194,8 @@ func (a *app) sessionRow(c *ui.Context, tr treeRow, index int) {
 			a.avatarSeed(c, av, name, s.SpaceID, 36, 8)
 		}
 		ui.Column(c).Grow(1).MinWidth(0).Gap(2).Children(func() {
-			ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
+			ui.Row(c).Gap(8).AlignItems(ui.Center).Padding(0, 34, 0, 0).Children(func() {
 				ui.Text(c, tr.title()).FontSize(14).FontWeight(500).TextColor(fg).SingleLine().Grow(1).MinWidth(0)
-				ui.Text(c, relTime(s.When(), now)).FontSize(11).TextColor(second).SingleLine().TextAlign(ui.End).MinWidth(30).Shrink(0)
 			})
 			ui.Row(c).Gap(6).AlignItems(ui.Center).Height(18).Children(func() {
 				if s.Running() {
@@ -218,15 +217,25 @@ func (a *app) sessionRow(c *ui.Context, tr treeRow, index int) {
 	} else {
 		a.pressable(row, false)
 	}
+	// The hover actions take the time's slot: the time goes while they
+	// show, rather than underneath them.
+	if !a.compact && !row.Hovered() {
+		row.Children(func() {
+			t := ui.Box(c.Key("time")).Absolute().Top(6).Right(6).Height(18).AlignItems(ui.End).Justify(ui.End)
+			t.Children(func() {
+				ui.Text(c, relTime(s.When(), now)).FontSize(11).TextColor(second).SingleLine()
+			})
+		})
+	}
 	row.OnClick(func() { a.openSession(s) })
 	row.ContextMenu(func(mn *ui.Menu) { fillMenu(mn, a.sessionMenu(s, false)) })
-	a.rowActions(c, row, s, false)
+	a.rowActions(c, row, s, false, selected)
 }
 
 // rowActions are a chat row's hover buttons, as SessionRow.svelte: insert
 // its reference (in a Space), rename it, archive or restore it. A rename
 // edits the title in a box over the row.
-func (a *app) rowActions(c *ui.Context, row ui.Element, s *cohub.Session, inSpace bool) {
+func (a *app) rowActions(c *ui.Context, row ui.Element, s *cohub.Session, inSpace, selected bool) {
 	p := a.pal
 	if a.rowRenaming == s.ID {
 		row.Children(func() {
@@ -262,9 +271,13 @@ func (a *app) rowActions(c *ui.Context, row ui.Element, s *cohub.Session, inSpac
 	}
 	row.Children(func() {
 		ui.Row(c.Key("actions")).Absolute().Top(0).Bottom(0).Right(6).Gap(2).AlignItems(ui.Center).Children(func() {
+			bg, fg := p.sidebarBg, p.textTertiary
+			if selected {
+				bg, fg = p.brandFg.Alpha(0.18), p.brandFg
+			}
 			btn := func(key, ic, label string) bool {
-				b := ui.ButtonBase(c.Key(key)).Size(24, 24).Center().Radius(5).Background(p.sidebarBg).Label(label).Tooltip(label).FocusRing(false).Children(func() {
-					ui.Icon(c, icon(ic)).Size(13, 13).TextColor(p.textTertiary)
+				b := ui.ButtonBase(c.Key(key)).Size(24, 24).Center().Radius(5).Background(bg).Label(label).Tooltip(label).FocusRing(false).Children(func() {
+					ui.Icon(c, icon(ic)).Size(13, 13).TextColor(fg)
 				})
 				if b.Hovered() {
 					b.Background(p.hoverStrong)
@@ -574,7 +587,7 @@ func (a *app) spaceSessionTreeRow(c *ui.Context, tr treeRow) {
 	row.Cursor(ui.CursorPointer)
 	row.OnClick(func() { a.openSession(s) })
 	row.ContextMenu(func(mn *ui.Menu) { fillMenu(mn, a.sessionMenu(s, true)) })
-	a.rowActions(c, row, s, true)
+	a.rowActions(c, row, s, true, false)
 }
 
 // labelRow is a label of the tree, which opens into the chats it holds.
