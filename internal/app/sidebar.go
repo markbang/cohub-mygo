@@ -175,7 +175,7 @@ func (a *app) sessionRow(c *ui.Context, tr treeRow) {
 				if s.Running() {
 					a.runningPill(c, s.ActiveTurn.StartedAt)
 				}
-				ui.Text(c, preview(s.LatestMessageText)).FontSize(12).TextColor(p.textTertiary).SingleLine().Grow(1).MinWidth(0)
+				ui.Text(c, a.previewOf(s.LatestMessageText)).FontSize(12).TextColor(p.textTertiary).SingleLine().Grow(1).MinWidth(0)
 				if a.unread(s) {
 					a.dot(c, p.errorC, 6)
 				}
@@ -617,9 +617,14 @@ func sourceLabel(src string) string {
 // sourceKey is a chat's source as the inbox sorts them, as the server's
 // resolveSessionSourceKey: "channel:feishu" is Feishu's, an unknown one
 // "other".
+var (
+	sourceSpaceRe   = regexp.MustCompile(`[\s-]+`)
+	sourceChannelRe = regexp.MustCompile(`^channel[:_](.+)$`)
+)
+
 func sourceKey(src string) string {
 	raw := strings.ToLower(strings.TrimSpace(src))
-	raw = regexp.MustCompile(`[\s-]+`).ReplaceAllString(raw, "_")
+	raw = sourceSpaceRe.ReplaceAllString(raw, "_")
 	switch raw {
 	case "", "web_app":
 		return "web"
@@ -629,7 +634,7 @@ func sourceKey(src string) string {
 		return raw
 	}
 	ch := strings.Split(raw, ":")[0]
-	if mm := regexp.MustCompile(`^channel[:_](.+)$`).FindStringSubmatch(raw); mm != nil {
+	if mm := sourceChannelRe.FindStringSubmatch(raw); mm != nil {
 		ch = mm[1]
 	}
 	if ch != raw && known(ch) {

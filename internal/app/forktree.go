@@ -24,6 +24,16 @@ type treeRow struct {
 
 const treeMaxDepth = 4
 
+// rowsCache is the inbox tree the view last built, for a model generation,
+// chip and filter: the tree is O(chats) and the sidebar asks each frame.
+type rowsCache struct {
+	gen    uint64
+	chip   string
+	filter string
+	rows   []treeRow
+	valid  bool
+}
+
 func forkTree(list []*cohub.Session, forks []cohub.SessionFork) []treeRow {
 	byID := map[string]*cohub.Session{}
 	for _, s := range list {

@@ -58,6 +58,8 @@ func probeWebRTC(w *mygo.Window) {
 // Run starts the app and returns when it quits.
 func Run() error {
 	a := newApp()
+	a.startAt = time.Now()
+	a.perf = os.Getenv("COHUB_PERF") != ""
 	useUpdates(a)
 	mygo.App.WhenReady(func() {
 		setMenu()

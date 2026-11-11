@@ -26,7 +26,7 @@ import (
 	"cohub-mygo/internal/i18n"
 )
 
-func demoApp(t *testing.T) *app {
+func demoApp(t testing.TB) *app {
 	t.Helper()
 	a := newApp()
 	a.seenPath, a.cachePath = "", ""

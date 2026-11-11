@@ -164,6 +164,13 @@ type app struct {
 	sessionList ui.ListState
 	spaceList   ui.ListState
 	timeline    ui.ListState
+	gen         uint64 // bumped on every model update, which the view's caches key on
+	perf        bool   // COHUB_PERF: log the launch's first frame
+	startAt     time.Time
+	firstFrame  bool
+	rows        rowsCache
+	previewRows map[string]string
+	initialsRow map[string]string
 	md          markdown.Options
 	mdTheme     *markdown.Theme
 	mdThemeKey  string
@@ -261,10 +268,11 @@ func newApp() *app {
 // it runs fn at once.
 func (a *app) update(fn func()) {
 	if a.win == nil {
+		a.gen++
 		fn()
 		return
 	}
-	a.win.Update(fn)
+	a.win.Update(func() { a.gen++; fn() })
 }
 
 // spawn runs slow work off the main thread, or queues it for flush in tests.
@@ -798,11 +806,17 @@ func (a *app) chatSpaces() []*cohub.Space {
 // visibleRows are the visible chats as the inbox lists them: forks under
 // the chat they were forked from.
 func (a *app) visibleRows() []treeRow {
+	key := rowsCache{gen: a.gen, chip: a.chip, filter: a.chats.key()}
+	if a.rows.valid && a.rows.gen == key.gen && a.rows.chip == key.chip && a.rows.filter == key.filter {
+		return a.rows.rows
+	}
 	forks := a.inboxForks
 	if f, ok := a.chipForks["chip:"+a.chip+":"+a.chats.key()]; ok && a.chip != "" {
 		forks = f
 	}
-	return forkTree(a.visibleSessions(), forks)
+	key.rows, key.valid = forkTree(a.visibleSessions(), forks), true
+	a.rows = key
+	return key.rows
 }
 
 func (a *app) visibleSessions() []*cohub.Session {
